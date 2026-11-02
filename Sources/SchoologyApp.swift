@@ -54,7 +54,6 @@ enum AppDestination: String, CaseIterable, Identifiable {
 enum SchoologyStyle {
     static let blue = Color(red: 0.0, green: 0.39, blue: 0.67)
     static let deepBlue = Color(red: 0.0, green: 0.13, blue: 0.22)
-    static let canvas = Color(uiColor: .systemGroupedBackground)
 }
 
 #if os(macOS)
