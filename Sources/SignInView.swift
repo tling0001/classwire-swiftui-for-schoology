@@ -152,40 +152,25 @@ struct SignInView: View {
 
     private var actionButtons: some View {
         VStack(spacing: 12) {
-                loginAction(
-                    title: "Continue with your school",
-                    subtitle: "Find your school to get started",
-                    systemImage: "building.2",
-                    prominent: true
-                ) {
-                    mode = .school
-                }
-
-                loginAction(
-                    title: "Sign in with username",
-                    subtitle: "Use your Schoology account details",
-                    systemImage: "person.crop.circle",
-                    prominent: false
-                ) {
-                    selectedSchool = nil
-                    mode = .credentials
-                }
+            loginAction(
+                title: "Continue with your school",
+                subtitle: "Find your school to get started",
+                systemImage: "building.2",
+                prominent: true
+            ) {
+                mode = .school
             }
 
-            Spacer(minLength: 28)
-
-            HStack(spacing: 7) {
-                Image(systemName: "lock.shield")
-                    .font(.caption)
-                Text("Secure sign in to your school account")
-                    .font(.footnote)
+            loginAction(
+                title: "Sign in with username",
+                subtitle: "Use your Schoology account details",
+                systemImage: "person.crop.circle",
+                prominent: false
+            ) {
+                selectedSchool = nil
+                mode = .credentials
             }
-            .foregroundStyle(.tertiary)
-            .padding(.bottom, 18)
         }
-        .padding(.horizontal, 28)
-        .padding(.top, 24)
-        .padding(.bottom, 12)
     }
 
     @ViewBuilder
