@@ -24,7 +24,8 @@ actor SchoologyAPI {
     private let mobileCookie = "s_mobile=03447c0175ac0c7299a5508fde9569fc"
     private let userAgent = "okhttp/4.8.0"
     private var timeOffset: Int64 = 0
-    var useCanadianServer = false
+    private var useCanadianServer = false
+    func setCanadianServer(_ enabled: Bool) { useCanadianServer = enabled }
 
     private var apiHost: String { useCanadianServer ? "api.schoologyca.com" : "api.schoology.com" }
     private var webHost: String { useCanadianServer ? "app.schoologyca.com" : "app.schoology.com" }
@@ -32,7 +33,7 @@ actor SchoologyAPI {
     func searchSchools(_ query: String) async throws -> [SchoologySchool] {
         guard !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return [] }
         let url = URL(string: "https://\(apiHost)/v1/login/school_search?query=\(query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")")!
-        let data = try await send(url: url, method: "GET", body: nil, auth: nil, signed: true, extra: [])
+        let data = try await send(url: url, method: "GET", body: nil, auth: nil, signed: false, extra: [])
         let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
         return (json?["school"] as? [[String: Any]] ?? []).compactMap(SchoologySchool.init)
     }
@@ -62,8 +63,9 @@ actor SchoologyAPI {
     }
 
     func currentUser(auth: SchoologyAuth) async throws -> SchoologyUser {
-        let json = try await get("users/me", auth: auth)
-        guard let id = json["id"] else { throw SchoologyAPIError.invalidResponse }
+        let data = try await get("users/me", auth: auth)
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let id = json["id"] else { throw SchoologyAPIError.invalidResponse }
         return SchoologyUser(
             id: String(describing: id),
             nameDisplay: json["name_display"] as? String ?? json["name"] as? String ?? "Schoology user",
@@ -71,17 +73,17 @@ actor SchoologyAPI {
         )
     }
 
-    func get(_ path: String, auth: SchoologyAuth, params: [String: String] = [:]) async throws -> [String: Any] {
+    func get(_ path: String, auth: SchoologyAuth, params: [String: String] = [:]) async throws -> Data {
         var components = URLComponents(string: "https://\(apiHost)/v1/\(path)")!
         components.queryItems = params.sorted { $0.key < $1.key }.map { URLQueryItem(name: $0.key, value: $0.value) }
         guard let url = components.url else { throw SchoologyAPIError.invalidResponse }
-        let data = try await send(url: url, method: "GET", body: nil, auth: auth, signed: true, extra: [])
-        return try JSONSerialization.jsonObject(with: data) as? [String: Any] ?? [:]
+        return try await send(url: url, method: "GET", body: nil, auth: auth, signed: true, extra: [])
     }
 
     private func requestToken() async throws -> SchoologyAuth {
         let url = URL(string: "https://\(apiHost)/v1/oauth/request_token")!
-        let data = try await send(url: url, method: "GET", body: nil, auth: nil, signed: true, extra: [])
+        let emptyAuth = SchoologyAuth(token: "", secret: "", userID: "")
+        let data = try await send(url: url, method: "GET", body: nil, auth: emptyAuth, signed: true, extra: [])
         let values = parseForm(String(decoding: data, as: UTF8.self))
         guard let token = values["oauth_token"], let secret = values["oauth_token_secret"] else { throw SchoologyAPIError.invalidToken }
         return SchoologyAuth(token: token, secret: secret, userID: "")
@@ -140,7 +142,7 @@ actor SchoologyAPI {
         let normalized = pairs.map { "\($0.0)=\($0.1)" }.joined(separator: "&")
         let baseURL = "\(url.scheme ?? "https")://\(url.host ?? "")\(url.path)"
         let base = "\(method.uppercased())&\(oauthEncode(baseURL))&\(oauthEncode(normalized))"
-        let signingKey = "\(oauthEncode(consumerSecret))&\(oauthEncode(auth?.secret ?? ""))"
+        let signingKey = "\(consumerSecret)&\(auth?.secret ?? "")"
         let key = SymmetricKey(data: Data(signingKey.utf8))
         let signature = HMAC<Insecure.SHA1>.authenticationCode(for: Data(base.utf8), using: key)
         let encodedSignature = Data(signature).base64EncodedString()
@@ -172,7 +174,9 @@ actor SchoologyAPI {
         values.keys.sorted().map { "\(oauthEncode($0))=\(oauthEncode(values[$0] ?? ""))" }.joined(separator: "&")
     }
 
-    private func oauthEncode(_ value: String) -> String {
-        value.addingPercentEncoding(withAllowedCharacters: CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_.~")) ?? value
+    private func oauthEncode(_ value: String) -> String { encodeOAuthBytes(value) }
+
+    private func encodeOAuthBytes(_ value: String) -> String {
+        encodeOAuthBytes(value)
     }
 }
