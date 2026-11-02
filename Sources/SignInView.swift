@@ -159,7 +159,10 @@ struct SignInView: View {
         }
         searching = true
         defer { searching = false }
-        do { schools = try await SchoologyAPI.shared.searchSchools(query) }
+        do {
+            await SchoologyAPI.shared.setCanadianServer(canadian)
+            schools = try await SchoologyAPI.shared.searchSchools(query)
+        }
         catch { session.errorMessage = error.localizedDescription }
     }
 }
