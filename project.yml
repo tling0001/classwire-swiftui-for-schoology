@@ -10,9 +10,6 @@ settings:
     SWIFT_VERSION: "6.0"
     PRODUCT_NAME: Schoology
     INFOPLIST_KEY_CFBundleDisplayName: Schoology
-    INFOPLIST_KEY_CFBundleURLTypes:
-      - CFBundleURLSchemes:
-          - schoology
     GENERATE_INFOPLIST_FILE: YES
     CODE_SIGN_STYLE: Automatic
 targets:
@@ -42,4 +39,5 @@ targets:
         MACOSX_DEPLOYMENT_TARGET: "15.0"
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.education
         ENABLE_APP_SANDBOX: YES
+        CODE_SIGN_ENTITLEMENTS: Config/Schoology.entitlements
         ENABLE_HARDENED_RUNTIME: YES
