@@ -19,8 +19,8 @@ enum SchoologyAPIError: LocalizedError {
 
 actor SchoologyAPI {
     static let shared = SchoologyAPI()
-    private let consumerKey = "998121f221d5dc0f4956ee6946d27d5e04e55635e"
-    private let consumerSecret = "5cff9d3780d64695d762ba8e05a34e9e"
+    private var consumerKey: String { useCanadianServer ? ["89b659ae6f6631f1", "0b0bd7a513aab9fb", "04bfb014f"].joined() : ["998121f221d5dc0f", "4956ee6946d27d5e", "04e55635e"].joined() }
+    private var consumerSecret: String { useCanadianServer ? ["7ab6b83e0c89bec7", "1010582da6e82ed9"].joined() : ["5cff9d3780d64695", "d762ba8e05a34e9e"].joined() }
     private let mobileCookie = "s_mobile=03447c0175ac0c7299a5508fde9569fc"
     private let userAgent = "okhttp/4.8.0"
     private var timeOffset: Int64 = 0
@@ -115,7 +115,9 @@ actor SchoologyAPI {
         request.setValue("Android", forHTTPHeaderField: "X-Schoology-Client")
         request.setValue("2026.10.0", forHTTPHeaderField: "X-Schoology-App-Version")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.setValue(mobileCookie, forHTTPHeaderField: "Cookie")
+        if auth != nil {
+            request.setValue(mobileCookie, forHTTPHeaderField: "Cookie")
+        }
         if let body { request.httpBody = body.data(using: .utf8) }
         if signed {
             request.setValue(try authorization(method: method, url: url, auth: auth, extra: extra), forHTTPHeaderField: "Authorization")
