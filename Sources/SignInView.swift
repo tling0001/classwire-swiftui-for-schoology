@@ -121,7 +121,37 @@ struct SignInView: View {
 
             Spacer(minLength: 36)
 
-            VStack(spacing: 12) {
+            welcomeActions
+
+            Spacer(minLength: 28)
+
+            HStack(spacing: 7) {
+                Image(systemName: "lock.shield")
+                    .font(.caption)
+                Text("Secure sign in to your school account")
+                    .font(.footnote)
+            }
+            .foregroundStyle(.tertiary)
+            .padding(.bottom, 18)
+        }
+        .padding(.horizontal, 28)
+        .padding(.top, 24)
+        .padding(.bottom, 12)
+    }
+
+    @ViewBuilder
+    private var welcomeActions: some View {
+        if #available(iOS 26, macOS 26, *) {
+            GlassEffectContainer(spacing: 12) {
+                actionButtons
+            }
+        } else {
+            actionButtons
+        }
+    }
+
+    private var actionButtons: some View {
+        VStack(spacing: 12) {
                 loginAction(
                     title: "Continue with your school",
                     subtitle: "Find your school to get started",
@@ -350,11 +380,10 @@ struct SignInView: View {
                     }
                     .frame(maxWidth: .infinity, minHeight: 48)
                 }
-                .buttonStyle(.borderedProminent)
                 .controlSize(.large)
                 .buttonBorderShape(.roundedRectangle(radius: 15))
                 .disabled(username.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || password.isEmpty || session.isLoading)
-                .modifier(AdaptiveLoginGlass(prominent: true))
+                .modifier(AdaptiveLoginButtonStyle(prominent: true))
 
                 Text("By continuing, you’ll connect securely to your school’s Schoology account.")
                     .font(.footnote)
