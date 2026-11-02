@@ -182,7 +182,7 @@ actor SchoologyAPI {
         var output = ""
         for byte in value.utf8 {
             switch byte {
-            case 65...90, 97...122, 48...57, 45, 95, 46: output.append(Character(UnicodeScalar(byte)))
+            case 65...90, 97...122, 48...57, 45, 95, 46: output += String(decoding: [byte], as: UTF8.self)
             case 42: output.append("*")
             case 32: output.append("+")
             default: output += String(format: "%%%02X", byte)
