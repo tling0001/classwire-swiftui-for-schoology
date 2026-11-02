@@ -1,0 +1,45 @@
+name: Schoology
+options:
+  bundleIdPrefix: com.schoologytauri
+  deploymentTarget:
+    iOS: "18.0"
+    macOS: "15.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    PRODUCT_NAME: Schoology
+    INFOPLIST_KEY_CFBundleDisplayName: Schoology
+    INFOPLIST_KEY_CFBundleURLTypes:
+      - CFBundleURLSchemes:
+          - schoology
+    GENERATE_INFOPLIST_FILE: YES
+    CODE_SIGN_STYLE: Automatic
+targets:
+  Schoology-iOS:
+    type: application
+    platform: iOS
+    sources:
+      - path: Sources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.schoologytauri.app
+        TARGETED_DEVICE_FAMILY: "1,2"
+        INFOPLIST_KEY_NSAppTransportSecurity_NSAllowsArbitraryLoads: NO
+        INFOPLIST_KEY_NSCameraUsageDescription: Scan a Schoology QR code to sign in.
+        INFOPLIST_KEY_NSPhotoLibraryUsageDescription: Attach files and images to Schoology assignments.
+        INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        SUPPORTS_MACCATALYST: NO
+  Schoology-macOS:
+    type: application
+    platform: macOS
+    sources:
+      - path: Sources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.schoologytauri.app
+        MACOSX_DEPLOYMENT_TARGET: "15.0"
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.education
+        ENABLE_APP_SANDBOX: YES
+        ENABLE_HARDENED_RUNTIME: YES
