@@ -42,6 +42,7 @@ struct SignInView: View {
                 }
             }
         }
+        .onAppear { canadian = session.canadianServer }
         .alert("Unable to sign in", isPresented: Binding(
             get: { session.errorMessage != nil },
             set: { if !$0 { session.errorMessage = nil } }
