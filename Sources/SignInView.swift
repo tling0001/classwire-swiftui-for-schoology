@@ -47,7 +47,6 @@ struct SignInView: View {
                     .ignoresSafeArea()
             }
             .navigationTitle(navigationTitle)
-            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 if mode != .welcome {
                     ToolbarItem(placement: .cancellationAction) {
@@ -177,7 +176,7 @@ struct SignInView: View {
                         .font(.headline)
                     Text(subtitle)
                         .font(.subheadline)
-                        .foregroundStyle(prominent ? .white.opacity(0.82) : .secondary)
+                        .foregroundStyle(prominent ? Color.white.opacity(0.82) : Color.secondary)
                 }
                 Spacer(minLength: 8)
                 Image(systemName: "arrow.right")
@@ -186,11 +185,10 @@ struct SignInView: View {
             .frame(maxWidth: .infinity, minHeight: 58)
             .contentShape(Rectangle())
         }
-        .buttonStyle(prominent ? .borderedProminent : .bordered)
         .controlSize(.large)
         .buttonBorderShape(.roundedRectangle(radius: 18))
         .accessibilityHint(subtitle)
-        .modifier(AdaptiveLoginGlass(prominent: prominent))
+        .modifier(AdaptiveLoginButtonStyle(prominent: prominent))
     }
 
     private var schoolPicker: some View {
@@ -303,9 +301,7 @@ struct SignInView: View {
                 VStack(spacing: 0) {
                     credentialField(
                         title: "Username or email",
-                        placeholder: "Enter your username or email",
                         icon: "person",
-                        field: .username
                     ) {
                         TextField("Username or email", text: $username)
                             .textContentType(.username)
@@ -321,9 +317,7 @@ struct SignInView: View {
 
                     credentialField(
                         title: "Password",
-                        placeholder: "Enter your password",
                         icon: "lock",
-                        field: .password
                     ) {
                         SecureField("Password", text: $password)
                             .textContentType(.password)
@@ -382,9 +376,7 @@ struct SignInView: View {
 
     private func credentialField<Content: View>(
         title: String,
-        placeholder: String,
         icon: String,
-        field: CredentialField,
         @ViewBuilder content: () -> Content
     ) -> some View {
         HStack(alignment: .center, spacing: 13) {
@@ -446,8 +438,7 @@ struct SignInView: View {
 private struct LoginBackdrop: View {
     var body: some View {
         ZStack {
-            Color(uiColor: .systemGroupedBackground)
-                .opacity(0.75)
+            Color.clear
             RadialGradient(
                 colors: [.primary.opacity(0.055), .clear],
                 center: .top,
@@ -458,16 +449,21 @@ private struct LoginBackdrop: View {
     }
 }
 
-private struct AdaptiveLoginGlass: ViewModifier {
+private struct AdaptiveLoginButtonStyle: ViewModifier {
     let prominent: Bool
 
     @ViewBuilder
     func body(content: Content) -> some View {
         if #available(iOS 26, macOS 26, *) {
-            content
-                .buttonStyle(prominent ? .glassProminent : .glass)
+            if prominent {
+                content.buttonStyle(.glassProminent)
+            } else {
+                content.buttonStyle(.glass)
+            }
+        } else if prominent {
+            content.buttonStyle(.borderedProminent)
         } else {
-            content
+            content.buttonStyle(.bordered)
         }
     }
 }
