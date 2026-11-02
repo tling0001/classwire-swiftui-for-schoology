@@ -46,7 +46,7 @@ final class AppSession {
         errorMessage = nil
         defer { isLoading = false }
         do {
-            api.useCanadianServer = canadian
+            await api.setCanadianServer(canadian)
             let credentials = try await api.login(username: username, password: password, schoolID: schoolID)
             let profile = try await api.currentUser(auth: credentials)
             KeychainStore.save(credentials)
@@ -62,19 +62,22 @@ final class AppSession {
     func refresh() async {
         guard let auth else { return }
         do {
-            async let courseResponse = api.get("sections", auth: auth, params: ["limit": "50", "enrollment_status": "1"])
-            async let groupResponse = api.get("groups", auth: auth, params: ["limit": "50"])
-            async let activityResponse = api.get("users/\(auth.userID)/recent_activity", auth: auth, params: ["limit": "30"])
-            let (courseJSON, groupJSON, activityJSON) = try await (courseResponse, groupResponse, activityResponse)
+            async let activityData = api.get("recent", auth: auth, params: ["start": "0", "limit": "20", "with_attachments": "TRUE", "richtext": "1"])
+            async let courseData = api.get("users/\\(auth.userID)/sections", auth: auth, params: ["limit": "100"])
+            async let groupData = api.get("users/\\(auth.userID)/groups", auth: auth, params: ["limit": "100"])
+            let (activity, course, group) = try await (activityData, courseData, groupData)
+            let activityJSON = Self.object(activity)
+            let courseJSON = Self.object(course)
+            let groupJSON = Self.object(group)
+            activities = SchoologyActivity.decodeList(activityJSON["update"] ?? activityJSON["updates"])
             courses = SchoologyCourse.decodeList(courseJSON["section"] ?? courseJSON["sections"])
             groups = SchoologyGroup.decodeList(groupJSON["group"] ?? groupJSON["groups"])
-            activities = SchoologyActivity.decodeList(activityJSON["recent_activity"] ?? activityJSON["activity"])
         } catch {
             errorMessage = error.localizedDescription
         }
     }
 
-    func signOut() {
+    private static func object(_ data: Data) -> [String: Any] {\n        (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] ?? [:]\n    }\n\n    func signOut() {
         KeychainStore.clear()
         auth = nil
         user = nil
