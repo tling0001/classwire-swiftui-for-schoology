@@ -77,7 +77,11 @@ final class AppSession {
         }
     }
 
-    private static func object(_ data: Data) -> [String: Any] {\n        (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] ?? [:]\n    }\n\n    func signOut() {
+    private static func object(_ data: Data) -> [String: Any] {
+        (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] ?? [:]
+    }
+
+    func signOut() {
         KeychainStore.clear()
         auth = nil
         user = nil
