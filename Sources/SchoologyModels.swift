@@ -6,6 +6,11 @@ struct SchoologyAuth: Codable, Sendable {
     let userID: String
 }
 
+struct SchoologyPendingSchoolLogin: Sendable {
+    let credential: SchoologyAuth
+    let authorizationURL: URL
+}
+
 struct SchoologyUser: Codable, Identifiable, Sendable {
     var id: String
     var nameDisplay: String

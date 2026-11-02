@@ -62,6 +62,74 @@ actor SchoologyAPI {
         return access
     }
 
+    func loginWithQRCode(_ qrCode: String) async throws -> SchoologyAuth {
+        let payload = qrCode.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !payload.isEmpty else { throw SchoologyAPIError.invalidResponse }
+        await syncServerTime()
+        let temporary = try await requestToken()
+        let url = URL(string: "https://\(apiHost)/v1/oauth/qr_code_authorize_auto")!
+        let body = formEncode([
+            "scanned_qr_data": payload,
+            "oauth_token": temporary.token
+        ])
+        _ = try await send(
+            url: url,
+            method: "POST",
+            body: body,
+            auth: temporary,
+            signed: true,
+            extra: [("scanned_qr_data", oauthEncode(payload))]
+        )
+        return try await exchangeToken(temporary)
+    }
+
+    func prepareSchoolBrowserLogin(domain: String) async throws -> SchoologyPendingSchoolLogin {
+        let rawDomain = domain.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !rawDomain.isEmpty,
+              let parsed = URL(string: rawDomain.contains("://") ? rawDomain : "https://\(rawDomain)"),
+              ["http", "https"].contains(parsed.scheme?.lowercased() ?? ""),
+              let host = parsed.host, !host.isEmpty else {
+            throw SchoologyAPIError.invalidResponse
+        }
+
+        await syncServerTime()
+        let temporary = try await requestToken()
+        let callback = "https://\(host)/mobile_login_success?os=android&os_version=34&app_version=600000478"
+        let encodedCallback = androidURIEncode(callback)
+        let landingPath = "oauth/authorize?oauth_token=\(temporary.token)&oauth_callback=\(encodedCallback)"
+
+        var components = URLComponents()
+        components.scheme = "https"
+        components.host = host
+        components.path = "/oauth/authorize"
+        components.queryItems = [
+            URLQueryItem(name: "oauth_token", value: temporary.token),
+            URLQueryItem(name: "oauth_callback", value: callback),
+            URLQueryItem(name: "login_landing_dest", value: landingPath)
+        ]
+        guard let authorizationURL = components.url else { throw SchoologyAPIError.invalidResponse }
+        return SchoologyPendingSchoolLogin(credential: temporary, authorizationURL: authorizationURL)
+    }
+
+    func completeSchoolBrowserLogin(
+        _ pending: SchoologyPendingSchoolLogin,
+        callbackURL: URL
+    ) async throws -> SchoologyAuth {
+        let callbackToken = URLComponents(url: callbackURL, resolvingAgainstBaseURL: false)?
+            .queryItems?.first(where: { $0.name == "request_token" })?.value
+        guard callbackURL.scheme?.lowercased() == "schoology",
+              callbackURL.host?.lowercased() == "external_login_callback",
+              callbackToken == pending.credential.token else {
+            throw SchoologyAPIError.invalidToken
+        }
+        return try await exchangeToken(pending.credential)
+    }
+
+    private func androidURIEncode(_ value: String) -> String {
+        let allowed = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_.!~*'()")
+        return value.addingPercentEncoding(withAllowedCharacters: allowed) ?? value
+    }
+
     func currentUser(auth: SchoologyAuth) async throws -> SchoologyUser {
         let data = try await get("users/me", auth: auth)
         guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -118,7 +186,10 @@ actor SchoologyAPI {
         if auth != nil {
             request.setValue(mobileCookie, forHTTPHeaderField: "Cookie")
         }
-        if let body { request.httpBody = body.data(using: .utf8) }
+        if let body {
+            request.httpBody = body.data(using: .utf8)
+            request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+        }
         if signed {
             request.setValue(try authorization(method: method, url: url, auth: auth, extra: extra), forHTTPHeaderField: "Authorization")
         }

@@ -3,6 +3,7 @@ import SwiftUI
 struct SignInView: View {
     @Environment(AppSession.self) private var session
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.openURL) private var openURL
     @FocusState private var focusedField: CredentialField?
 
     @State private var mode: Mode = .welcome
@@ -18,6 +19,8 @@ struct SignInView: View {
         case welcome
         case school
         case credentials
+        case schoolBrowser
+        case qr
     }
 
     private enum CredentialField: Hashable {
@@ -37,6 +40,12 @@ struct SignInView: View {
                         .transition(.opacity)
                 case .credentials:
                     credentials
+                        .transition(.opacity)
+                case .schoolBrowser:
+                    schoolBrowserProgress
+                        .transition(.opacity)
+                case .qr:
+                    qrLogin
                         .transition(.opacity)
                 }
             }
@@ -76,6 +85,8 @@ struct SignInView: View {
         case .welcome: "Welcome"
         case .school: "Find your school"
         case .credentials: "Sign in"
+        case .schoolBrowser: "Sign in through your school"
+        case .qr: "QR Code Login"
         }
     }
 
@@ -84,6 +95,8 @@ struct SignInView: View {
         case .welcome: 0
         case .school: 1
         case .credentials: 2
+        case .schoolBrowser: 3
+        case .qr: 4
         }
     }
 
@@ -153,8 +166,8 @@ struct SignInView: View {
     private var actionButtons: some View {
         VStack(spacing: 12) {
             loginAction(
-                title: "Continue with your school",
-                subtitle: "Find your school to get started",
+                title: "Sign in through my school",
+                subtitle: "Find your school and use its sign-in page",
                 systemImage: "building.2",
                 prominent: true
             ) {
@@ -162,14 +175,36 @@ struct SignInView: View {
             }
 
             loginAction(
-                title: "Sign in with username",
-                subtitle: "Use your Schoology account details",
+                title: "Sign in with my account",
+                subtitle: "Use your Schoology username and password",
                 systemImage: "person.crop.circle",
                 prominent: false
             ) {
                 selectedSchool = nil
                 mode = .credentials
             }
+
+            loginAction(
+                title: "Sign in with a QR code",
+                subtitle: "Scan the code displayed by Schoology",
+                systemImage: "qrcode.viewfinder",
+                prominent: false
+            ) {
+                session.errorMessage = nil
+                mode = .qr
+            }
+
+            Button {
+                if let url = URL(string: "https://docs.powerschool.com/SGYH/en/students/schoology-mobile-apps/logging-into-the-schoology-mobile-app-students") {
+                    openURL(url)
+                }
+            } label: {
+                Text("I need help signing in")
+                    .font(.footnote.weight(.medium))
+                    .foregroundStyle(.secondary)
+                    .padding(.top, 8)
+            }
+            .buttonStyle(.plain)
         }
     }
 
@@ -260,7 +295,8 @@ struct SignInView: View {
                         ForEach(schools) { school in
                             Button {
                                 selectedSchool = school
-                                mode = .credentials
+                                mode = .schoolBrowser
+                                Task { await signInThroughSchool() }
                             } label: {
                                 HStack(spacing: 13) {
                                     Image(systemName: "building.2.crop.circle")
@@ -423,8 +459,72 @@ struct SignInView: View {
         switch mode {
         case .welcome: break
         case .school: mode = .welcome
-        case .credentials: mode = selectedSchool == nil ? .welcome : .school
+        case .credentials: mode = .welcome
+        case .schoolBrowser: mode = .school
+        case .qr: mode = .welcome
         }
+    }
+
+    private var schoolBrowserProgress: some View {
+        VStack(spacing: 18) {
+            Image(systemName: "building.2.crop.circle")
+                .font(.system(size: 52, weight: .light))
+                .foregroundStyle(.secondary)
+            Text(selectedSchool?.title ?? "Your school")
+                .font(.title2.bold())
+                .multilineTextAlignment(.center)
+            if session.isLoading {
+                ProgressView()
+                Text("Continue signing in in the secure browser window. Schoology will return here when sign-in is complete.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+            } else {
+                Text("School sign-in didn’t complete. You can try again.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                Button("Try school sign-in again") {
+                    Task { await signInThroughSchool() }
+                }
+                .buttonStyle(.borderedProminent)
+            }
+        }
+        .padding(28)
+        .frame(maxWidth: 420)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var qrLogin: some View {
+        VStack(spacing: 18) {
+            VStack(spacing: 6) {
+                Text("Scan Your Code")
+                    .font(.title2.bold())
+                Text("Point your camera at the QR code shown in Schoology.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+            if session.isLoading {
+                ProgressView("Signing in to Schoology…")
+                    .frame(maxWidth: .infinity, minHeight: 260)
+            } else {
+                QRCodeScannerView { value in
+                    Task { await session.signInWithQRCode(value) }
+                }
+                .frame(maxWidth: 440)
+                .frame(height: 300)
+            }
+        }
+        .padding(24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private func signInThroughSchool() async {
+        guard let domain = selectedSchool?.domain, !domain.isEmpty else {
+            session.errorMessage = "This school did not provide a valid login domain."
+            return
+        }
+        await session.signInThroughSchool(domain: domain, canadian: canadian)
     }
 
     private func signIn() {

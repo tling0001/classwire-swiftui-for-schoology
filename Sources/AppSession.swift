@@ -17,6 +17,7 @@ final class AppSession {
     var canadianServer = UserDefaults.standard.bool(forKey: "schoology.canadian")
 
     private let api = SchoologyAPI.shared
+    private let schoolBrowserAuthenticator = SchoolBrowserAuthenticator()
 
     init() {
         auth = KeychainStore.loadAuth()
@@ -61,6 +62,44 @@ final class AppSession {
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    func signInWithQRCode(_ qrCode: String) async {
+        isLoading = true
+        errorMessage = nil
+        defer { isLoading = false }
+        do {
+            let credentials = try await api.loginWithQRCode(qrCode)
+            try await establishSession(credentials)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func signInThroughSchool(domain: String, canadian: Bool) async {
+        isLoading = true
+        errorMessage = nil
+        defer { isLoading = false }
+        do {
+            canadianServer = canadian
+            UserDefaults.standard.set(canadian, forKey: "schoology.canadian")
+            await api.setCanadianServer(canadian)
+            let pending = try await api.prepareSchoolBrowserLogin(domain: domain)
+            let callback = try await schoolBrowserAuthenticator.authenticate(using: pending.authorizationURL)
+            let credentials = try await api.completeSchoolBrowserLogin(pending, callbackURL: callback)
+            try await establishSession(credentials)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func establishSession(_ credentials: SchoologyAuth) async throws {
+        let profile = try await api.currentUser(auth: credentials)
+        KeychainStore.save(credentials)
+        auth = credentials
+        user = profile
+        destination = .home
+        await refresh()
     }
 
     func refresh() async {

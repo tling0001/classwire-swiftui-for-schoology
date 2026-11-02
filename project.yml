@@ -30,6 +30,8 @@ targets:
         INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         SUPPORTS_MACCATALYST: NO
+    info:
+      path: Config/Info.plist
   Schoology-macOS:
     type: application
     platform: macOS
@@ -40,5 +42,8 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.schoologytauri.app
         MACOSX_DEPLOYMENT_TARGET: "15.0"
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.education
+        INFOPLIST_KEY_NSCameraUsageDescription: Scan a Schoology QR code to sign in.
         ENABLE_APP_SANDBOX: NO
         ENABLE_HARDENED_RUNTIME: YES
+    info:
+      path: Config/Info.plist
