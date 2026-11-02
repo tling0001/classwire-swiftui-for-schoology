@@ -3,11 +3,14 @@ import SwiftUI
 @main
 struct SchoologyApp: App {
     @State private var session = AppSession()
+    @State private var updateService = AppUpdateService()
 
     var body: some Scene {
         WindowGroup {
             RootView()
                 .environment(session)
+                .environment(updateService)
+                .task { await updateService.checkForUpdates() }
                 .tint(SchoologyStyle.blue)
                 .preferredColorScheme(session.appearance.colorScheme)
         }

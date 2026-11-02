@@ -29,20 +29,15 @@ Schoology-specific implementation should be grounded in those supplied sources r
 - Native appearance settings, system/light/dark theme support, and reduced-motion-aware shell transitions.
 - macOS menu commands and keyboard shortcuts.
 
-This is the first implementation milestone, not a feature-complete port. District SSO/browser handoff, QR login, messages, notifications, requests, resources, grades, calendar, course/group detail pages, assignment submission, PDF annotation, push notifications, and signed release packaging remain to be ported.
+This is the first implementation milestone, not a feature-complete port. District SSO/browser handoff, QR login, messages, notifications, requests, resources, grades, calendar, course/group detail pages, assignment submission, PDF annotation, and push notifications remain to be ported.
 
-## Build locally
+## Builds and releases
 
-Install Xcode and XcodeGen, then:
+GitHub Actions builds the native macOS app as a universal Apple Silicon/Intel Developer ID package, notarizes the app and DMG, and exports a signed iOS Ad Hoc IPA for registered devices. Releases include versioned macOS DMG/ZIP files, the iOS IPA, an installation manifest, and a QR code.
 
-```sh
-brew install xcodegen
-xcodegen generate
-xcodebuild -project Schoology.xcodeproj -scheme Schoology-macOS -configuration Debug -destination 'platform=macOS' build
-xcodebuild -project Schoology.xcodeproj -scheme Schoology-iOS -configuration Debug -destination 'generic/platform=iOS Simulator' build
-```
+The release version is stored in `VERSION` as `2026.10.0-port.1`. Increment the `-port.N` value for each new port release and add a matching `## [version]` section to `RELEASE_NOTES.md`. The workflow uses the numeric marketing version and port number as the Apple bundle version/build number, while GitHub release tags retain the complete `-port.N` suffix.
 
-GitHub Actions performs unsigned macOS and iOS Simulator build validation. Local builds are not part of the current project workflow.
+The iOS update action opens Apple's `itms-services` installation flow for the Ad Hoc manifest. iOS requires a registered device and user confirmation; the app cannot silently replace itself. On macOS, Download Update opens the signed DMG for the user to install.
 
 ## Apple signing configuration
 

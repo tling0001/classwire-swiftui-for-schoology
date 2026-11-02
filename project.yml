@@ -8,6 +8,8 @@ options:
 settings:
   base:
     SWIFT_VERSION: "6.0"
+    MARKETING_VERSION: "2026.10.0"
+    CURRENT_PROJECT_VERSION: "1"
     PRODUCT_NAME: Schoology
     INFOPLIST_KEY_CFBundleDisplayName: Schoology
     GENERATE_INFOPLIST_FILE: YES

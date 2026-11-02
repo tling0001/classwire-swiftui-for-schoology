@@ -2,7 +2,7 @@ import SwiftUI
 
 struct SignInView: View {
     @Environment(AppSession.self) private var session
-    @Environment(\\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @FocusState private var focusedField: CredentialField?
 
     @State private var mode: Mode = .welcome
