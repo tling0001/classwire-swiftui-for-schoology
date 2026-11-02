@@ -177,6 +177,15 @@ actor SchoologyAPI {
     private func oauthEncode(_ value: String) -> String { encodeOAuthBytes(value) }
 
     private func encodeOAuthBytes(_ value: String) -> String {
-        encodeOAuthBytes(value)
+        var output = ""
+        for byte in value.utf8 {
+            switch byte {
+            case 65...90, 97...122, 48...57, 45, 95, 46: output.append(Character(UnicodeScalar(byte)))
+            case 42: output.append("*")
+            case 32: output.append("+")
+            default: output += String(format: "%%%02X", byte)
+            }
+        }
+        return output
     }
 }
