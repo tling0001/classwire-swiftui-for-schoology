@@ -14,6 +14,7 @@ final class AppSession {
     var groups: [SchoologyGroup] = []
     var activities: [SchoologyActivity] = []
     var appearance: AppAppearance = .system
+    var canadianServer = UserDefaults.standard.bool(forKey: "schoology.canadian")
 
     private let api = SchoologyAPI.shared
 
@@ -30,6 +31,7 @@ final class AppSession {
         isLoading = true
         defer { isLoading = false }
         do {
+            await api.setCanadianServer(canadianServer)
             let profile = try await api.currentUser(auth: credentials)
             auth = credentials
             user = profile
@@ -46,6 +48,8 @@ final class AppSession {
         errorMessage = nil
         defer { isLoading = false }
         do {
+            canadianServer = canadian
+            UserDefaults.standard.set(canadian, forKey: "schoology.canadian")
             await api.setCanadianServer(canadian)
             let credentials = try await api.login(username: username, password: password, schoolID: schoolID)
             let profile = try await api.currentUser(auth: credentials)
