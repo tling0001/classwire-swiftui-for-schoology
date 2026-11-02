@@ -38,6 +38,5 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.schoologytauri.app
         MACOSX_DEPLOYMENT_TARGET: "15.0"
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.education
-        ENABLE_APP_SANDBOX: YES
-        CODE_SIGN_ENTITLEMENTS: Config/Schoology.entitlements
+        ENABLE_APP_SANDBOX: NO
         ENABLE_HARDENED_RUNTIME: YES
