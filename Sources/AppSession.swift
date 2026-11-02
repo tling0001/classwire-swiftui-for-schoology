@@ -63,8 +63,8 @@ final class AppSession {
         guard let auth else { return }
         do {
             async let activityData = api.get("recent", auth: auth, params: ["start": "0", "limit": "20", "with_attachments": "TRUE", "richtext": "1"])
-            async let courseData = api.get("users/\\(auth.userID)/sections", auth: auth, params: ["limit": "100"])
-            async let groupData = api.get("users/\\(auth.userID)/groups", auth: auth, params: ["limit": "100"])
+            async let courseData = api.get("users/\(auth.userID)/sections", auth: auth, params: ["limit": "100"])
+            async let groupData = api.get("users/\(auth.userID)/groups", auth: auth, params: ["limit": "100"])
             let (activity, course, group) = try await (activityData, courseData, groupData)
             let activityJSON = Self.object(activity)
             let courseJSON = Self.object(course)
