@@ -33,7 +33,7 @@ This is the first implementation milestone, not a feature-complete port. Distric
 
 ## Builds and releases
 
-GitHub Actions builds the native macOS app as a universal Apple Silicon/Intel Developer ID package, notarizes the app and DMG, and exports a signed iOS Ad Hoc IPA for registered devices. Releases include versioned macOS DMG/ZIP files, the iOS IPA, an installation manifest, and a QR code.
+GitHub Actions builds the native macOS app as a universal Apple Silicon/Intel Developer ID package, notarizes the app and DMG, and exports a signed iOS Ad Hoc IPA for registered devices. Releases include the versioned macOS DMG, the iOS IPA, an installation manifest, and a QR code.
 
 The release version is stored in `VERSION` as `2026.10.0-port.1`. Increment the `-port.N` value for each new port release and add a matching `## [version]` section to `RELEASE_NOTES.md`. The workflow uses the numeric marketing version and port number as the Apple bundle version/build number, while GitHub release tags retain the complete `-port.N` suffix.
 

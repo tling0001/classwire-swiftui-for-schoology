@@ -107,7 +107,6 @@ jobs:
           xcrun notarytool submit "$RUNNER_TEMP/Schoology-notarization.zip" --apple-id "$APPLE_ID" --password "$APPLE_APP_SPECIFIC_PASSWORD" --team-id "$APPLE_TEAM_ID" --wait
           xcrun stapler staple "$APP"
           xcrun stapler validate "$APP"
-          ditto -c -k --sequesterRsrc --keepParent "$APP" "release-macos/Schoology-$VERSION-macOS.zip"
           cp -R "$APP" release-macos/dmg-root/
           ln -s /Applications release-macos/dmg-root/Applications
           hdiutil create -volname Schoology -srcfolder release-macos/dmg-root -ov -format UDZO "release-macos/Schoology-$VERSION-macOS.dmg"
@@ -313,7 +312,6 @@ jobs:
           test -s "release-assets/Schoology-$VERSION-iOS-Install-QR.png"
           if [ "${{ inputs.ios_adhoc_only }}" != "true" ]; then
             test -s "release-assets/Schoology-$VERSION-macOS.dmg"
-            test -s "release-assets/Schoology-$VERSION-macOS.zip"
           fi
           find release-assets -maxdepth 1 -type f -printf '%f\n' | sort
       - name: Publish GitHub Release

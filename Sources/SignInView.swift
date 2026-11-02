@@ -222,9 +222,11 @@ struct SignInView: View {
                     .foregroundStyle(.secondary)
                 TextField("School name or domain", text: $searchText)
                     .textContentType(.organizationName)
+                    #if os(iOS)
                     .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
                     .submitLabel(.search)
+                    #endif
+                    .autocorrectionDisabled()
                     .onSubmit { Task { await searchSchools(searchText) } }
                     .onChange(of: searchText) { _, value in
                         Task { await searchSchools(value) }
@@ -320,10 +322,12 @@ struct SignInView: View {
                     ) {
                         TextField("Username or email", text: $username)
                             .textContentType(.username)
+                            #if os(iOS)
                             .textInputAutocapitalization(.never)
+                            .submitLabel(.next)
+                            #endif
                             .autocorrectionDisabled()
                             .focused($focusedField, equals: .username)
-                            .submitLabel(.next)
                             .onSubmit { focusedField = .password }
                     }
 
@@ -337,7 +341,9 @@ struct SignInView: View {
                         SecureField("Password", text: $password)
                             .textContentType(.password)
                             .focused($focusedField, equals: .password)
+                            #if os(iOS)
                             .submitLabel(.go)
+                            #endif
                             .onSubmit { signIn() }
                     }
                 }

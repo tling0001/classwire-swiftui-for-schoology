@@ -16,6 +16,7 @@ struct RootView: View {
         .animation(reduceMotion ? nil : .snappy(duration: 0.24), value: session.isSignedIn)
     }
 
+    @ViewBuilder
     private var signedInShell: some View {
         #if os(macOS)
         NavigationSplitView {
