@@ -230,7 +230,7 @@ actor SchoologyAPI {
 
     func getV2(_ path: String, auth: SchoologyAuth, params: [String: String] = [:]) async throws -> Data {
         var components = URLComponents(string: "https://\(apiHost)/v2/\(path)")!
-        components.queryItems = params.sorted { $0.key < $1.key }.map { URLQueryItem(name: $0.key, value: $1.value) }
+        components.queryItems = params.sorted { $0.key < $1.key }.map { URLQueryItem(name: $0.key, value: $0.value) }
         guard let url = components.url else { throw SchoologyAPIError.invalidResponse }
         return try await send(url: url, method: "GET", body: nil, auth: auth, signed: true, extra: [])
     }

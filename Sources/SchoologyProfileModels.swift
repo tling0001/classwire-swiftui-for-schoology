@@ -29,10 +29,10 @@ struct SchoologyProfileItem: Identifiable, Sendable {
             let lastName = SchoologyValue.string(person["name_last"] ?? person["last_name"] ?? person["nameLast"])
             let preferredName = SchoologyValue.string(person["name_first_preferred"] ?? person["nameFirstPreferred"])
             let displayName = [firstName, lastName].filter { !$0.isEmpty }.joined(separator: " ")
-            let roleValue = item["role"] ?? item["role_name"] ?? item["roleName"] ?? person["role"] ?? person["role_name"] ?? person["roleName"]
+            let roleValue = item["role"] ?? item["role_name"] ?? item["roleName"] ?? item["role_title"] ?? item["roleTitle"] ?? item["position"] ?? item["member_role"] ?? item["memberRole"] ?? person["role"] ?? person["role_name"] ?? person["roleName"] ?? person["role_title"] ?? person["roleTitle"] ?? person["position"] ?? person["member_role"] ?? person["memberRole"]
             let roleObject = roleValue as? [String: Any]
             let roleText = SchoologyValue.string(roleObject?["name"] ?? roleObject?["title"] ?? roleObject?["label"] ?? roleValue)
-            let adminFlags: [Any?] = [item["admin"], item["is_admin"], item["isAdmin"], item["group_admin"], item["groupAdmin"], item["is_group_admin"], item["isGroupAdmin"], item["owner"], item["is_owner"], item["isOwner"], person["admin"], person["is_admin"], person["isAdmin"]]
+            let adminFlags: [Any?] = [item["admin"], item["is_admin"], item["isAdmin"], item["group_admin"], item["groupAdmin"], item["is_group_admin"], item["isGroupAdmin"], item["owner"], item["is_owner"], item["isOwner"], person["admin"], person["is_admin"], person["isAdmin"], person["group_admin"], person["groupAdmin"], person["is_group_admin"], person["isGroupAdmin"], person["owner"], person["is_owner"], person["isOwner"]]
             let normalizedRole = roleText.lowercased().replacingOccurrences(of: "_", with: " ").replacingOccurrences(of: "-", with: " ")
             let isAdmin = adminFlags.contains(where: { SchoologyValue.bool($0) }) || ["admin", "administrator", "owner"].contains { normalizedRole.contains($0) }
             let nestedTemplate = item["template"] as? [String: Any] ?? [:]
