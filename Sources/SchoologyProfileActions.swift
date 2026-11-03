@@ -52,7 +52,9 @@ struct GroupProfileActionSheet: View {
                 } else {
                     Section("Resource") {
                         TextField("Schoology resource ID", text: $resourceID)
+                            #if os(iOS)
                             .keyboardType(.numberPad)
+                            #endif
                         Text("Enter the resource ID supplied by Schoology. The app does not guess or create resource IDs.")
                             .font(.footnote).foregroundStyle(.secondary)
                     }

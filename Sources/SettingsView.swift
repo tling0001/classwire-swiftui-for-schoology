@@ -65,6 +65,11 @@ struct SettingsView: View {
             }
 
             Section("Account") {
+                NavigationLink {
+                    SchoologyAccountInfoView()
+                } label: {
+                    Label("Account Info", systemImage: "person.text.rectangle")
+                }
                 if let user = session.user {
                     LabeledContent("Signed in as", value: user.nameDisplay)
                 }

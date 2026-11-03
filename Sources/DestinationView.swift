@@ -92,7 +92,7 @@ struct HomeView: View {
     }
 }
 
-private struct RecentActivityView: View {
+struct RecentActivityView: View {
     let activities: [SchoologyActivity]
 
     var body: some View {
@@ -224,7 +224,7 @@ private struct CourseDashboardCard: View {
 
     var body: some View {
         NavigationLink {
-            CourseDashboardDetailView(course: course)
+            SchoologyCourseProfileView(course: course)
         } label: {
             VStack(alignment: .leading, spacing: 0) {
                 ZStack(alignment: .bottomLeading) {
@@ -274,6 +274,7 @@ private struct CourseDashboardCard: View {
 }
 
 private struct UpcomingEventList: View {
+    @Environment(AppSession.self) private var session
     let events: [SchoologyUpcomingEvent]
 
     var body: some View {
@@ -459,7 +460,7 @@ struct CourseListView: View {
     var body: some View {
         List(session.courses) { course in
             NavigationLink {
-                CourseDashboardDetailView(course: course)
+                SchoologyCourseProfileView(course: course)
             } label: {
                 Label {
                     VStack(alignment: .leading, spacing: 3) {

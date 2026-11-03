@@ -334,7 +334,18 @@ struct SchoologyMessage: Identifiable, Hashable, Sendable {
 
     static func decodeList(_ value: Any?) -> [SchoologyMessage] {
         let payload = (value as? [String: Any]).map { $0["data"] ?? $0["response"] ?? $0 } ?? value
-        let rows = SchoologyValue.list(payload, keys: ["message", "messages", "items", "data", "response"])
+        func threadRows(_ value: Any?) -> [[String: Any]] {
+            if let rows = value as? [[String: Any]] { return rows }
+            guard let object = value as? [String: Any] else { return [] }
+            for key in ["message", "messages", "items", "data", "response"] {
+                guard let nested = object[key] else { continue }
+                if let rows = nested as? [[String: Any]], !rows.isEmpty { return rows }
+                let rows = threadRows(nested)
+                if !rows.isEmpty { return rows }
+            }
+            return object["id"] != nil || object["message_id"] != nil ? [object] : []
+        }
+        let rows = threadRows(payload)
         return rows.compactMap { item in
             guard let rawID = item["id"] ?? item["message_id"] ?? item["messageId"] else { return nil }
             let attachmentRoot = item["attachments"] ?? item["attachment"] ?? [:]
@@ -361,7 +372,7 @@ struct SchoologyMessage: Identifiable, Hashable, Sendable {
                     (item["is_read"] as? Bool == false) ||
                     SchoologyValue.bool(item["unread"]) ||
                     (item["read"] as? Bool == false),
-                authorID: SchoologyValue.optionalString(item["author_id"] ?? item["authorId"] ?? item["user_id"] ?? item["uid"] ?? (item["author"] as? [String: Any])?["id"]),
+                authorID: SchoologyValue.optionalString(item["author_id"] ?? item["authorId"] ?? item["user_id"] ?? item["uid"] ?? item["sender_id"] ?? item["senderId"] ?? (item["author"] as? [String: Any])?["id"] ?? (item["sender"] as? [String: Any])?["id"]),
                 recipientID: SchoologyValue.optionalString(recipientList.split(separator: ",").first.map(String.init)),
                 personName: "",
                 personPictureURL: nil,
@@ -372,6 +383,13 @@ struct SchoologyMessage: Identifiable, Hashable, Sendable {
 
     static func == (lhs: SchoologyMessage, rhs: SchoologyMessage) -> Bool { lhs.id == rhs.id }
     func hash(into hasher: inout Hasher) { hasher.combine(id) }
+}
+
+struct SchoologyWebCookie: Sendable {
+    let name: String
+    let value: String
+    let domain: String
+    let path: String
 }
 
 struct SchoologyNotification: Identifiable, Sendable {

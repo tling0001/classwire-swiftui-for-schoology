@@ -148,14 +148,24 @@ private struct MessageThreadView: View {
                     LazyVStack(alignment: .leading, spacing: 14) {
                         ForEach(thread) { item in
                             VStack(alignment: .leading, spacing: 10) {
-                                HStack {
-                                    Text(item.personName.isEmpty ? "Schoology" : item.personName)
-                                        .font(.subheadline.weight(.semibold))
-                                    Spacer()
-                                    if let date = SchoologyValue.date(item.created) {
-                                        Text(date.formatted(date: .abbreviated, time: .shortened))
-                                            .font(.caption).foregroundStyle(.secondary)
+                                HStack(spacing: 10) {
+                                    if let avatar = item.personPictureURL {
+                                        AuthenticatedSchoologyImage(url: avatar)
+                                            .frame(width: 38, height: 38)
+                                            .clipShape(Circle())
+                                    } else {
+                                        Image(systemName: "person.crop.circle.fill")
+                                            .font(.system(size: 36))
+                                            .foregroundStyle(SchoologyStyle.blue)
                                     }
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        Text(item.personName.isEmpty ? "Schoology" : item.personName)
+                                            .font(.subheadline.weight(.semibold))
+                                        if let date = SchoologyValue.date(item.created) {
+                                            Text(date, style: .relative).font(.caption2).foregroundStyle(.secondary)
+                                        }
+                                    }
+                                    Spacer()
                                 }
                                 Text(item.body.isEmpty ? " " : item.body)
                                     .frame(maxWidth: .infinity, alignment: .leading)

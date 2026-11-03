@@ -127,7 +127,7 @@ struct GroupProfileView: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 12) {
                     switch tab {
-                    case .updates: profileRows(profile.updates, empty: "No group updates")
+                    case .updates: RecentActivityView(activities: profile.updates)
                     case .members: memberRows(profile.members)
                     case .upcoming: ForEach(profile.upcoming) { event in eventCard(event) }
                     case .discussions: profileRows(profile.discussions, empty: "No discussions")
@@ -158,42 +158,64 @@ struct GroupProfileView: View {
     }
 
     private func memberRow(_ item: SchoologyProfileItem) -> some View {
-        HStack(spacing: 10) {
-            Image(systemName: item.isAdmin ? "star.circle.fill" : "person.crop.circle")
-                .foregroundStyle(item.isAdmin ? .yellow : SchoologyStyle.blue).font(.title2)
-            VStack(alignment: .leading) {
-                Text(item.title)
-                if !item.subtitle.isEmpty { Text(item.subtitle).font(.caption).foregroundStyle(.secondary) }
-            }
-            Spacer()
-        }.padding(12).background(.background, in: RoundedRectangle(cornerRadius: 11))
-            .overlay(RoundedRectangle(cornerRadius: 11).strokeBorder(.quaternary))
+        NavigationLink { SchoologyPersonProfileView(userID: item.id) } label: {
+            HStack(spacing: 10) {
+                Image(systemName: item.isAdmin ? "star.circle.fill" : "person.crop.circle")
+                    .foregroundStyle(item.isAdmin ? .yellow : SchoologyStyle.blue).font(.title2)
+                VStack(alignment: .leading) {
+                    Text(item.title)
+                    if !item.subtitle.isEmpty { Text(item.subtitle).font(.caption).foregroundStyle(.secondary) }
+                }
+                Spacer()
+            }.padding(12).background(.background, in: RoundedRectangle(cornerRadius: 11))
+                .overlay(RoundedRectangle(cornerRadius: 11).strokeBorder(.quaternary))
+        }.buttonStyle(.plain)
     }
 
     @ViewBuilder private func profileRows(_ items: [SchoologyProfileItem], empty: String) -> some View {
         if items.isEmpty { ContentUnavailableView(empty, systemImage: "tray") }
         else {
             ForEach(items) { item in
-                VStack(alignment: .leading, spacing: 6) {
-                    Button { selectedDetail = item } label: { Text(item.title).font(.headline).frame(maxWidth: .infinity, alignment: .leading) }.buttonStyle(.plain)
-                    if !item.body.isEmpty { Text(item.body).foregroundStyle(.secondary).textSelection(.enabled) }
-                    if !item.subtitle.isEmpty { Text(item.subtitle).font(.caption).foregroundStyle(.tertiary) }
-                    if let url = item.url { Link(destination: url) { Label("Open attachment", systemImage: "paperclip") }.font(.subheadline) }
-                }.padding(14).frame(maxWidth: .infinity, alignment: .leading)
-                    .background(.background, in: RoundedRectangle(cornerRadius: 12))
-                    .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(.quaternary))
+                NavigationLink {
+                    switch tab {
+                    case .discussions: SchoologyDiscussionDetailView(realm: "groups", realmID: group.id, itemID: item.id, title: item.title)
+                    case .albums: SchoologyAlbumDetailView(groupID: group.id, albumID: item.id, title: item.title)
+                    case .resources: SchoologyResourceFolderView(groupID: group.id, item: item)
+                    default: SchoologyProfileItemDetailSheet(item: item)
+                    }
+                } label: {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(item.title).font(.headline).frame(maxWidth: .infinity, alignment: .leading)
+                        if !item.body.isEmpty { Text(item.body).foregroundStyle(.secondary).textSelection(.enabled) }
+                        if !item.subtitle.isEmpty { Text(item.subtitle).font(.caption).foregroundStyle(.tertiary) }
+                        if item.kind == "folder" { Label("Folder", systemImage: "folder").font(.caption).foregroundStyle(.secondary) }
+                        else if let url = item.url { Label(url.host ?? "Attachment", systemImage: "paperclip").font(.caption).foregroundStyle(.secondary) }
+                    }.padding(14).frame(maxWidth: .infinity, alignment: .leading)
+                        .background(.background, in: RoundedRectangle(cornerRadius: 12))
+                        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(.quaternary))
+                }.buttonStyle(.plain)
             }
         }
     }
 
     private func eventCard(_ event: SchoologyUpcomingEvent) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(event.title).font(.subheadline.weight(.semibold))
-            Text([event.typeLabel,event.date?.formatted(date: .abbreviated,time: .shortened) ?? ""].filter { !$0.isEmpty }.joined(separator: " • "))
-                .font(.caption).foregroundStyle(.secondary)
-        }.padding(11).frame(maxWidth: .infinity, alignment: .leading)
-            .background(.background, in: RoundedRectangle(cornerRadius: 10))
-            .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(.quaternary))
+        NavigationLink {
+            if event.type == "assignment", let assignmentID = event.assignmentID {
+                SchoologyAssignmentDetailView(sectionID: event.sectionID ?? group.id, assignmentID: assignmentID, title: event.title)
+            } else if event.type == "discussion", let discussionID = event.discussionID {
+                SchoologyDiscussionDetailView(realm: "groups", realmID: group.id, itemID: discussionID, title: event.title)
+            } else {
+                SchoologyEventDetailView(realm: "groups", realmID: group.id, eventID: event.id, title: event.title)
+            }
+        } label: {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(event.title).font(.subheadline.weight(.semibold))
+                Text([event.typeLabel,event.date?.formatted(date: .abbreviated,time: .shortened) ?? ""].filter { !$0.isEmpty }.joined(separator: " • "))
+                    .font(.caption).foregroundStyle(.secondary)
+            }.padding(11).frame(maxWidth: .infinity, alignment: .leading)
+                .background(.background, in: RoundedRectangle(cornerRadius: 10))
+                .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(.quaternary))
+        }.buttonStyle(.plain)
     }
 
     private func load() async {
@@ -301,7 +323,20 @@ struct SchoolProfileView: View {
                                 }
                             }
                         }
-                        else { rows(discussions, empty: "No discussions") }
+                        else {
+                            if discussions.isEmpty { ContentUnavailableView("No discussions", systemImage: "bubble.left.and.bubble.right") }
+                            ForEach(discussions) { item in
+                                NavigationLink {
+                                    SchoologyDiscussionDetailView(realm: "schools", realmID: schoolID, itemID: item.id, title: item.title)
+                                } label: {
+                                    VStack(alignment: .leading, spacing: 6) {
+                                        Text(item.title).font(.headline)
+                                        if !item.body.isEmpty { Text(item.body).font(.subheadline).foregroundStyle(.secondary).lineLimit(3) }
+                                    }.padding(14).frame(maxWidth: .infinity, alignment: .leading)
+                                        .background(.background, in: RoundedRectangle(cornerRadius: 12))
+                                }.buttonStyle(.plain)
+                            }
+                        }
                     default: EmptyView()
                     }
                 }.padding()
@@ -323,12 +358,22 @@ struct SchoolProfileView: View {
     }
 
     private func eventCard(_ event: SchoologyUpcomingEvent) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(event.title).font(.subheadline.weight(.semibold))
-            Text([event.typeLabel,event.date?.formatted(date: .abbreviated,time: .shortened) ?? ""].filter { !$0.isEmpty }.joined(separator: " • "))
-                .font(.caption).foregroundStyle(.secondary)
-        }.padding(11).frame(maxWidth: .infinity, alignment: .leading)
-            .background(.background, in: RoundedRectangle(cornerRadius: 10))
+        NavigationLink {
+            if event.type == "assignment", let sectionID = event.sectionID, let assignmentID = event.assignmentID {
+                SchoologyAssignmentDetailView(sectionID: sectionID, assignmentID: assignmentID, title: event.title)
+            } else if event.type == "discussion", let discussionID = event.discussionID {
+                SchoologyDiscussionDetailView(realm: "schools", realmID: schoolID, itemID: discussionID, title: event.title)
+            } else {
+                SchoologyEventDetailView(realm: "schools", realmID: schoolID, eventID: event.id, title: event.title)
+            }
+        } label: {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(event.title).font(.subheadline.weight(.semibold))
+                Text([event.typeLabel,event.date?.formatted(date: .abbreviated,time: .shortened) ?? ""].filter { !$0.isEmpty }.joined(separator: " • "))
+                    .font(.caption).foregroundStyle(.secondary)
+            }.padding(11).frame(maxWidth: .infinity, alignment: .leading)
+                .background(.background, in: RoundedRectangle(cornerRadius: 10))
+        }.buttonStyle(.plain)
     }
 
     private func load() async {

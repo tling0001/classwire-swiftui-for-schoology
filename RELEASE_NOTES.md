@@ -1,5 +1,22 @@
 # Schoology SwiftUI Release Notes
 
+## [2026.10.0-port.10]
+
+### Groups, posts, and profiles
+- Reuse the same shared recent-activity post cards for group updates, including authenticated author images and attachments.
+- Add native group discussion, event, album, resource-folder, and member-profile navigation.
+- Add a dedicated searchable Groups screen.
+
+### Assignments, courses, and upcoming
+- Add native course sections for Materials, Assignments, Updates, Grades, Members, and Upcoming.
+- Add native assignment details and discussion/event detail pages with comment threads and reply posting.
+- Route upcoming items into the matching native detail page where Schoology provides the relevant IDs.
+
+### Messages and account
+- Decode complete message threads and show each author's profile image beside their name.
+- Add Account Info in Settings using the authenticated Schoology shared WebKit session.
+- Fix the macOS resource composer keyboard modifier so the iOS-only keyboard configuration is excluded from macOS compilation.
+
 ## [2026.10.0-port.9]
 
 ### Groups and schools
