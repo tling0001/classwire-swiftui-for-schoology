@@ -1,5 +1,17 @@
 # Schoology SwiftUI Release Notes
 
+## [2026.10.0-port.15]
+
+### Shared comments and likes
+- Add one reusable native comments sheet for update posts, with nested replies, author-profile navigation, attachments, and a composer.
+- Add a shared likes directory for posts and individual comments.
+- Support post Like / Unlike, comment Like / Unlike, reply actions, and live count updates.
+- Use the official update comments, like, and comment-like API routes with OAuth-signed requests.
+- Add realm metadata to recent activity and explicitly scope course/group update posts to their owning section or group.
+
+### Build
+- Increment the iOS and macOS bundle build number to 15.
+
 ## [2026.10.0-port.14]
 
 ### Home and dashboard

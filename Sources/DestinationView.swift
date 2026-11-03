@@ -207,15 +207,8 @@ private struct SchoologyActivityCard: View {
                 }
             }
 
-            if activity.likes > 0 || activity.comments > 0 {
-                Divider()
-                HStack(spacing: 18) {
-                    Label("\(activity.likes)", systemImage: "hand.thumbsup")
-                    Label("\(activity.comments)", systemImage: "bubble.right")
-                    Spacer()
-                }
-                .font(.caption).foregroundStyle(.secondary)
-            }
+            Divider()
+            SchoologyPostActionsView(activity: activity)
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)

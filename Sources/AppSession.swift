@@ -186,7 +186,12 @@ final class AppSession {
     func loadCourseUpdates(courseID: String) async throws -> [SchoologyActivity] {
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         let data = try await api.get("sections/\(courseID)/updates", auth: auth, params: ["start": "0", "limit": "50", "with_attachments": "TRUE", "richtext": "1"])
-        return await hydratedActivityAuthors(SchoologyActivity.decodeList(Self.object(data)), auth: auth)
+        var updates = SchoologyActivity.decodeList(Self.object(data))
+        for index in updates.indices {
+            updates[index].commentRealm = "sections"
+            updates[index].commentRealmID = courseID
+        }
+        return await hydratedActivityAuthors(updates, auth: auth)
     }
 
     func loadCourseAssignments(courseID: String) async throws -> [SchoologyProfileItem] {
@@ -330,6 +335,71 @@ final class AppSession {
         let raw = (json["event"] as? [String: Any]) ?? (json["data"] as? [String: Any]) ?? json
         return SchoologyProfileItem.decodeList(["event": raw], keys: ["event"]).first ??
             SchoologyProfileItem(id: eventID, title: "Event", body: "", subtitle: "", url: nil, isAdmin: false, kind: "event", collectionID: nil)
+    }
+
+    func loadUpdateComments(realm: String, realmID: String, updateID: String) async throws -> [SchoologyComment] {
+        guard let auth else { throw SchoologyAPIError.notSignedIn }
+        let data = try await api.get("\(realm)/\(realmID)/updates/\(updateID)/comments", auth: auth, params: [
+            "start": "0", "limit": "100", "with_attachments": "TRUE", "richtext": "1"
+        ])
+        var comments = SchoologyComment.decodeList(Self.object(data))
+        let missingIDs = Set(comments.filter { $0.authorName.isEmpty || $0.avatarURL == nil }.compactMap(\.authorID))
+            .subtracting([auth.userID])
+        let users = await loadMessageUsers(missingIDs, auth: auth)
+        for index in comments.indices {
+            guard let authorID = comments[index].authorID else { continue }
+            if authorID == auth.userID {
+                if comments[index].authorName.isEmpty { comments[index].authorName = "You" }
+            } else if let user = users[authorID] {
+                if comments[index].authorName.isEmpty { comments[index].authorName = user.nameDisplay }
+                if comments[index].avatarURL == nil { comments[index].avatarURL = user.pictureURL }
+            }
+        }
+        return SchoologyComment.ordered(comments)
+    }
+
+    func postUpdateComment(realm: String, realmID: String, updateID: String, body: String, parentID: String? = nil) async throws {
+        guard let auth else { throw SchoologyAPIError.notSignedIn }
+        _ = try await api.post("\(realm)/\(realmID)/updates/\(updateID)/comments", auth: auth, params: [
+            "comment": body,
+            "parent_id": parentID ?? "0"
+        ])
+    }
+
+    func loadUpdateLikes(updateID: String) async throws -> [SchoologyProfileItem] {
+        guard let auth else { throw SchoologyAPIError.notSignedIn }
+        let data = try await api.get("like/\(updateID)", auth: auth)
+        return SchoologyProfileItem.decodeList(Self.object(data), keys: ["users", "user", "items", "data"])
+    }
+
+    func setUpdateLike(updateID: String, liked: Bool) async throws -> Bool {
+        guard let auth else { throw SchoologyAPIError.notSignedIn }
+        let data = try await api.post("like/\(updateID)", auth: auth, params: [
+            "like_action": liked ? "true" : "false"
+        ])
+        let response = Self.object(data)
+        if let value = response["user_like_action"] ?? response["userLikeAction"] ?? response["liked"] {
+            return SchoologyValue.bool(value)
+        }
+        return liked
+    }
+
+    func loadCommentLikes(updateID: String, commentID: String) async throws -> [SchoologyProfileItem] {
+        guard let auth else { throw SchoologyAPIError.notSignedIn }
+        let data = try await api.get("like/\(updateID)/comment/\(commentID)", auth: auth)
+        return SchoologyProfileItem.decodeList(Self.object(data), keys: ["users", "user", "items", "data"])
+    }
+
+    func setCommentLike(updateID: String, commentID: String, liked: Bool) async throws -> Bool {
+        guard let auth else { throw SchoologyAPIError.notSignedIn }
+        let data = try await api.post("like/\(updateID)/comment/\(commentID)", auth: auth, params: [
+            "like_action": liked ? "true" : "false"
+        ])
+        let response = Self.object(data)
+        if let value = response["user_like_action"] ?? response["userLikeAction"] ?? response["liked"] {
+            return SchoologyValue.bool(value)
+        }
+        return liked
     }
 
     func loadDiscussionComments(realm: String, realmID: String, discussionID: String) async throws -> [SchoologyProfileItem] {
@@ -572,6 +642,10 @@ final class AppSession {
         let (m,u,e,ds,a,r) = await (membersRequest,updatesRequest,eventsRequest,discussionsRequest,albumsRequest,resourcesRequest)
         let raw = Self.object(d); let groupJSON = (raw["group"] as? [String:Any]) ?? raw
         var groupUpdates = SchoologyActivity.decodeList(Self.object(u ?? Data()))
+        for index in groupUpdates.indices {
+            groupUpdates[index].commentRealm = "groups"
+            groupUpdates[index].commentRealmID = group.id
+        }
         groupUpdates = await hydratedActivityAuthors(groupUpdates, auth: auth)
         let requestPaths = ["updates","discussions","events","albums","resources"].map { "/v1/groups/\(group.id)/\($0)" }
         let permissionData = try? await api.postMultiOptions(requestPaths, auth: auth)

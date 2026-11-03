@@ -92,12 +92,38 @@ struct SchoologyActivity: Identifiable, Sendable {
     let imageURLs: [URL]
     let likes: Int
     let comments: Int
+    var commentRealm: String?
+    var commentRealmID: String?
+    let isLiked: Bool
 
     var createdDate: Date? { SchoologyValue.date(created) }
 
     static func decodeList(_ value: Any?) -> [SchoologyActivity] {
         SchoologyValue.list(value, keys: ["update", "updates", "update_list", "items", "data", "response"]).enumerated().map { index, item in
             let authorID = SchoologyValue.optionalString(item["user_id"] ?? item["uid"] ?? item["author_id"] ?? item["authorId"])
+            let rawRealm = SchoologyValue.string(item["realm"] ?? item["realm_name"] ?? item["realmName"], fallback: "user").lowercased()
+            let commentRealm: String
+            switch rawRealm {
+            case "section", "sections": commentRealm = "sections"
+            case "group", "groups": commentRealm = "groups"
+            case "school", "schools": commentRealm = "schools"
+            case "user", "users": commentRealm = "users"
+            default: commentRealm = rawRealm
+            }
+            let rawRealmID: Any?
+            switch rawRealm {
+            case "section", "sections":
+                rawRealmID = item["section_id"] ?? item["sectionId"] ?? item["realm_id"] ?? item["realmId"]
+            case "group", "groups":
+                rawRealmID = item["group_id"] ?? item["groupId"] ?? item["realm_id"] ?? item["realmId"]
+            case "school", "schools":
+                rawRealmID = item["school_id"] ?? item["schoolId"] ?? item["realm_id"] ?? item["realmId"]
+            default:
+                rawRealmID = item["user_id"] ?? item["uid"] ?? item["realm_id"] ?? item["realmId"]
+            }
+            let commentRealmID = SchoologyValue.optionalString(rawRealmID)
+            let likedValues: [Any?] = [item["user_like_action"], item["userLikeAction"], item["userLiked"], item["user_liked"], item["isLiked"], item["is_liked"], item["liked"]]
+            let isLiked = likedValues.contains { SchoologyValue.bool($0) }
             let avatar = item["user_photo"] ?? item["photo_url"] ?? item["picture_url"] ?? item["pictureUrl"]
             let rawBody = SchoologyValue.string(item["body"] ?? item["message"] ?? item["description"] ?? item["title"])
             let rawAttachments = item["attachments"] ?? item["attachment"] ?? item["files"]
@@ -127,7 +153,10 @@ struct SchoologyActivity: Identifiable, Sendable {
                 attachments: attachments,
                 imageURLs: imageURLs(in: rawBody, attachments: rawAttachments),
                 likes: SchoologyValue.integer(item["likes"] ?? item["like_count"] ?? item["likeCount"]),
-                comments: SchoologyValue.integer(item["num_comments"] ?? item["comment_count"] ?? item["commentCount"])
+                comments: SchoologyValue.integer(item["num_comments"] ?? item["comment_count"] ?? item["commentCount"]),
+                commentRealm: commentRealm,
+                commentRealmID: commentRealmID,
+                isLiked: isLiked
             )
         }
     }
