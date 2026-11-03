@@ -362,6 +362,10 @@ struct SchoologyMessage: Identifiable, Hashable, Sendable {
             }
             let status = SchoologyValue.string(item["message_status"] ?? item["messageStatus"])
             let recipientList = SchoologyValue.string(item["recipient_ids"] ?? item["recipientIds"] ?? item["recipient_id"])
+            let author = (item["author"] as? [String: Any]) ?? (item["sender"] as? [String: Any]) ?? [:]
+            let authorUser = (author["user"] as? [String: Any]) ?? author
+            let authorID = item["author_id"] ?? item["authorId"] ?? item["user_id"] ?? item["uid"] ??
+                item["sender_id"] ?? item["senderId"] ?? author["id"] ?? author["user_id"]
             return SchoologyMessage(
                 id: SchoologyValue.string(rawID),
                 subject: SchoologyValue.string(item["subject"], fallback: "Message"),
@@ -372,10 +376,10 @@ struct SchoologyMessage: Identifiable, Hashable, Sendable {
                     (item["is_read"] as? Bool == false) ||
                     SchoologyValue.bool(item["unread"]) ||
                     (item["read"] as? Bool == false),
-                authorID: SchoologyValue.optionalString(item["author_id"] ?? item["authorId"] ?? item["user_id"] ?? item["uid"] ?? item["sender_id"] ?? item["senderId"] ?? (item["author"] as? [String: Any])?["id"] ?? (item["sender"] as? [String: Any])?["id"]),
+                authorID: SchoologyValue.optionalString(authorID),
                 recipientID: SchoologyValue.optionalString(recipientList.split(separator: ",").first.map(String.init)),
-                personName: "",
-                personPictureURL: nil,
+                personName: SchoologyValue.string(authorUser["name_display"] ?? authorUser["display_name"] ?? authorUser["name"]),
+                personPictureURL: SchoologyValue.url(authorUser["picture_url"] ?? authorUser["pictureUrl"] ?? authorUser["picture"]),
                 attachments: attachments
             )
         }

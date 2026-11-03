@@ -1,5 +1,16 @@
 # Schoology SwiftUI Release Notes
 
+## [2026.10.0-port.13]
+
+### Messages
+- Hydrate distinct message participants concurrently with a six-request limit instead of serial user lookups.
+- Reuse author profiles already included in message-thread responses and only request missing users.
+- Preserve nested author/sender names and avatars when decoding conversation messages.
+- Keep all decoded conversation messages and attachments in the existing native thread view.
+
+### Build
+- Increment the iOS and macOS bundle build number to 13.
+
 ## [2026.10.0-port.12]
 
 ### Course Apps and People

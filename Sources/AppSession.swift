@@ -366,31 +366,80 @@ final class AppSession {
             SchoologyProfileItem(id: assignmentID, title: "Assignment", body: "", subtitle: "", url: nil, isAdmin: false, kind: "assignment", collectionID: nil)
     }
 
+    private func loadMessageUsers(_ ids: Set<String>, auth: SchoologyAuth) async -> [String: SchoologyUser] {
+        let requestedIDs = ids.filter { !$0.isEmpty && $0 != auth.userID }.sorted()
+        guard !requestedIDs.isEmpty else { return [:] }
+        let api = self.api
+        let responseData = await withTaskGroup(
+            of: (String, Data?).self,
+            returning: [String: Data].self
+        ) { group in
+            var responses: [String: Data] = [:]
+            var nextIndex = 0
+            for id in requestedIDs.prefix(6) {
+                group.addTask { (id, try? await api.get("users/\(id)", auth: auth)) }
+                nextIndex += 1
+            }
+            while let (id, data) = await group.next() {
+                if let data { responses[id] = data }
+                if nextIndex < requestedIDs.count {
+                    let nextID = requestedIDs[nextIndex]
+                    nextIndex += 1
+                    group.addTask { (nextID, try? await api.get("users/\(nextID)", auth: auth)) }
+                }
+            }
+            return responses
+        }
+
+        var users: [String: SchoologyUser] = [:]
+        for (id, data) in responseData {
+            let json = Self.object(data)
+            let raw = (json["user"] as? [String: Any]) ?? json
+            guard raw["id"] != nil else { continue }
+            users[id] = SchoologyUser(
+                id: id,
+                nameDisplay: SchoologyValue.string(raw["name_display"] ?? raw["display_name"] ?? raw["name"], fallback: "Schoology user"),
+                pictureURL: SchoologyValue.url(raw["picture_url"] ?? raw["pictureUrl"] ?? raw["picture"])
+            )
+        }
+        return users
+    }
+
+    private func embeddedMessageUsers(_ payload: [String: Any]) -> [String: SchoologyUser] {
+        let nested = payload["data"] as? [String: Any]
+        let value = payload["user"] ?? payload["users"] ?? nested?["user"] ?? nested?["users"]
+        let rows = SchoologyValue.list(value, keys: ["user", "users", "items", "data"])
+        var users: [String: SchoologyUser] = [:]
+        for raw in rows {
+            let id = SchoologyValue.string(raw["id"] ?? raw["user_id"] ?? raw["uid"])
+            guard !id.isEmpty else { continue }
+            users[id] = SchoologyUser(
+                id: id,
+                nameDisplay: SchoologyValue.string(raw["name_display"] ?? raw["display_name"] ?? raw["name"], fallback: "Schoology user"),
+                pictureURL: SchoologyValue.url(raw["picture_url"] ?? raw["pictureUrl"] ?? raw["picture"])
+            )
+        }
+        return users
+    }
+
     func loadMessages(folder: SchoologyMessageFolder, force: Bool = false) async -> [SchoologyMessage] {
         guard let auth else { return [] }
         messageFolder = folder
+        errorMessage = nil
         let endpoint = folder == .sent ? "messages/sent" : "messages/inbox"
         do {
             let data = try await api.get(endpoint, auth: auth, params: ["limit": "50"])
             let rows = SchoologyMessage.decodeList(Self.object(data))
             var hydrated = rows
-            let ids = Set(rows.compactMap { folder == .sent ? $0.recipientID : $0.authorID })
-            var users: [String: SchoologyUser] = [:]
-            for id in ids {
-                guard let userData = try? await api.get("users/\(id)", auth: auth) else { continue }
-                let userJSON = Self.object(userData)
-                let raw = (userJSON["user"] as? [String: Any]) ?? userJSON
-                guard raw["id"] != nil else { continue }
-                users[id] = SchoologyUser(
-                    id: id,
-                    nameDisplay: SchoologyValue.string(raw["name_display"] ?? raw["display_name"] ?? raw["name"], fallback: "Schoology user"),
-                    pictureURL: SchoologyValue.url(raw["picture_url"] ?? raw["pictureUrl"] ?? raw["picture"])
-                )
-            }
+            let ids = Set(rows.compactMap { row in
+                if folder == .sent { return row.recipientID }
+                return row.personName.isEmpty ? row.authorID : nil
+            })
+            let users = await loadMessageUsers(ids, auth: auth)
             for index in hydrated.indices {
                 let id = folder == .sent ? hydrated[index].recipientID : hydrated[index].authorID
                 hydrated[index].personName = users[id ?? ""]?.nameDisplay ?? (id == auth.userID ? "You" : "Schoology")
-                hydrated[index].personPictureURL = users[id ?? ""]?.pictureURL
+                hydrated[index].personPictureURL = users[id ?? ""]?.pictureURL ?? hydrated[index].personPictureURL
             }
             return folder == .unread ? hydrated.filter(\.isUnread) : hydrated
         } catch {
@@ -402,19 +451,26 @@ final class AppSession {
     func loadMessageThread(_ message: SchoologyMessage, folder: SchoologyMessageFolder) async -> [SchoologyMessage] {
         guard let auth else { return [] }
         let sourceFolder = folder == .sent ? "sent" : "inbox"
+        errorMessage = nil
         do {
             let data = try await api.get("messages/\(sourceFolder)/\(message.id)", auth: auth, params: ["with_attachments": "TRUE"])
             let json = Self.object(data)
             let payload = (json["data"] as? [String: Any]) ?? (json["response"] as? [String: Any]) ?? json
             let rows = SchoologyMessage.decodeList(payload)
             var result = rows
+            var users = embeddedMessageUsers(payload)
+            let missingIDs = Set(rows.filter { $0.personName.isEmpty }.compactMap(\.authorID))
+                .subtracting(users.keys)
+                .subtracting([auth.userID])
+            let fetchedUsers = await loadMessageUsers(missingIDs, auth: auth)
+            users.merge(fetchedUsers) { existing, _ in existing }
             for index in result.indices {
-                if result[index].personName.isEmpty, let id = result[index].authorID,
-                   let userData = try? await api.get("users/\(id)", auth: auth) {
-                    let userJSON = Self.object(userData)
-                    let raw = (userJSON["user"] as? [String: Any]) ?? userJSON
-                    result[index].personName = SchoologyValue.string(raw["name_display"] ?? raw["display_name"] ?? raw["name"], fallback: "Schoology")
-                    result[index].personPictureURL = SchoologyValue.url(raw["picture_url"] ?? raw["pictureUrl"] ?? raw["picture"])
+                guard let id = result[index].authorID else { continue }
+                if id == auth.userID {
+                    result[index].personName = "You"
+                } else if let user = users[id] {
+                    result[index].personName = user.nameDisplay
+                    result[index].personPictureURL = user.pictureURL
                 }
             }
             return result
