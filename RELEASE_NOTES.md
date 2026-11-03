@@ -1,5 +1,21 @@
 # Schoology SwiftUI Release Notes
 
+## [2026.10.0-port.3]
+
+### Sign-in
+- Rebuilt sign-in with native SwiftUI button styles, system backgrounds, adaptive light/dark colors, and the same Schoology action labels.
+- Updated the Schoology wordmark treatment and made sign-in controls respond to system appearance.
+
+### Home
+- Fixed recent activity decoding to handle the official `recent` response wrappers and update-list shapes.
+- Added author and attachment parsing for activity posts.
+- Added the Home Recent Activity, Course Dashboard, and Upcoming sections.
+- Added course images, school names, and course-specific upcoming events.
+
+### Navigation and app icon
+- Replaced the compact iPhone tab bar with a native NavigationSplitView sidebar that collapses into the standard iPhone navigation stack.
+- Added an iOS release validation step that verifies the exported app references the AppIcon catalog and contains compiled assets.
+
 ## [2026.10.0-port.2]
 
 ### Fixed

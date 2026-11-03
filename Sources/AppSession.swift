@@ -8,11 +8,15 @@ final class AppSession {
     var auth: SchoologyAuth?
     var user: SchoologyUser?
     var destination: AppDestination = .home
+    var homeSection: HomeSection = .recent
     var isLoading = false
+    var isRefreshing = false
     var errorMessage: String?
     var courses: [SchoologyCourse] = []
     var groups: [SchoologyGroup] = []
     var activities: [SchoologyActivity] = []
+    var upcomingEvents: [SchoologyUpcomingEvent] = []
+    var schoolNames: [String: String] = [:]
     var appearance: AppAppearance = .system
     var canadianServer = UserDefaults.standard.bool(forKey: "schoology.canadian")
 
@@ -97,8 +101,6 @@ final class AppSession {
     }
 
     private func establishSession(_ credentials: SchoologyAuth) async throws {
-        // Verify the access token once before persisting it, then bind the returned
-        // Schoology user ID to the credentials used by the rest of the app.
         let profile = try await api.currentUser(auth: credentials)
         let verifiedCredentials = SchoologyAuth(
             token: credentials.token,
@@ -109,25 +111,99 @@ final class AppSession {
         auth = verifiedCredentials
         user = profile
         destination = .home
+        homeSection = .recent
         await refresh()
     }
 
     func refresh() async {
         guard let auth else { return }
-        do {
-            async let activityData = api.get("recent", auth: auth, params: ["start": "0", "limit": "20", "with_attachments": "TRUE", "richtext": "1"])
-            async let courseData = api.get("users/\(auth.userID)/sections", auth: auth, params: ["limit": "100"])
-            async let groupData = api.get("users/\(auth.userID)/groups", auth: auth, params: ["limit": "100"])
-            let (activity, course, group) = try await (activityData, courseData, groupData)
-            let activityJSON = Self.object(activity)
-            let courseJSON = Self.object(course)
-            let groupJSON = Self.object(group)
-            activities = SchoologyActivity.decodeList(activityJSON["update"] ?? activityJSON["updates"])
-            courses = SchoologyCourse.decodeList(courseJSON["section"] ?? courseJSON["sections"])
-            groups = SchoologyGroup.decodeList(groupJSON["group"] ?? groupJSON["groups"])
-        } catch {
-            errorMessage = error.localizedDescription
+        isRefreshing = true
+        defer { isRefreshing = false }
+
+        async let activityRequest = try? api.get("recent", auth: auth, params: [
+            "start": "0", "limit": "20", "with_attachments": "TRUE", "richtext": "1"
+        ])
+        async let courseRequest = try? api.get("users/\(auth.userID)/sections", auth: auth, params: ["limit": "100"])
+        async let groupRequest = try? api.get("users/\(auth.userID)/groups", auth: auth, params: ["limit": "100"])
+        async let upcomingRequest = try? api.get("users/\(auth.userID)/events", auth: auth, params: [
+            "start_date": Self.apiDate(Date()), "start": "0", "limit": "50"
+        ])
+
+        let (activityData, courseData, groupData, upcomingData) = await (
+            activityRequest, courseRequest, groupRequest, upcomingRequest
+        )
+
+        if let activityData {
+            activities = SchoologyActivity.decodeList(Self.object(activityData))
+            await hydrateActivityAuthors(auth: auth)
         }
+        if let courseData {
+            courses = SchoologyCourse.decodeList(Self.object(courseData))
+        }
+        if let groupData {
+            groups = SchoologyGroup.decodeList(Self.object(groupData))
+        }
+        if let upcomingData {
+            upcomingEvents = SchoologyUpcomingEvent.decodeList(Self.object(upcomingData))
+                .sorted { ($0.date ?? .distantFuture) < ($1.date ?? .distantFuture) }
+        }
+    }
+
+    func loadSchoolName(for course: SchoologyCourse) async -> String {
+        if let cached = schoolNames[course.id] { return cached }
+        guard let auth else { return "" }
+
+        var schoolID = course.schoolID
+        if let sectionData = try? await api.get("sections/\(course.id)", auth: auth) {
+            let sectionJSON = Self.object(sectionData)
+            let section = (sectionJSON["section"] as? [String: Any]) ?? sectionJSON
+            schoolID = SchoologyValue.optionalString(section["school_id"] ?? section["schoolId"]) ?? schoolID
+        }
+
+        guard let schoolID, !schoolID.isEmpty,
+              let schoolData = try? await api.get("schools/\(schoolID)", auth: auth) else {
+            schoolNames[course.id] = ""
+            return ""
+        }
+        let schoolJSON = Self.object(schoolData)
+        let school = (schoolJSON["school"] as? [String: Any]) ?? schoolJSON
+        let name = SchoologyValue.string(school["title"] ?? school["name"])
+        schoolNames[course.id] = name
+        return name
+    }
+
+    func loadUpcomingEvents(for course: SchoologyCourse) async -> [SchoologyUpcomingEvent] {
+        guard let auth,
+              let data = try? await api.get("sections/\(course.id)/events", auth: auth, params: [
+                "start_date": Self.apiDate(Date()), "start": "0", "limit": "50"
+              ]) else { return [] }
+        return SchoologyUpcomingEvent.decodeList(Self.object(data))
+            .sorted { ($0.date ?? .distantFuture) < ($1.date ?? .distantFuture) }
+    }
+
+    private func hydrateActivityAuthors(auth: SchoologyAuth) async {
+        for index in activities.indices.prefix(20) {
+            guard activities[index].authorName.isEmpty,
+                  let authorID = activities[index].authorID,
+                  let data = try? await api.get("users/\(authorID)", auth: auth) else { continue }
+            let json = Self.object(data)
+            let user = (json["user"] as? [String: Any]) ?? json
+            activities[index].authorName = SchoologyValue.string(
+                user["name_display"] ?? user["display_name"] ?? user["name"],
+                fallback: "Schoology"
+            )
+            activities[index].avatarURL = SchoologyValue.url(
+                user["picture_url"] ?? user["pictureUrl"] ?? user["picture"] ?? user["photo_url"]
+            )
+        }
+    }
+
+    private static func apiDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone.current
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.string(from: date)
     }
 
     private static func object(_ data: Data) -> [String: Any] {
@@ -141,7 +217,10 @@ final class AppSession {
         courses = []
         groups = []
         activities = []
+        upcomingEvents = []
+        schoolNames = [:]
         destination = .home
+        homeSection = .recent
     }
 }
 

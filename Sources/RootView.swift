@@ -2,91 +2,84 @@ import SwiftUI
 
 struct RootView: View {
     @Environment(AppSession.self) private var session
-    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var preferredCompactColumn: NavigationSplitViewColumn = .sidebar
 
     var body: some View {
         Group {
             if session.isSignedIn {
-                signedInShell
+                NavigationSplitView(preferredCompactColumn: $preferredCompactColumn) {
+                    SchoologySidebar()
+                } detail: {
+                    DestinationView(destination: session.destination)
+                }
+                .navigationSplitViewStyle(.balanced)
             } else {
                 SignInView()
             }
         }
         .animation(reduceMotion ? nil : .snappy(duration: 0.24), value: session.isSignedIn)
     }
+}
 
-    @ViewBuilder
-    private var signedInShell: some View {
-        #if os(macOS)
-        NavigationSplitView {
-            List(selection: Binding(
-                get: { Optional(session.destination) },
+private struct SchoologySidebar: View {
+    @Environment(AppSession.self) private var session
+
+    var body: some View {
+        Group {
+            #if os(macOS)
+            List(selection: Binding<AppDestination?>(
+                get: { session.destination },
                 set: { if let destination = $0 { session.destination = destination } }
             )) {
-                Section {
-                    ForEach(AppDestination.allCases.filter { $0 != .settings }) { item in
-                        NavigationLink(value: item) {
-                            Label(item.rawValue, systemImage: item.symbol)
-                        }
-                    }
-                }
-                Section {
-                    NavigationLink(value: AppDestination.settings) {
-                        Label("Settings", systemImage: AppDestination.settings.symbol)
-                    }
-                }
+                sidebarSections
             }
-            .navigationTitle("Schoology")
-            .listStyle(.sidebar)
-        } detail: {
-            DestinationView(destination: session.destination)
+            #else
+            List {
+                sidebarSections
+            }
+            #endif
         }
-        .navigationSplitViewStyle(.balanced)
+        .navigationTitle("Schoology")
+        .listStyle(.sidebar)
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
+    }
+
+    @ViewBuilder
+    private var sidebarSections: some View {
+        Section("Learning") {
+            ForEach([AppDestination.home, .courses, .groups, .calendar]) { item in
+                destinationRow(item)
+            }
+        }
+
+        Section("Communication") {
+            ForEach([AppDestination.messages, .notifications, .requests]) { item in
+                destinationRow(item)
+            }
+        }
+
+        Section("More") {
+            ForEach([AppDestination.resources, .grades, .people, .settings]) { item in
+                destinationRow(item)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func destinationRow(_ item: AppDestination) -> some View {
+        #if os(macOS)
+        NavigationLink(value: item) {
+            Label(item.rawValue, systemImage: item.symbol)
+        }
         #else
-        if horizontalSizeClass == .regular {
-            NavigationSplitView {
-                List(selection: Binding(
-                    get: { Optional(session.destination) },
-                    set: { if let destination = $0 { session.destination = destination } }
-                )) {
-                    ForEach(AppDestination.allCases) { item in
-                        NavigationLink(value: item) {
-                            Label(item.rawValue, systemImage: item.symbol)
-                        }
-                    }
-                }
-                .navigationTitle("Schoology")
-                .listStyle(.sidebar)
-                .navigationSplitViewColumnWidth(min: 220, ideal: 260)
-            } detail: {
-                DestinationView(destination: session.destination)
-            }
-            .navigationSplitViewStyle(.balanced)
-        } else {
-            TabView(selection: Binding(
-                get: { session.destination },
-                set: { session.destination = $0 }
-            )) {
-                ForEach([AppDestination.home, .courses, .groups, .messages, .notifications, .calendar], id: \.self) { item in
-                    Tab(item.rawValue, systemImage: item.symbol, value: item) {
-                        NavigationStack {
-                            DestinationView(destination: item)
-                                .navigationDestination(for: AppDestination.self) {
-                                    DestinationView(destination: $0)
-                                }
-                        }
-                    }
-                }
-                Tab("More", systemImage: "ellipsis", value: AppDestination.settings) {
-                    NavigationStack {
-                        MoreView()
-                            .navigationDestination(for: AppDestination.self) {
-                                DestinationView(destination: $0)
-                            }
-                    }
-                }
-            }
+        NavigationLink {
+            DestinationView(destination: item)
+                .onAppear { session.destination = item }
+        } label: {
+            Label(item.rawValue, systemImage: item.symbol)
         }
         #endif
     }

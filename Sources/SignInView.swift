@@ -25,28 +25,29 @@ struct SignInView: View {
 
     var body: some View {
         NavigationStack {
-            Group {
-                switch mode {
-                case .welcome:
-                    welcome
-                        .transition(.opacity)
-                case .school:
-                    schoolPicker
-                        .transition(.opacity)
-                case .credentials:
-                    credentials
-                        .transition(.opacity)
-                case .schoolBrowser:
-                    schoolBrowserProgress
-                        .transition(.opacity)
-                case .qr:
-                    qrLogin
-                        .transition(.opacity)
+            ScrollView {
+                VStack(spacing: 22) {
+                    switch mode {
+                    case .welcome:
+                        welcome
+                    case .school:
+                        schoolPicker
+                    case .credentials:
+                        credentials
+                    case .schoolBrowser:
+                        schoolBrowserProgress
+                    case .qr:
+                        qrLogin
+                    }
                 }
+                .padding(.horizontal, 22)
+                .padding(.vertical, 28)
+                .frame(maxWidth: 520)
+                .frame(maxWidth: .infinity)
+                .frame(minHeight: 560)
             }
-            .frame(maxWidth: 520)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(LoginPalette.background.ignoresSafeArea())
+            .scrollIndicators(.hidden)
+            .background(.background)
             #if os(iOS)
             .toolbar(.hidden, for: .navigationBar)
             #endif
@@ -61,7 +62,7 @@ struct SignInView: View {
         } message: {
             Text(session.errorMessage ?? "")
         }
-        .animation(reduceMotion ? nil : .easeInOut(duration: 0.22), value: modeKey)
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: modeKey)
     }
 
     private var modeKey: Int {
@@ -77,10 +78,8 @@ struct SignInView: View {
     private var welcome: some View {
         VStack(spacing: 0) {
             SchoologyBrandLockup()
-                .padding(.top, 42)
+                .padding(.top, 30)
                 .padding(.bottom, 34)
-
-            Spacer(minLength: 18)
 
             VStack(spacing: 14) {
                 LoginActionButton(title: "Sign in through my school", icon: .school, style: .primary) {
@@ -92,14 +91,13 @@ struct SignInView: View {
                     selectedSchool = nil
                     mode = .credentials
                 }
-                LoginActionButton(title: "Sign in with a QR code", icon: .qr, style: .qr) {
+                LoginActionButton(title: "Sign in with a QR code", icon: .qr, style: .outlined) {
                     session.errorMessage = nil
                     mode = .qr
                 }
             }
             .frame(maxWidth: 420)
-
-            Spacer(minLength: 24)
+            .padding(.top, 22)
 
             Button("I need help signing in") {
                 if let url = URL(string: "https://docs.powerschool.com/SGYH/en/students/schoology-mobile-apps/logging-into-the-schoology-mobile-app-students") {
@@ -107,12 +105,13 @@ struct SignInView: View {
                 }
             }
             .font(.footnote)
-            .foregroundStyle(.white.opacity(0.92))
-            .buttonStyle(.plain)
-            .padding(.bottom, 28)
+            .buttonStyle(.borderless)
+            .padding(.top, 30)
+
+            instanceSwitch
+                .padding(.top, 18)
         }
-        .padding(.horizontal, 22)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(maxWidth: .infinity)
     }
 
     private var schoolPicker: some View {
@@ -121,13 +120,12 @@ struct SignInView: View {
 
             VStack(alignment: .leading, spacing: 9) {
                 Text("School")
-                    .font(.body)
-                    .foregroundStyle(.white)
+                    .font(.headline)
 
                 HStack(spacing: 10) {
                     TextField("Enter your School or domain", text: $searchText)
                         .textContentType(.organizationName)
-                        .foregroundStyle(LoginPalette.inputText)
+                        .textFieldStyle(.roundedBorder)
                         #if os(iOS)
                         .textInputAutocapitalization(.never)
                         .submitLabel(.search)
@@ -139,194 +137,121 @@ struct SignInView: View {
                         }
 
                     if searching {
-                        ProgressView()
-                            .controlSize(.small)
-                            .tint(LoginPalette.blue)
+                        ProgressView().controlSize(.small)
                     } else if !searchText.isEmpty {
                         Button("Clear", systemImage: "xmark.circle.fill") {
                             searchText = ""
                             schools = []
                         }
                         .labelStyle(.iconOnly)
-                        .foregroundStyle(.secondary)
-                    } else {
-                        Image(systemName: "magnifyingglass")
-                            .foregroundStyle(.secondary)
+                        .buttonStyle(.borderless)
                     }
                 }
-                .padding(.horizontal, 13)
-                .frame(minHeight: 48)
-                .background(.white, in: RoundedRectangle(cornerRadius: 5))
             }
             .frame(maxWidth: 420)
 
             if schools.isEmpty && !searching {
                 ContentUnavailableView.search(text: searchText)
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .frame(maxWidth: .infinity, minHeight: 180)
             } else {
-                ScrollView {
-                    LazyVStack(spacing: 3) {
-                        ForEach(schools) { school in
-                            Button {
-                                selectedSchool = school
-                                session.errorMessage = nil
-                                mode = .schoolBrowser
-                                Task { await signInThroughSchool() }
-                            } label: {
-                                HStack(spacing: 12) {
-                                    Image(systemName: "building.2.fill")
-                                        .foregroundStyle(LoginPalette.blue)
-                                        .frame(width: 26)
-                                    VStack(alignment: .leading, spacing: 3) {
-                                        Text(school.title)
-                                            .font(.body.weight(.medium))
-                                            .foregroundStyle(LoginPalette.inputText)
-                                        if !school.domain.isEmpty {
-                                            Text(school.domain)
-                                                .font(.caption)
-                                                .foregroundStyle(.secondary)
-                                        }
+                LazyVStack(spacing: 6) {
+                    ForEach(schools) { school in
+                        Button {
+                            selectedSchool = school
+                            session.errorMessage = nil
+                            mode = .schoolBrowser
+                            Task { await signInThroughSchool() }
+                        } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: "building.2")
+                                    .font(.title3)
+                                    .foregroundStyle(LoginPalette.blue)
+                                    .frame(width: 28)
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(school.title).font(.body.weight(.medium))
+                                    if !school.domain.isEmpty {
+                                        Text(school.domain).font(.caption).foregroundStyle(.secondary)
                                     }
-                                    Spacer()
-                                    Image(systemName: "chevron.right")
-                                        .font(.caption.weight(.semibold))
-                                        .foregroundStyle(.tertiary)
                                 }
-                                .padding(.horizontal, 13)
-                                .padding(.vertical, 11)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .background(.white)
-                                .contentShape(Rectangle())
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(.tertiary)
                             }
-                            .buttonStyle(.plain)
+                            .padding(12)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .contentShape(Rectangle())
                         }
+                        .buttonStyle(.plain)
+                        .background(.quaternary, in: RoundedRectangle(cornerRadius: 12))
                     }
-                    .clipShape(RoundedRectangle(cornerRadius: 5))
-                    .frame(maxWidth: 420)
                 }
-                .scrollIndicators(.hidden)
+                .frame(maxWidth: 420)
             }
 
             instanceSwitch
         }
-        .padding(.horizontal, 22)
-        .padding(.top, 22)
-        .padding(.bottom, 20)
     }
 
     private var credentials: some View {
-        ScrollView {
-            VStack(spacing: 20) {
-                subpageHeader
+        VStack(spacing: 20) {
+            subpageHeader
 
-                VStack(alignment: .leading, spacing: 7) {
-                    if let selectedSchool {
-                        Text(selectedSchool.title)
-                            .font(.title3.weight(.medium))
-                            .foregroundStyle(.white)
-                    } else {
-                        Text("Sign in with my account")
-                            .font(.title3.weight(.medium))
-                            .foregroundStyle(.white)
-                    }
-                }
+            Text(selectedSchool?.title ?? "Sign in with my account")
+                .font(.title3.weight(.semibold))
                 .frame(maxWidth: 420, alignment: .leading)
 
-                VStack(spacing: 0) {
-                    credentialField(title: "Username or Email", icon: "person") {
-                        TextField("Username or Email", text: $username)
-                            .textContentType(.username)
-                            .foregroundStyle(LoginPalette.inputText)
-                            #if os(iOS)
-                            .textInputAutocapitalization(.never)
-                            .submitLabel(.next)
-                            #endif
-                            .autocorrectionDisabled()
-                            .focused($focusedField, equals: .username)
-                            .onSubmit { focusedField = .password }
-                    }
+            VStack(alignment: .leading, spacing: 14) {
+                TextField("Username or Email", text: $username)
+                    .textContentType(.username)
+                    .textFieldStyle(.roundedBorder)
+                    #if os(iOS)
+                    .textInputAutocapitalization(.never)
+                    .submitLabel(.next)
+                    #endif
+                    .autocorrectionDisabled()
+                    .focused($focusedField, equals: .username)
+                    .onSubmit { focusedField = .password }
 
-                    Divider().padding(.leading, 46)
-
-                    credentialField(title: "Password", icon: "lock") {
-                        SecureField("Password", text: $password)
-                            .textContentType(.password)
-                            .foregroundStyle(LoginPalette.inputText)
-                            .focused($focusedField, equals: .password)
-                            #if os(iOS)
-                            .submitLabel(.go)
-                            #endif
-                            .onSubmit { signIn() }
-                    }
-                }
-                .background(.white, in: RoundedRectangle(cornerRadius: 5))
-                .frame(maxWidth: 420)
-
-                Button {
-                    signIn()
-                } label: {
-                    HStack(spacing: 9) {
-                        if session.isLoading {
-                            ProgressView().tint(.white)
-                        }
-                        Text(session.isLoading ? "Signing in…" : "Sign in")
-                            .font(.body.weight(.semibold))
-                    }
-                    .frame(maxWidth: .infinity, minHeight: 48)
-                }
-                .foregroundStyle(.white)
-                .background(LoginPalette.blue, in: RoundedRectangle(cornerRadius: 5))
-                .buttonStyle(.plain)
-                .disabled(username.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || password.isEmpty || session.isLoading)
-                .opacity(username.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || password.isEmpty || session.isLoading ? 0.55 : 1)
-                .frame(maxWidth: 420)
-
-                instanceSwitch
-
-                Button("I need help signing in") {
-                    if let url = URL(string: "https://docs.powerschool.com/SGYH/en/students/schoology-mobile-apps/logging-into-the-schoology-mobile-app-students") {
-                        openURL(url)
-                    }
-                }
-                .font(.footnote)
-                .foregroundStyle(.white.opacity(0.92))
-                .buttonStyle(.plain)
+                SecureField("Password", text: $password)
+                    .textContentType(.password)
+                    .textFieldStyle(.roundedBorder)
+                    #if os(iOS)
+                    .submitLabel(.go)
+                    #endif
+                    .focused($focusedField, equals: .password)
+                    .onSubmit { signIn() }
             }
-            .padding(.horizontal, 22)
-            .padding(.top, 22)
-            .padding(.bottom, 30)
-            .frame(maxWidth: .infinity)
+            .frame(maxWidth: 420)
+
+            Button {
+                signIn()
+            } label: {
+                HStack(spacing: 9) {
+                    if session.isLoading { ProgressView() }
+                    Text(session.isLoading ? "Signing in…" : "Sign in")
+                }
+                .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .disabled(username.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || password.isEmpty || session.isLoading)
+            .frame(maxWidth: 420)
+
+            instanceSwitch
+
+            Button("I need help signing in") {
+                if let url = URL(string: "https://docs.powerschool.com/SGYH/en/students/schoology-mobile-apps/logging-into-the-schoology-mobile-app-students") {
+                    openURL(url)
+                }
+            }
+            .font(.footnote)
+            .buttonStyle(.borderless)
         }
-        .scrollIndicators(.hidden)
+        .frame(maxWidth: .infinity)
         .onAppear {
             if selectedSchool == nil { focusedField = .username }
         }
-    }
-
-    private func credentialField<Content: View>(
-        title: String,
-        icon: String,
-        @ViewBuilder content: () -> Content
-    ) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon)
-                .font(.body)
-                .foregroundStyle(.secondary)
-                .frame(width: 22)
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                content()
-                    .textFieldStyle(.plain)
-                    .font(.body)
-            }
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 11)
-        .frame(minHeight: 62)
     }
 
     private var schoolBrowserProgress: some View {
@@ -335,24 +260,23 @@ struct SignInView: View {
 
             if let selectedSchool {
                 Text(selectedSchool.title)
-                    .font(.title3.weight(.medium))
-                    .foregroundStyle(.white)
+                    .font(.title3.weight(.semibold))
                     .multilineTextAlignment(.center)
             }
 
             if session.isLoading {
                 ProgressView()
-                    .tint(.white)
-                    .scaleEffect(1.15)
+                    .controlSize(.large)
                 Text("Continue signing in in your browser…")
                     .font(.body)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
             } else {
-                Text("School sign-in didn’t complete. You can try again.")
-                    .font(.subheadline)
-                    .foregroundStyle(.white.opacity(0.85))
-                    .multilineTextAlignment(.center)
+                ContentUnavailableView(
+                    "School sign-in didn’t complete",
+                    systemImage: "person.crop.circle.badge.exclamationmark",
+                    description: Text("You can try signing in again.")
+                )
 
                 Button("Try browser sign-in again") {
                     Task { await signInThroughSchool() }
@@ -360,8 +284,7 @@ struct SignInView: View {
                 .buttonStyle(.borderedProminent)
             }
         }
-        .padding(26)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(maxWidth: .infinity)
     }
 
     private var qrLogin: some View {
@@ -369,18 +292,14 @@ struct SignInView: View {
             subpageHeader
 
             Text("QR Code Login")
-                .font(.title2.weight(.medium))
-                .foregroundStyle(.white)
+                .font(.title2.weight(.semibold))
 
             if session.isLoading {
                 ProgressView("Signing in to Schoology…")
-                    .tint(.white)
-                    .foregroundStyle(.white)
                     .frame(maxWidth: .infinity, minHeight: 260)
             } else {
                 Text("Scan Your Code")
-                    .font(.body)
-                    .foregroundStyle(.white)
+                    .font(.headline)
 
                 QRCodeScannerView { value in
                     Task { await session.signInWithQRCode(value) }
@@ -390,34 +309,33 @@ struct SignInView: View {
 
                 Text("Point your camera at the QR code shown in Schoology.")
                     .font(.subheadline)
-                    .foregroundStyle(.white.opacity(0.9))
+                    .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
             }
         }
-        .padding(.horizontal, 22)
-        .padding(.top, 22)
-        .padding(.bottom, 28)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(maxWidth: .infinity)
     }
 
     private var subpageHeader: some View {
-        ZStack {
-            SchoologyBrandLockup(compact: true)
-            HStack {
-                Button(action: goBack) {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 19, weight: .medium))
-                        .foregroundStyle(.white)
-                        .frame(width: 42, height: 42)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Back")
-                Spacer()
+        HStack(spacing: 12) {
+            Button(action: goBack) {
+                Label("Back", systemImage: "chevron.left")
+                    .labelStyle(.iconOnly)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
             }
+            .buttonStyle(.borderless)
+            .accessibilityLabel("Back")
+
+            Spacer()
+            SchoologyBrandLockup(compact: true)
+            Spacer()
+
+            Color.clear.frame(width: 44, height: 44)
+                .accessibilityHidden(true)
         }
         .frame(maxWidth: 420)
-        .padding(.bottom, 12)
+        .padding(.bottom, 8)
     }
 
     private var instanceSwitch: some View {
@@ -429,8 +347,7 @@ struct SignInView: View {
             UserDefaults.standard.set(canadian, forKey: "schoology.canadian")
         }
         .font(.footnote)
-        .foregroundStyle(.white.opacity(0.92))
-        .buttonStyle(.plain)
+        .buttonStyle(.borderless)
     }
 
     private func goBack() {
@@ -487,10 +404,7 @@ struct SignInView: View {
 }
 
 private enum LoginPalette {
-    static let background = Color(red: 68.0 / 255, green: 80.0 / 255, blue: 93.0 / 255)
-    static let blue = Color(red: 46.0 / 255, green: 102.0 / 255, blue: 163.0 / 255)
-    static let inputText = Color(red: 34.0 / 255, green: 48.0 / 255, blue: 62.0 / 255)
-    static let darkButton = Color(red: 34.0 / 255, green: 48.0 / 255, blue: 62.0 / 255)
+    static let blue = SchoologyStyle.blue
 }
 
 private struct SchoologyBrandLockup: View {
@@ -498,14 +412,12 @@ private struct SchoologyBrandLockup: View {
 
     var body: some View {
         HStack(spacing: compact ? 7 : 10) {
-            SchoologyMark(size: compact ? 27 : 38, letterColor: .white)
+            SchoologyMark(size: compact ? 27 : 38)
             HStack(spacing: 0) {
-                Text("School")
-                    .foregroundStyle(.white)
-                Text("ogy")
-                    .foregroundStyle(Color(red: 72.0 / 255, green: 175.0 / 255, blue: 236.0 / 255))
+                Text("School").foregroundStyle(.primary)
+                Text("ogy").foregroundStyle(Color(red: 72.0 / 255, green: 175.0 / 255, blue: 236.0 / 255))
             }
-            .font(.system(size: compact ? 23 : 34, weight: .light, design: .rounded))
+            .font(.system(size: compact ? 23 : 34, weight: .light, design: .default))
             .tracking(compact ? -0.7 : -1.0)
         }
         .accessibilityElement(children: .ignore)
@@ -515,19 +427,55 @@ private struct SchoologyBrandLockup: View {
 
 private struct SchoologyMark: View {
     var size: CGFloat
-    var letterColor: Color
 
     var body: some View {
         ZStack {
             Circle()
-                .stroke(Color(red: 6.0 / 255, green: 119.0 / 255, blue: 186.0 / 255), lineWidth: max(2, size * 0.075))
-            Text("S")
-                .font(.system(size: size * 0.63, weight: .medium, design: .rounded))
-                .foregroundStyle(letterColor)
-                .offset(y: -size * 0.015)
+                .stroke(
+                    Color(red: 72.0 / 255, green: 175.0 / 255, blue: 236.0 / 255),
+                    lineWidth: size * 0.083
+                )
+                .padding(size * 0.0415)
+            SchoologyGlyph()
+                .fill(.primary)
         }
         .frame(width: size, height: size)
         .accessibilityHidden(true)
+    }
+}
+
+private struct SchoologyGlyph: Shape {
+    func path(in rect: CGRect) -> Path {
+        func point(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
+            CGPoint(
+                x: rect.minX + x * rect.width / 20,
+                y: rect.minY + y * rect.height / 20
+            )
+        }
+
+        var path = Path()
+        path.move(to: point(9.634, 10.54))
+        path.addCurve(to: point(6.368, 7.801), control1: point(8.165, 10.18), control2: point(6.368, 9.762))
+        path.addCurve(to: point(9.885, 5), control1: point(6.368, 6.08), control2: point(7.776, 5))
+        path.addCurve(to: point(13.789, 8.081), control1: point(11.624, 5), control2: point(13.479, 5.859))
+        path.addLine(to: point(12.127, 8.301))
+        path.addCurve(to: point(11.469, 6.778), control1: point(12.108, 7.72), control2: point(12.068, 7.261))
+        path.addCurve(to: point(9.713, 6.22), control1: point(10.869, 6.3), control2: point(10.174, 6.22))
+        path.addCurve(to: point(7.915, 7.6), control1: point(8.512, 6.22), control2: point(7.915, 6.959))
+        path.addCurve(to: point(10.096, 9.08), control1: point(7.915, 8.501), control2: point(8.899, 8.781))
+        path.addLine(to: point(10.967, 9.299))
+        path.addCurve(to: point(14, 12.021), control1: point(12.048, 9.559), control2: point(14, 10.041))
+        path.addCurve(to: point(10.174, 15), control1: point(14, 13.559), control2: point(12.687, 15))
+        path.addCurve(to: point(7.354, 14.241), control1: point(9.149, 15), control2: point(8.088, 14.781))
+        path.addCurve(to: point(6, 11.681), control1: point(7.063, 14.019), control2: point(6.174, 13.26))
+        path.addLine(to: point(7.739, 11.401))
+        path.addCurve(to: point(8.375, 13.24), control1: point(7.72, 11.821), control2: point(7.68, 12.621))
+        path.addCurve(to: point(10.214, 13.782), control1: point(8.915, 13.72), control2: point(9.594, 13.782))
+        path.addCurve(to: point(12.355, 12.22), control1: point(11.565, 13.782), control2: point(12.355, 13.24))
+        path.addCurve(to: point(10.462, 10.721), control1: point(12.355, 11.141), control2: point(11.565, 10.941))
+        path.addLine(to: point(9.594, 10.54))
+        path.closeSubpath()
+        return path
     }
 }
 
@@ -537,7 +485,7 @@ private struct LoginActionButton: View {
     }
 
     enum Style: Equatable {
-        case primary, outlined, qr
+        case primary, outlined
     }
 
     let title: String
@@ -546,43 +494,38 @@ private struct LoginActionButton: View {
     let action: () -> Void
 
     var body: some View {
-        Button(action: action) {
-            HStack(spacing: 10) {
-                Group {
-                    switch icon {
-                    case .school:
-                        Image(systemName: "building.2.fill")
-                            .font(.system(size: 23, weight: .regular))
-                    case .account:
-                        SchoologyMark(size: 26, letterColor: LoginPalette.background)
-                    case .qr:
-                        Image(systemName: "qrcode")
-                            .font(.system(size: 25, weight: .regular))
-                    }
-                }
-                .frame(width: 30, height: 30)
-
-                Text(title)
-                    .font(.system(size: 16, weight: .regular))
+        Group {
+            if style == .primary {
+                Button(action: action) { buttonLabel }
+                    .buttonStyle(.borderedProminent)
+            } else {
+                Button(action: action) { buttonLabel }
+                    .buttonStyle(.bordered)
             }
-            .frame(maxWidth: .infinity, minHeight: 54)
-            .contentShape(Rectangle())
         }
-        .foregroundStyle(.white)
-        .background(background, in: RoundedRectangle(cornerRadius: 5))
-        .overlay {
-            RoundedRectangle(cornerRadius: 5)
-                .strokeBorder(style == .primary ? LoginPalette.blue : .white, lineWidth: 1)
-        }
-        .buttonStyle(.plain)
+        .controlSize(.large)
+        .tint(LoginPalette.blue)
         .accessibilityLabel(title)
     }
 
-    private var background: Color {
-        switch style {
-        case .primary: LoginPalette.blue
-        case .outlined: .clear
-        case .qr: LoginPalette.darkButton
+    private var buttonLabel: some View {
+        HStack(spacing: 12) {
+            Group {
+                switch icon {
+                case .school:
+                    Image(systemName: "building.2")
+                case .account:
+                    SchoologyMark(size: 27)
+                case .qr:
+                    Image(systemName: "qrcode")
+                }
+            }
+            .font(.title3)
+            .frame(width: 30, height: 30)
+            Text(title).font(.body.weight(.semibold))
+            Spacer(minLength: 0)
         }
+        .frame(maxWidth: .infinity, minHeight: 48)
+        .contentShape(Rectangle())
     }
 }

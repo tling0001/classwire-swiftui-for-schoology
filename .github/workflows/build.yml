@@ -240,6 +240,9 @@ jobs:
           test -n "$APP"
           APP_ID="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Info.plist")"
           test "$APP_ID" = "com.schoologytauri.app" || { echo "Unexpected bundle identifier: $APP_ID" >&2; exit 1; }
+          ICON_NAME="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIconName' "$APP/Info.plist" 2>/dev/null || true)"
+          test "$ICON_NAME" = "AppIcon" || { echo "The exported iOS app does not reference the AppIcon asset catalog (CFBundleIconName=$ICON_NAME)." >&2; exit 1; }
+          test -s "$APP/Assets.car" || { echo "The exported iOS app is missing its compiled asset catalog." >&2; exit 1; }
           security cms -D -i "$APP/embedded.mobileprovision" > "$RUNNER_TEMP/embedded-profile.plist"
           /usr/libexec/PlistBuddy -c 'Print :ProvisionedDevices' "$RUNNER_TEMP/embedded-profile.plist" >/dev/null
           VERSION="$(tr -d '[:space:]' < VERSION)"

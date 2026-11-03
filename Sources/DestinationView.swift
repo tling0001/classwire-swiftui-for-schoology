@@ -20,6 +20,7 @@ struct DestinationView: View {
                 Button("Refresh", systemImage: "arrow.clockwise") {
                     Task { await session.refresh() }
                 }
+                .disabled(session.isRefreshing)
             }
         }
     }
@@ -29,69 +30,460 @@ struct HomeView: View {
     @Environment(AppSession.self) private var session
 
     var body: some View {
+        @Bindable var model = session
+
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 18) {
                 if let user = session.user {
                     HStack(spacing: 12) {
-                        Image(systemName: "person.crop.circle.fill")
-                            .font(.largeTitle)
-                            .foregroundStyle(SchoologyStyle.blue)
-                        VStack(alignment: .leading) {
-                            Text("Welcome back")
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
+                        if let avatar = user.pictureURL {
+                            AsyncImage(url: avatar) { image in
+                                image.resizable().scaledToFill()
+                            } placeholder: {
+                                Image(systemName: "person.crop.circle.fill")
+                                    .resizable().scaledToFit().foregroundStyle(SchoologyStyle.blue)
+                            }
+                            .frame(width: 48, height: 48)
+                            .clipShape(Circle())
+                        } else {
+                            Image(systemName: "person.crop.circle.fill")
+                                .font(.system(size: 42)).foregroundStyle(SchoologyStyle.blue)
+                        }
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("Welcome back").font(.subheadline).foregroundStyle(.secondary)
                             Text(user.nameDisplay).font(.title2.bold())
                         }
                     }
-                    .padding(.bottom, 8)
+                    .padding(.bottom, 4)
                 }
-                sectionTitle("Recent Activity")
-                if session.activities.isEmpty {
-                    ContentUnavailableView(
-                        "No recent activity",
-                        systemImage: "text.bubble",
-                        description: Text("Your Schoology updates will appear here.")
-                    )
-                } else {
-                    ForEach(session.activities) { activity in
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text(activity.title).font(.headline)
-                            if !activity.body.isEmpty { Text(activity.body).foregroundStyle(.secondary) }
-                            if !activity.created.isEmpty { Text(activity.created).font(.caption).foregroundStyle(.tertiary) }
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding()
-                        .background(.background, in: RoundedRectangle(cornerRadius: 14))
+
+                Picker("Home", selection: $model.homeSection) {
+                    ForEach(HomeSection.allCases) { section in
+                        Text(section.rawValue).tag(section)
                     }
+                }
+                .pickerStyle(.segmented)
+                .accessibilityLabel("Home section")
+
+                switch session.homeSection {
+                case .recent:
+                    RecentActivityView(activities: session.activities)
+                case .dashboard:
+                    CourseDashboardView(courses: session.courses)
+                case .upcoming:
+                    UpcomingEventList(events: session.upcomingEvents)
                 }
             }
             .padding()
-            .frame(maxWidth: 900)
+            .frame(maxWidth: 980)
             .frame(maxWidth: .infinity)
         }
         .refreshable { await session.refresh() }
-        .task { if session.activities.isEmpty { await session.refresh() } }
+        .overlay {
+            if session.isRefreshing && session.activities.isEmpty && session.courses.isEmpty && session.upcomingEvents.isEmpty {
+                ProgressView("Loading Schoology…")
+                    .padding()
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
+            }
+        }
+        .task {
+            if session.activities.isEmpty && session.courses.isEmpty && session.upcomingEvents.isEmpty {
+                await session.refresh()
+            }
+        }
+    }
+}
+
+private struct RecentActivityView: View {
+    let activities: [SchoologyActivity]
+
+    var body: some View {
+        if activities.isEmpty {
+            ContentUnavailableView(
+                "No recent activity",
+                systemImage: "text.bubble",
+                description: Text("Your recent Schoology updates will appear here.")
+            )
+            .frame(maxWidth: .infinity, minHeight: 180)
+        } else {
+            LazyVStack(spacing: 12) {
+                ForEach(activities) { activity in
+                    SchoologyActivityCard(activity: activity)
+                }
+            }
+        }
+    }
+}
+
+private struct SchoologyActivityCard: View {
+    let activity: SchoologyActivity
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 10) {
+                if let avatar = activity.avatarURL {
+                    AsyncImage(url: avatar) { image in
+                        image.resizable().scaledToFill()
+                    } placeholder: {
+                        avatarPlaceholder
+                    }
+                    .frame(width: 42, height: 42)
+                    .clipShape(Circle())
+                } else {
+                    avatarPlaceholder
+                }
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(activity.authorName.isEmpty ? "Schoology" : activity.authorName)
+                        .font(.subheadline.weight(.semibold))
+                    if !activity.contextLabel.isEmpty {
+                        Text(activity.contextLabel)
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+                Spacer(minLength: 8)
+                if let date = activity.createdDate {
+                    Text(date, style: .relative)
+                        .font(.caption).foregroundStyle(.tertiary)
+                }
+            }
+
+            if !activity.body.isEmpty {
+                Text(activity.body)
+                    .font(.body)
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            if !activity.attachments.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(activity.attachments) { attachment in
+                        Link(destination: attachment.url) {
+                            Label(attachment.title, systemImage: "paperclip")
+                                .font(.subheadline)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(10)
+                                .background(.quaternary, in: RoundedRectangle(cornerRadius: 10))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+
+            if activity.likes > 0 || activity.comments > 0 {
+                Divider()
+                HStack(spacing: 18) {
+                    Label("\(activity.likes)", systemImage: "hand.thumbsup")
+                    Label("\(activity.comments)", systemImage: "bubble.right")
+                    Spacer()
+                }
+                .font(.caption).foregroundStyle(.secondary)
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.background, in: RoundedRectangle(cornerRadius: 16))
+        .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(.quaternary, lineWidth: 1))
     }
 
-    private func sectionTitle(_ title: String) -> some View {
-        Text(title).font(.title3.bold())
+    private var avatarPlaceholder: some View {
+        Image(systemName: "person.crop.circle.fill")
+            .font(.system(size: 38))
+            .foregroundStyle(SchoologyStyle.blue.opacity(0.8))
+            .frame(width: 42, height: 42)
+            .accessibilityHidden(true)
+    }
+}
+
+private struct CourseDashboardView: View {
+    let courses: [SchoologyCourse]
+
+    var body: some View {
+        if courses.isEmpty {
+            ContentUnavailableView(
+                "No courses found",
+                systemImage: "books.vertical",
+                description: Text("Courses available to your Schoology account will appear here.")
+            )
+            .frame(maxWidth: .infinity, minHeight: 180)
+        } else {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 230), spacing: 14)], spacing: 14) {
+                ForEach(courses) { course in
+                    CourseDashboardCard(course: course)
+                }
+            }
+        }
+    }
+}
+
+private struct CourseDashboardCard: View {
+    @Environment(AppSession.self) private var session
+    let course: SchoologyCourse
+    @State private var schoolName = ""
+
+    var body: some View {
+        NavigationLink {
+            CourseDashboardDetailView(course: course)
+        } label: {
+            VStack(alignment: .leading, spacing: 0) {
+                ZStack(alignment: .bottomLeading) {
+                    if let imageURL = course.profileURL {
+                        AsyncImage(url: imageURL) { image in
+                            image.resizable().scaledToFill()
+                        } placeholder: {
+                            courseFallback
+                        }
+                        .frame(height: 132)
+                        .frame(maxWidth: .infinity)
+                        .clipped()
+                    } else {
+                        courseFallback.frame(height: 132)
+                    }
+                    LinearGradient(
+                        colors: [.clear, .black.opacity(0.32)],
+                        startPoint: .center,
+                        endPoint: .bottom
+                    )
+                    Text(String(course.title.prefix(1)).uppercased())
+                        .font(.title.bold())
+                        .foregroundStyle(.white)
+                        .padding(12)
+                }
+
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(course.title)
+                        .font(.headline).foregroundStyle(.primary).lineLimit(2)
+                    if !course.section.isEmpty {
+                        Text(course.section).font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
+                    }
+                    if !schoolName.isEmpty {
+                        Text(schoolName).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                    }
+                }
+                .padding(13)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .background(.background, in: RoundedRectangle(cornerRadius: 15))
+            .clipShape(RoundedRectangle(cornerRadius: 15))
+            .overlay(RoundedRectangle(cornerRadius: 15).strokeBorder(.quaternary, lineWidth: 1))
+        }
+        .buttonStyle(.plain)
+        .task { schoolName = await session.loadSchoolName(for: course) }
+    }
+
+    private var courseFallback: some View {
+        ZStack {
+            LinearGradient(
+                colors: [SchoologyStyle.blue, SchoologyStyle.blue.opacity(0.62)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            Image(systemName: "book.closed.fill")
+                .font(.system(size: 34))
+                .foregroundStyle(.white.opacity(0.92))
+        }
+    }
+}
+
+private struct UpcomingEventList: View {
+    let events: [SchoologyUpcomingEvent]
+
+    var body: some View {
+        if events.isEmpty {
+            ContentUnavailableView(
+                "No upcoming events",
+                systemImage: "calendar",
+                description: Text("Assignments, discussions, quizzes, and events will appear here.")
+            )
+            .frame(maxWidth: .infinity, minHeight: 180)
+        } else {
+            LazyVStack(alignment: .leading, spacing: 16) {
+                ForEach(upcomingDays) { day in
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(day.date.formatted(date: .complete, time: .omitted))
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.secondary)
+
+                        VStack(spacing: 0) {
+                            ForEach(day.events) { event in
+                                NavigationLink {
+                                    UpcomingEventDetailView(event: event)
+                                } label: {
+                                    HStack(spacing: 12) {
+                                        Image(systemName: icon(for: event.type))
+                                            .font(.title3)
+                                            .foregroundStyle(SchoologyStyle.blue)
+                                            .frame(width: 34)
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            Text(event.title)
+                                                .font(.body.weight(.medium))
+                                                .foregroundStyle(.primary)
+                                            Text([event.typeLabel, event.timeLabel].filter { !$0.isEmpty }.joined(separator: " • "))
+                                                .font(.caption).foregroundStyle(.secondary)
+                                        }
+                                        Spacer()
+                                        Image(systemName: "chevron.right")
+                                            .font(.caption.weight(.semibold))
+                                            .foregroundStyle(.tertiary)
+                                    }
+                                    .padding(.vertical, 12)
+                                    .padding(.horizontal, 14)
+                                    .contentShape(Rectangle())
+                                }
+                                .buttonStyle(.plain)
+                                if event.id != day.events.last?.id {
+                                    Divider().padding(.leading, 60)
+                                }
+                            }
+                        }
+                        .background(.background, in: RoundedRectangle(cornerRadius: 14))
+                        .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(.quaternary, lineWidth: 1))
+                    }
+                }
+
+                if !undatedEvents.isEmpty {
+                    Text("Date not available")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    ForEach(undatedEvents) { event in
+                        NavigationLink(event.title, destination: UpcomingEventDetailView(event: event))
+                            .buttonStyle(.plain)
+                    }
+                }
+            }
+        }
+    }
+
+    private var upcomingDays: [UpcomingDay] {
+        let datedEvents = events.compactMap { event -> (Date, SchoologyUpcomingEvent)? in
+            guard let date = event.date else { return nil }
+            return (Calendar.current.startOfDay(for: date), event)
+        }
+        let grouped = Dictionary(grouping: datedEvents) { $0.0 }
+        return grouped.keys.sorted().map { date in
+            let dayEvents = (grouped[date] ?? []).map { $0.1 }.sorted {
+                ($0.date ?? .distantFuture) < ($1.date ?? .distantFuture)
+            }
+            return UpcomingDay(date: date, events: dayEvents)
+        }
+    }
+
+    private var undatedEvents: [SchoologyUpcomingEvent] {
+        events.filter { $0.date == nil }
+    }
+
+    private func icon(for type: String) -> String {
+        switch type {
+        case "assignment": "doc.text"
+        case "assessment", "assessment_v2", "managed_assessment", "quiz": "doc.text.magnifyingglass"
+        case "discussion": "text.bubble"
+        case "external_tool": "app"
+        case "event": "calendar"
+        default: "calendar"
+        }
+    }
+}
+
+private struct UpcomingDay: Identifiable {
+    let date: Date
+    let events: [SchoologyUpcomingEvent]
+    var id: Date { date }
+}
+
+private struct CourseDashboardDetailView: View {
+    @Environment(AppSession.self) private var session
+    let course: SchoologyCourse
+    @State private var events: [SchoologyUpcomingEvent] = []
+    @State private var schoolName = ""
+    @State private var isLoading = true
+
+    var body: some View {
+        List {
+            Section("Course") {
+                LabeledContent("Course", value: course.title)
+                if !course.section.isEmpty { LabeledContent("Section", value: course.section) }
+                if !course.courseCode.isEmpty { LabeledContent("Course code", value: course.courseCode) }
+                if !schoolName.isEmpty { LabeledContent("School", value: schoolName) }
+            }
+
+            Section("Upcoming") {
+                if isLoading {
+                    ProgressView().frame(maxWidth: .infinity)
+                } else if events.isEmpty {
+                    ContentUnavailableView("Nothing upcoming", systemImage: "calendar")
+                } else {
+                    ForEach(events) { event in
+                        NavigationLink {
+                            UpcomingEventDetailView(event: event)
+                        } label: {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(event.title).font(.body.weight(.medium))
+                                Text([event.typeLabel, event.date?.formatted(date: .abbreviated, time: .shortened) ?? ""]
+                                    .filter { !$0.isEmpty }.joined(separator: " • "))
+                                    .font(.caption).foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .navigationTitle(course.title)
+        .task {
+            async let eventRequest = session.loadUpcomingEvents(for: course)
+            async let schoolRequest = session.loadSchoolName(for: course)
+            events = await eventRequest
+            schoolName = await schoolRequest
+            isLoading = false
+        }
+    }
+}
+
+private struct UpcomingEventDetailView: View {
+    let event: SchoologyUpcomingEvent
+
+    var body: some View {
+        List {
+            Section("Details") {
+                LabeledContent("Type", value: event.typeLabel)
+                LabeledContent("Title", value: event.title)
+                if let date = event.date {
+                    LabeledContent("Date", value: date.formatted(date: .complete, time: .shortened))
+                }
+                if event.allDay {
+                    LabeledContent("Time", value: "All day")
+                }
+            }
+            if let url = event.webURL {
+                Section {
+                    Link(destination: url) {
+                        Label("Open in Schoology", systemImage: "arrow.up.right.square")
+                    }
+                }
+            }
+        }
+        .navigationTitle(event.typeLabel)
     }
 }
 
 struct CourseListView: View {
     @Environment(AppSession.self) private var session
+
     var body: some View {
         List(session.courses) { course in
-            Label {
-                VStack(alignment: .leading) {
-                    Text(course.title)
-                    if !course.courseCode.isEmpty || !course.section.isEmpty {
-                        Text([course.courseCode, course.section].filter { !$0.isEmpty }.joined(separator: " • "))
-                            .font(.caption).foregroundStyle(.secondary)
+            NavigationLink {
+                CourseDashboardDetailView(course: course)
+            } label: {
+                Label {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(course.title)
+                        if !course.courseCode.isEmpty || !course.section.isEmpty {
+                            Text([course.courseCode, course.section].filter { !$0.isEmpty }.joined(separator: " • "))
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
                     }
+                } icon: {
+                    Image(systemName: "book.closed.fill").foregroundStyle(SchoologyStyle.blue)
                 }
-            } icon: {
-                Image(systemName: "book.closed.fill").foregroundStyle(SchoologyStyle.blue)
             }
         }
         .overlay {
@@ -99,12 +491,14 @@ struct CourseListView: View {
                 ContentUnavailableView("No courses yet", systemImage: "books.vertical")
             }
         }
-        .task { await session.refresh() }
+        .refreshable { await session.refresh() }
+        .task { if session.courses.isEmpty { await session.refresh() } }
     }
 }
 
 struct GroupListView: View {
     @Environment(AppSession.self) private var session
+
     var body: some View {
         List(session.groups) { group in
             Label(group.title, systemImage: "person.3.fill")
@@ -114,12 +508,14 @@ struct GroupListView: View {
                 ContentUnavailableView("No groups yet", systemImage: "person.3")
             }
         }
-        .task { await session.refresh() }
+        .refreshable { await session.refresh() }
+        .task { if session.groups.isEmpty { await session.refresh() } }
     }
 }
 
 struct PlaceholderView: View {
     let destination: AppDestination
+
     var body: some View {
         ContentUnavailableView(
             destination.rawValue,
