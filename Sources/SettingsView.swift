@@ -47,13 +47,7 @@ struct SettingsView: View {
                             if let url = updates.installURL { openURL(url) }
                             #endif
                         }
-                        .disabled(
-                            #if os(macOS)
-                            updates.macOSDownloadURL == nil || isInstallingUpdate
-                            #else
-                            updates.installURL == nil
-                            #endif
-                        )
+                        .disabled(isUpdateInstallDisabled)
                         #if os(macOS)
                         if isInstallingUpdate {
                             ProgressView("Downloading and preparing update…")
@@ -112,6 +106,14 @@ struct SettingsView: View {
         .formStyle(.grouped)
         .padding()
         .frame(maxWidth: 720)
+    }
+
+    private var isUpdateInstallDisabled: Bool {
+        #if os(macOS)
+        updates.macOSDownloadURL == nil || isInstallingUpdate
+        #else
+        updates.installURL == nil
+        #endif
     }
 
     #if os(macOS)
