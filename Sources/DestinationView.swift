@@ -13,6 +13,7 @@ struct DestinationView: View {
             case .messages: MessagesView()
             case .notifications: NotificationsView()
             case .profile: SignedInProfileView()
+            case .people: SchoologyPeopleDirectoryScreen()
             case .settings: SettingsView()
             default: PlaceholderView(destination: destination)
             }

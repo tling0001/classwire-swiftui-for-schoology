@@ -2,11 +2,11 @@ import SwiftUI
 
 private enum SchoologyCourseTab: String, CaseIterable, Identifiable {
     case materials = "Materials"
-    case assignments = "Assignments"
     case updates = "Updates"
     case grades = "Grades"
     case members = "Members"
     case upcoming = "Upcoming"
+    case courseApps = "Course Apps"
     var id: String { rawValue }
 }
 
@@ -15,8 +15,10 @@ struct SchoologyCourseProfileView: View {
     let course: SchoologyCourse
     @State private var tab: SchoologyCourseTab = .materials
     @State private var materials: [SchoologyProfileItem] = []
-    @State private var assignments: [SchoologyProfileItem] = []
     @State private var updates: [SchoologyActivity] = []
+    @State private var courseApps: [SchoologyCourseApp] = []
+    @State private var courseAppsLoading = false
+    @State private var courseAppsError: String?
     @State private var grades: [SchoologyProfileItem] = []
     @State private var members: [SchoologyProfileItem] = []
     @State private var upcoming: [SchoologyUpcomingEvent] = []
@@ -39,6 +41,7 @@ struct SchoologyCourseProfileView: View {
             }
         }
         .task(id: tab) { await load() }
+        .task(id: course.id) { await loadCourseApps() }
         .refreshable { await load() }
     }
 
@@ -72,8 +75,18 @@ struct SchoologyCourseProfileView: View {
                 if !course.courseCode.isEmpty { Text(course.courseCode).font(.caption).foregroundStyle(.secondary) }
                 if !schoolName.isEmpty { Text(schoolName).font(.caption).foregroundStyle(SchoologyStyle.blue) }
                 Divider().padding(.vertical, 3)
-                ForEach([SchoologyCourseTab.materials, .assignments, .updates, .grades, .members]) { item in
+                ForEach([SchoologyCourseTab.materials, .updates, .grades, .members]) { item in
                     courseTabButton(item)
+                }
+                if courseAppsLoading || !courseApps.isEmpty || courseAppsError != nil {
+                    Divider().padding(.vertical, 3)
+                    Text("Course Apps").font(.caption.weight(.semibold)).foregroundStyle(.secondary).padding(.horizontal, 10)
+                    if courseAppsLoading && courseApps.isEmpty { ProgressView().controlSize(.small).padding(10) }
+                    if let courseAppsError, courseApps.isEmpty { Text(courseAppsError).font(.caption).foregroundStyle(.secondary).padding(10) }
+                    ForEach(courseApps) { app in
+                        NavigationLink { SchoologyCourseAppLaunchView(courseID: course.id, app: app) } label: { courseAppLabel(app) }
+                            .buttonStyle(.plain)
+                    }
                 }
                 Spacer(minLength: 0)
             }
@@ -143,12 +156,32 @@ struct SchoologyCourseProfileView: View {
     private func courseTabSymbol(_ item: SchoologyCourseTab) -> String {
         switch item {
         case .materials: "folder"
-        case .assignments: "doc.text"
         case .updates: "text.bubble"
         case .grades: "chart.bar"
         case .members: "person.2"
         case .upcoming: "calendar"
+        case .courseApps: "square.grid.2x2"
         }
+    }
+
+    @ViewBuilder private func courseAppLabel(_ app: SchoologyCourseApp) -> some View {
+        HStack(spacing: 10) {
+            if let logoURL = app.logoURL {
+                AuthenticatedSchoologyImage(url: logoURL).frame(width: 28, height: 28).clipShape(RoundedRectangle(cornerRadius: 6))
+            } else {
+                Image(systemName: "square.grid.2x2").font(.title3).foregroundStyle(SchoologyStyle.blue).frame(width: 28, height: 28)
+            }
+            Text(app.title).font(.subheadline).lineLimit(2)
+            Spacer(minLength: 0)
+        }.frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, 7).contentShape(Rectangle())
+    }
+
+    private func loadCourseApps() async {
+        courseAppsLoading = true
+        courseAppsError = nil
+        defer { courseAppsLoading = false }
+        do { courseApps = try await session.loadCourseApps(courseID: course.id) }
+        catch { courseAppsError = error.localizedDescription }
     }
 
     private func courseUpcomingRow(_ event: SchoologyUpcomingEvent) -> some View {
@@ -185,18 +218,6 @@ struct SchoologyCourseProfileView: View {
                 }
             }
             .overlay { if materials.isEmpty && !loading { ContentUnavailableView("No materials", systemImage: "folder") } }
-        case .assignments:
-            List(assignments) { item in
-                NavigationLink {
-                    SchoologyAssignmentDetailView(sectionID: course.id, assignmentID: item.id, title: item.title)
-                } label: {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(item.title)
-                        if !item.subtitle.isEmpty { Text(item.subtitle).font(.caption).foregroundStyle(.secondary) }
-                    }
-                }
-            }
-            .overlay { if assignments.isEmpty && !loading { ContentUnavailableView("No assignments", systemImage: "doc.text") } }
         case .updates:
             ScrollView { RecentActivityView(activities: updates).padding() }
         case .grades:
@@ -209,12 +230,21 @@ struct SchoologyCourseProfileView: View {
             }
             .overlay { if grades.isEmpty && !loading { ContentUnavailableView("No grades available", systemImage: "chart.bar") } }
         case .members:
-            List(members) { item in
-                NavigationLink { SchoologyPersonProfileView(userID: item.id) } label: {
-                    Label(item.title, systemImage: item.isAdmin ? "star.circle.fill" : "person.crop.circle")
+            SchoologyPeopleDirectoryView(items: members, membersMode: true, placeholder: "Search course members")
+        case .courseApps:
+            Group {
+                if courseAppsLoading && courseApps.isEmpty {
+                    ProgressView("Loading course apps…").frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else if let courseAppsError, courseApps.isEmpty {
+                    ContentUnavailableView("Unable to load course apps", systemImage: "exclamationmark.triangle", description: Text(courseAppsError))
+                } else if courseApps.isEmpty {
+                    ContentUnavailableView("No course apps", systemImage: "square.grid.2x2")
+                } else {
+                    List(courseApps) { app in
+                        NavigationLink { SchoologyCourseAppLaunchView(courseID: course.id, app: app) } label: { courseAppLabel(app) }
+                    }
                 }
             }
-            .overlay { if members.isEmpty && !loading { ContentUnavailableView("No members", systemImage: "person.2") } }
         case .upcoming:
             List(upcoming) { event in
                 NavigationLink {
@@ -240,11 +270,11 @@ struct SchoologyCourseProfileView: View {
     private var currentIsEmpty: Bool {
         switch tab {
         case .materials: return materials.isEmpty
-        case .assignments: return assignments.isEmpty
         case .updates: return updates.isEmpty
         case .grades: return grades.isEmpty
         case .members: return members.isEmpty
         case .upcoming: return upcoming.isEmpty
+        case .courseApps: return courseApps.isEmpty
         }
     }
 
@@ -257,11 +287,11 @@ struct SchoologyCourseProfileView: View {
             schoolName = await session.loadSchoolName(for: course)
             switch tab {
             case .materials: materials = try await session.loadCourseMaterials(courseID: course.id)
-            case .assignments: assignments = try await session.loadCourseAssignments(courseID: course.id)
             case .updates: updates = try await session.loadCourseUpdates(courseID: course.id)
             case .grades: grades = try await session.loadCourseGrades(courseID: course.id)
             case .members: members = try await session.loadCourseMembers(courseID: course.id)
             case .upcoming: upcoming = await session.loadUpcomingEvents(for: course)
+            case .courseApps: break
             }
         } catch { self.error = error.localizedDescription }
         loading = false

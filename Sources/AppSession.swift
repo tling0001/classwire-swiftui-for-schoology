@@ -175,6 +175,45 @@ final class AppSession {
         return SchoologyProfileItem.decodeList(Self.object(data), keys: ["enrollment", "enrollments", "user", "users"])
     }
 
+    func loadCourseApps(courseID: String) async throws -> [SchoologyCourseApp] {
+        guard let auth else { throw SchoologyAPIError.notSignedIn }
+        let data = try await api.getV2("sections/\\(courseID)/applications", auth: auth)
+        return SchoologyCourseApp.decodeList(data)
+    }
+
+    func launchCourseApp(_ app: SchoologyCourseApp, courseID: String) async throws -> URL {
+        guard let auth else { throw SchoologyAPIError.notSignedIn }
+        guard let launchURL = app.launchURL else { throw SchoologyAPIError.invalidResponse }
+        return try await api.launchCourseApp(launchURL, sectionID: courseID, auth: auth)
+    }
+
+    func loadPeopleDirectory() async throws -> [SchoologyProfileItem] {
+        guard let auth else { throw SchoologyAPIError.notSignedIn }
+        do {
+            let data = try await api.get("users", auth: auth, params: ["start": "0", "limit": "200"])
+            return SchoologyProfileItem.decodeList(Self.object(data), keys: ["user", "users", "items"])
+                .sorted { $0.lastName.localizedCaseInsensitiveCompare($1.lastName) == .orderedAscending }
+        } catch let error as SchoologyAPIError {
+            guard case .http(403, _) = error else { throw error }
+        }
+        let sectionData = try await api.get("users/\\(auth.userID)/sections", auth: auth, params: ["limit": "100"])
+        let sections = SchoologyCourse.decodeList(Self.object(sectionData))
+        var peopleByID: [String: SchoologyProfileItem] = [:]
+        if let user {
+            peopleByID[user.id] = SchoologyProfileItem(
+                id: user.id, title: user.nameDisplay, body: "", subtitle: "", url: nil,
+                isAdmin: false, kind: "person", collectionID: nil, pictureURL: user.pictureURL
+            )
+        }
+        for section in sections.prefix(30) {
+            guard let data = try? await api.get("sections/\\(section.id)/enrollments", auth: auth,
+                params: ["enrollment_status": "1", "limit": "200"]) else { continue }
+            let members = SchoologyProfileItem.decodeList(Self.object(data), keys: ["enrollment", "enrollments", "user", "users"])
+            for member in members where !member.id.isEmpty { peopleByID[member.id] = member }
+        }
+        return peopleByID.values.sorted { $0.lastName.localizedCaseInsensitiveCompare($1.lastName) == .orderedAscending }
+    }
+
     func loadCourseGrades(courseID: String) async throws -> [SchoologyProfileItem] {
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         let data = try await api.get("sections/\(courseID)/grades", auth: auth, params: ["start": "0", "limit": "100"])

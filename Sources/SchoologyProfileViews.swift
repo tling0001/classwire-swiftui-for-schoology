@@ -117,25 +117,27 @@ struct GroupProfileView: View {
                     if profile.permissions.canCreateAlbum { Button("Create album", systemImage: "photo.badge.plus") { presentedAction = .album } }
                     if profile.permissions.canAddResources { Button("Add resource", systemImage: "folder.badge.plus") { presentedAction = .resource } }
                 } label: {
-                    Label("Create", systemImage: "plus.circle.fill")
-                        .font(.subheadline.weight(.semibold))
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 14).padding(.vertical, 10)
+                    Label("Create", systemImage: "plus.circle.fill").font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 14).padding(.vertical, 10)
                 }
                 .accessibilityHint("Shows actions allowed by this group's permissions")
             }
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 12) {
-                    switch tab {
-                    case .updates: RecentActivityView(activities: profile.updates)
-                    case .members: memberRows(profile.members)
-                    case .upcoming: ForEach(profile.upcoming) { event in eventCard(event) }
-                    case .discussions: profileRows(profile.discussions, empty: "No discussions")
-                    case .albums: profileRows(profile.albums, empty: "No albums")
-                    case .resources: profileRows(profile.resources, empty: "No resources")
-                    case .info: EmptyView()
-                    }
-                }.padding()
+            if tab == .members {
+                SchoologyPeopleDirectoryView(items: profile.members, membersMode: true, placeholder: "Search group members")
+            } else {
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 12) {
+                        switch tab {
+                        case .updates: RecentActivityView(activities: profile.updates)
+                        case .members: EmptyView()
+                        case .upcoming: ForEach(profile.upcoming) { event in eventCard(event) }
+                        case .discussions: profileRows(profile.discussions, empty: "No discussions")
+                        case .albums: profileRows(profile.albums, empty: "No albums")
+                        case .resources: profileRows(profile.resources, empty: "No resources")
+                        case .info: EmptyView()
+                        }
+                    }.padding()
+                }
             }
         }
     }
@@ -143,33 +145,6 @@ struct GroupProfileView: View {
     private func hasGroupActions(_ permissions: SchoologyGroupPermissions) -> Bool {
         permissions.canPostUpdates || permissions.canCreateDiscussion || permissions.canCreateEvent ||
         permissions.canCreateAlbum || permissions.canAddResources
-    }
-
-    @ViewBuilder private func memberRows(_ items: [SchoologyProfileItem]) -> some View {
-        if items.isEmpty { ContentUnavailableView("No members", systemImage: "person.3") }
-        else {
-            let admins = items.filter(\.isAdmin)
-            let members = items.filter { !$0.isAdmin }
-            if !admins.isEmpty {
-                Section("Admins") { ForEach(admins) { memberRow($0) } }
-            }
-            Section("Members") { ForEach(members) { memberRow($0) } }
-        }
-    }
-
-    private func memberRow(_ item: SchoologyProfileItem) -> some View {
-        NavigationLink { SchoologyPersonProfileView(userID: item.id) } label: {
-            HStack(spacing: 10) {
-                Image(systemName: item.isAdmin ? "star.circle.fill" : "person.crop.circle")
-                    .foregroundStyle(item.isAdmin ? .yellow : SchoologyStyle.blue).font(.title2)
-                VStack(alignment: .leading) {
-                    Text(item.title)
-                    if !item.subtitle.isEmpty { Text(item.subtitle).font(.caption).foregroundStyle(.secondary) }
-                }
-                Spacer()
-            }.padding(12).background(.background, in: RoundedRectangle(cornerRadius: 11))
-                .overlay(RoundedRectangle(cornerRadius: 11).strokeBorder(.quaternary))
-        }.buttonStyle(.plain)
     }
 
     @ViewBuilder private func profileRows(_ items: [SchoologyProfileItem], empty: String) -> some View {

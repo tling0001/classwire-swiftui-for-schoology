@@ -9,22 +9,47 @@ struct SchoologyProfileItem: Identifiable, Sendable {
     let isAdmin: Bool
     let kind: String
     let collectionID: String?
+    var firstName: String = ""
+    var lastName: String = ""
+    var preferredName: String = ""
+    var pictureURL: URL? = nil
+    var role: String = ""
 
     static func decodeList(_ value: Any?, keys: [String]) -> [Self] {
         SchoologyValue.list(value, keys: keys).enumerated().compactMap { index, item in
-            let person = (item["user"] as? [String: Any]) ?? (item["member"] as? [String: Any]) ?? (item["profile"] as? [String: Any]) ?? item
-            let rawID = person["id"] ?? person["uid"] ?? person["user_id"] ?? item["user_id"] ?? item["uid"] ?? item["id"]
+            let nestedPerson = (item["user"] as? [String: Any]) ?? (item["member"] as? [String: Any]) ?? (item["profile"] as? [String: Any])
+            let person = nestedPerson ?? item
+            let rawID: Any?
+            if nestedPerson != nil {
+                rawID = person["id"] ?? person["uid"] ?? person["user_id"] ?? item["user_id"] ?? item["userId"] ?? item["uid"] ?? item["id"]
+            } else {
+                rawID = item["user_id"] ?? item["userId"] ?? item["uid"] ?? item["id"]
+            }
+            let firstName = SchoologyValue.string(person["name_display_start"] ?? person["nameDisplayStart"] ?? person["name_first"] ?? person["first_name"] ?? person["nameFirst"])
+            let lastName = SchoologyValue.string(person["name_last"] ?? person["last_name"] ?? person["nameLast"])
+            let preferredName = SchoologyValue.string(person["name_first_preferred"] ?? person["nameFirstPreferred"])
+            let displayName = [firstName, lastName].filter { !$0.isEmpty }.joined(separator: " ")
+            let roleValue = item["role"] ?? item["role_name"] ?? item["roleName"] ?? person["role"] ?? person["role_name"] ?? person["roleName"]
+            let roleObject = roleValue as? [String: Any]
+            let roleText = SchoologyValue.string(roleObject?["name"] ?? roleObject?["title"] ?? roleObject?["label"] ?? roleValue)
+            let adminFlags: [Any?] = [item["admin"], item["is_admin"], item["isAdmin"], item["group_admin"], item["groupAdmin"], item["is_group_admin"], item["isGroupAdmin"], item["owner"], item["is_owner"], item["isOwner"], person["admin"], person["is_admin"], person["isAdmin"]]
+            let normalizedRole = roleText.lowercased().replacingOccurrences(of: "_", with: " ").replacingOccurrences(of: "-", with: " ")
+            let isAdmin = adminFlags.contains(where: { SchoologyValue.bool($0) }) || ["admin", "administrator", "owner"].contains { normalizedRole.contains($0) }
             let nestedTemplate = item["template"] as? [String: Any] ?? [:]
             let nestedFields = item["template_fields"] as? [String: Any] ?? [:]
+            let rawTitle = SchoologyValue.string(item["title"] ?? item["subject"] ?? item["template_title"] ?? item["templateTitle"] ?? person["name_display"] ?? person["display_name"] ?? person["name"])
             return Self(
                 id: SchoologyValue.string(rawID, fallback: String(index)),
-                title: SchoologyValue.string(item["title"] ?? item["subject"] ?? item["template_title"] ?? item["templateTitle"] ?? person["name_display"] ?? person["display_name"] ?? person["name"], fallback: "Schoology"),
+                title: rawTitle.isEmpty ? (displayName.isEmpty ? "Schoology" : displayName) : rawTitle,
                 body: SchoologyValue.plainText(SchoologyValue.string(item["body"] ?? item["description"] ?? item["message"])),
-                subtitle: SchoologyValue.string(item["role_name"] ?? item["role"] ?? item["due"] ?? item["due_date"] ?? item["dueDate"] ?? item["created"] ?? item["timestamp"] ?? item["photo_count"]),
+                subtitle: SchoologyValue.string(roleText.isEmpty ? (item["due"] ?? item["due_date"] ?? item["dueDate"] ?? item["created"] ?? item["timestamp"] ?? item["photo_count"]) : roleText),
                 url: SchoologyValue.url(item["link"] ?? item["url"] ?? item["web_url"] ?? item["webUrl"] ?? item["file_download_url"] ?? item["download_path"] ?? item["photo_url"] ?? item["photoUrl"] ?? item["original_url"] ?? item["originalUrl"] ?? ((item["attachments"] as? [String: Any])?["files"] as? [String: Any])?["file_download_url"] ?? ((item["attachment"] as? [String: Any])?["file"] as? [String: Any])?["file_download_url"]),
-                isAdmin: SchoologyValue.bool(item["admin"] ?? item["is_admin"] ?? item["isAdmin"] ?? person["admin"] ?? person["is_admin"]),
+                isAdmin: isAdmin,
                 kind: SchoologyValue.string(item["template_type"] ?? item["templateType"] ?? item["type"] ?? item["assignment_type"] ?? item["assignmentType"] ?? item["document_type"] ?? item["documentType"] ?? nestedTemplate["template_document_type"] ?? nestedFields["document_type"]).lowercased(),
-                collectionID: SchoologyValue.optionalString(item["collection_id"] ?? item["collectionID"] ?? item["collectionId"])
+                collectionID: SchoologyValue.optionalString(item["collection_id"] ?? item["collectionID"] ?? item["collectionId"]),
+                firstName: firstName, lastName: lastName, preferredName: preferredName,
+                pictureURL: SchoologyValue.url(person["picture_url"] ?? person["pictureUrl"] ?? person["picture"] ?? person["photo_url"] ?? person["photoUrl"]),
+                role: roleText
             )
         }
     }

@@ -1,5 +1,17 @@
 # Schoology SwiftUI Release Notes
 
+## [2026.10.0-port.12]
+
+### Course Apps and People
+- Remove the unsupported Assignments course-profile tab; assignments remain accessible from official activity and upcoming-item destinations.
+- Restore Course Apps separately from core course sections, filter `@extra` entries through the `@items` relationship, and use validated OAuth-signed v2 launch links.
+- Add native pushed Course App destinations backed by the authenticated WebKit session.
+- Reuse one searchable, alphabetically grouped People directory for course members, group members, and the People destination, including All / Members / Admins filters and administrator badges.
+- Prefer enrollment user IDs over enrollment record IDs when decoding member profiles.
+
+### Build
+- Increment the iOS and macOS bundle build number to 12.
+
 ## [2026.10.0-port.11]
 
 ### Adaptive wide-screen layouts

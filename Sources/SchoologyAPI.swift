@@ -228,6 +228,40 @@ actor SchoologyAPI {
         return try await send(url: url, method: "GET", body: nil, auth: auth, signed: true, extra: [])
     }
 
+    func getV2(_ path: String, auth: SchoologyAuth, params: [String: String] = [:]) async throws -> Data {
+        var components = URLComponents(string: "https://\\(apiHost)/v2/\\(path)")!
+        components.queryItems = params.sorted { $0.key < $1.key }.map { URLQueryItem(name: $0.key, value: $1.value) }
+        guard let url = components.url else { throw SchoologyAPIError.invalidResponse }
+        return try await send(url: url, method: "GET", body: nil, auth: auth, signed: true, extra: [])
+    }
+
+    func launchCourseApp(_ launchLink: URL, sectionID: String, auth: SchoologyAuth) async throws -> URL {
+        let apiBase = URL(string: "https://\\(apiHost)")!
+        let url = URL(string: launchLink.absoluteString, relativeTo: apiBase)?.absoluteURL ?? launchLink
+        guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+              components.scheme?.lowercased() == "https",
+              components.host?.caseInsensitiveCompare(apiHost) == .orderedSame,
+              components.user == nil, components.password == nil, components.port == nil else {
+            throw SchoologyAPIError.invalidResponse
+        }
+        let path = components.path.split(separator: "/")
+        guard path.count == 6, path[0] == "v2", path[1] == "sections",
+              String(path[2]) == sectionID, path[3] == "applications",
+              Int(path[4]) != nil, path[5] == "launch" else {
+            throw SchoologyAPIError.invalidResponse
+        }
+        let data = try await send(url: url, method: "GET", body: nil, auth: auth, signed: true, extra: [])
+        let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] ?? [:]
+        let payload = (json["data"] as? [String: Any]) ?? (json["response"] as? [String: Any]) ?? json
+        guard let rawURL = payload["url"] as? String, let destination = URL(string: rawURL),
+              let target = URLComponents(url: destination, resolvingAgainstBaseURL: false),
+              target.scheme?.lowercased() == "https", target.host != nil,
+              target.user == nil, target.password == nil else {
+            throw SchoologyAPIError.invalidResponse
+        }
+        return destination
+    }
+
     func post(_ path: String, auth: SchoologyAuth) async throws -> Data {
         try await post(path, auth: auth, params: [:])
     }
