@@ -1,5 +1,13 @@
 # Schoology SwiftUI Release Notes
 
+## [2026.10.0-port.5]
+
+### Fixed
+- Correct the iOS primary icon metadata in the generated Info.plist so the app points to the AppIcon asset catalog.
+- Validate the exported icon from the compiled Assets.car using Apple's assetutil, including the 1024x1024 primary rendition.
+- Keep the Xcode project fallback build number aligned with the port release number.
+
+
 ## [2026.10.0-port.4]
 
 ### Fixed
