@@ -10,7 +10,15 @@ import AppKit
 @MainActor
 final class SchoolBrowserAuthenticator: NSObject, ASWebAuthenticationPresentationContextProviding {
     private var activeSession: ASWebAuthenticationSession?
+    private var pendingContinuation: CheckedContinuation<URL, Error>?
     private var isCancelling = false
+
+    #if os(macOS)
+    // Keep a fallback anchor alive for the entire authentication session. Returning
+    // an unretained temporary NSWindow can leave AuthenticationServices with a
+    // deallocated presentation anchor when the app is reactivated for the callback.
+    private var fallbackPresentationWindow: NSWindow?
+    #endif
 
     func cancel() {
         isCancelling = true
@@ -18,38 +26,53 @@ final class SchoolBrowserAuthenticator: NSObject, ASWebAuthenticationPresentatio
     }
 
     func authenticate(using url: URL) async throws -> URL {
-        if isCancelling {
+        guard !isCancelling else {
             isCancelling = false
             throw CancellationError()
         }
-        return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<URL, Error>) in
+        guard activeSession == nil, pendingContinuation == nil else {
+            throw SchoolBrowserAuthenticatorError.authenticationAlreadyInProgress
+        }
+
+        return try await withCheckedThrowingContinuation { continuation in
+            pendingContinuation = continuation
             let session = ASWebAuthenticationSession(
                 url: url,
                 callback: .customScheme("schoology")
             ) { [weak self] callbackURL, error in
-                Task { @MainActor in
-                    let wasCancelledByApp = self?.isCancelling == true
-                    self?.isCancelling = false
-                    self?.activeSession = nil
-                    if wasCancelledByApp {
-                        continuation.resume(throwing: CancellationError())
+                Task { @MainActor [weak self] in
+                    guard let self else { return }
+                    if self.isCancelling {
+                        self.finish(.failure(CancellationError()))
                     } else if let error {
-                        continuation.resume(throwing: error)
+                        self.finish(.failure(error))
                     } else if let callbackURL {
-                        continuation.resume(returning: callbackURL)
+                        self.finish(.success(callbackURL))
                     } else {
-                        continuation.resume(throwing: SchoolBrowserAuthenticatorError.missingCallback)
+                        self.finish(.failure(SchoolBrowserAuthenticatorError.missingCallback))
                     }
                 }
             }
             session.presentationContextProvider = self
             session.prefersEphemeralWebBrowserSession = false
             activeSession = session
-            if !session.start() {
-                activeSession = nil
-                continuation.resume(throwing: SchoolBrowserAuthenticatorError.unableToStart)
+
+            guard session.start() else {
+                finish(.failure(SchoolBrowserAuthenticatorError.unableToStart))
+                return
             }
         }
+    }
+
+    private func finish(_ result: Result<URL, Error>) {
+        guard let continuation = pendingContinuation else { return }
+        pendingContinuation = nil
+        activeSession = nil
+        isCancelling = false
+        #if os(macOS)
+        fallbackPresentationWindow = nil
+        #endif
+        continuation.resume(with: result)
     }
 
     func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
@@ -59,7 +82,19 @@ final class SchoolBrowserAuthenticator: NSObject, ASWebAuthenticationPresentatio
             .flatMap(\.windows)
             .first(where: \.isKeyWindow) ?? UIWindow()
         #else
-        NSApplication.shared.keyWindow ?? NSApplication.shared.mainWindow ?? NSWindow()
+        if let window = NSApplication.shared.keyWindow
+            ?? NSApplication.shared.mainWindow
+            ?? NSApplication.shared.windows.first(where: \.isVisible) {
+            return window
+        }
+        let anchor = fallbackPresentationWindow ?? NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 1, height: 1),
+            styleMask: [.borderless],
+            backing: .buffered,
+            defer: false
+        )
+        fallbackPresentationWindow = anchor
+        return anchor
         #endif
     }
 }
@@ -67,11 +102,13 @@ final class SchoolBrowserAuthenticator: NSObject, ASWebAuthenticationPresentatio
 private enum SchoolBrowserAuthenticatorError: LocalizedError {
     case missingCallback
     case unableToStart
+    case authenticationAlreadyInProgress
 
     var errorDescription: String? {
         switch self {
         case .missingCallback: "School sign-in did not return an authorization callback."
         case .unableToStart: "The secure school sign-in browser could not be started."
+        case .authenticationAlreadyInProgress: "A school sign-in session is already in progress."
         }
     }
 }
