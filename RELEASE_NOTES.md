@@ -1,5 +1,14 @@
 # Schoology SwiftUI Release Notes
 
+## [2026.10.0-port.6]
+
+### Fixed
+- Add the asset catalog directly to each app target's resource build phase so Xcode compiles it into the iOS and macOS applications.
+- Remove manually injected iOS primary-icon metadata and let the asset catalog compiler generate the authoritative CFBundleIcons entries.
+- Validate the compiled asset catalog before validating the primary icon metadata.
+- Align the fallback Xcode build number with port.6.
+
+
 ## [2026.10.0-port.5]
 
 ### Fixed
