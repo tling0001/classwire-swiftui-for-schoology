@@ -1,5 +1,17 @@
 # Schoology SwiftUI Release Notes
 
+## [2026.10.0-port.2]
+
+### Fixed
+- Match the QR authorization endpoint and request signing to the official Tauri 2026.10.0-port.28 implementation.
+- Re-sign Schoology API requests after same-host HTTPS redirects instead of replaying a stale OAuth Authorization header.
+- Verify the access token once before saving it, and store the verified Schoology user ID.
+
+### Changed
+- Align the native sign-in screens, labels, logo treatment, and action buttons with the official Tauri sign-in experience.
+- Add the Schoology ring-and-S app icon for macOS and iOS, including iOS dark and tinted appearances.
+- Increment the native port release to 2026.10.0-port.2.
+
 ## [2026.10.0-port.1]
 
 ### Added

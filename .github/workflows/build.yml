@@ -30,6 +30,8 @@ jobs:
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
+      - name: Prepare Schoology app icons
+        run: swift Scripts/prepare-app-icons.swift
       - name: Read release version
         id: version
         shell: bash
@@ -126,6 +128,8 @@ jobs:
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
+      - name: Prepare Schoology app icons
+        run: swift Scripts/prepare-app-icons.swift
       - name: Read release version
         id: version
         shell: bash

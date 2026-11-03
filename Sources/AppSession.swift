@@ -53,12 +53,7 @@ final class AppSession {
             UserDefaults.standard.set(canadian, forKey: "schoology.canadian")
             await api.setCanadianServer(canadian)
             let credentials = try await api.login(username: username, password: password, schoolID: schoolID)
-            let profile = try await api.currentUser(auth: credentials)
-            KeychainStore.save(credentials)
-            auth = credentials
-            user = profile
-            destination = .home
-            await refresh()
+            try await establishSession(credentials)
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -69,6 +64,7 @@ final class AppSession {
         errorMessage = nil
         defer { isLoading = false }
         do {
+            await api.setCanadianServer(canadianServer)
             let credentials = try await api.loginWithQRCode(qrCode)
             try await establishSession(credentials)
         } catch {
@@ -101,9 +97,16 @@ final class AppSession {
     }
 
     private func establishSession(_ credentials: SchoologyAuth) async throws {
+        // Verify the access token once before persisting it, then bind the returned
+        // Schoology user ID to the credentials used by the rest of the app.
         let profile = try await api.currentUser(auth: credentials)
-        KeychainStore.save(credentials)
-        auth = credentials
+        let verifiedCredentials = SchoologyAuth(
+            token: credentials.token,
+            secret: credentials.secret,
+            userID: profile.id
+        )
+        KeychainStore.save(verifiedCredentials)
+        auth = verifiedCredentials
         user = profile
         destination = .home
         await refresh()

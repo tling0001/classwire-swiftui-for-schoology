@@ -1,6 +1,18 @@
 import Foundation
 import CryptoKit
 
+private final class NoRedirectDelegate: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
+    func urlSession(
+        _ session: URLSession,
+        task: URLSessionTask,
+        willPerformHTTPRedirection response: HTTPURLResponse,
+        newRequest request: URLRequest,
+        completionHandler: @escaping (URLRequest?) -> Void
+    ) {
+        completionHandler(nil)
+    }
+}
+
 enum SchoologyAPIError: LocalizedError {
     case invalidResponse
     case http(Int, String)
@@ -72,7 +84,9 @@ actor SchoologyAPI {
         guard !payload.isEmpty else { throw SchoologyAPIError.invalidResponse }
         await syncServerTime()
         let temporary = try await requestToken()
-        let url = URL(string: "https://\(apiHost)/v1/oauth/qr_code_authorize_auto")!
+        // Match login_qr() in the official Tauri 2026.10.0-port.28 source.
+        // This endpoint is rooted at /oauth, not /v1/oauth.
+        let url = URL(string: "https://\(apiHost)/oauth/qr_code_authorize_auto")!
         let body = formEncode([
             "scanned_qr_data": payload,
             "oauth_token": temporary.token
@@ -173,7 +187,7 @@ actor SchoologyAPI {
     private func requestToken() async throws -> SchoologyAuth {
         let url = URL(string: "https://\(apiHost)/v1/oauth/request_token")!
         let emptyAuth = SchoologyAuth(token: "", secret: "", userID: "")
-        let data = try await send(url: url, method: "GET", body: nil, auth: emptyAuth, signed: true, extra: [])
+        let data = try await send(url: url, method: "GET", body: nil, auth: emptyAuth, signed: true, extra: [], clientIdentity: false)
         let values = parseForm(String(decoding: data, as: UTF8.self))
         guard let token = values["oauth_token"], let secret = values["oauth_token_secret"] else { throw SchoologyAPIError.invalidToken }
         return SchoologyAuth(token: token, secret: secret, userID: "")
@@ -184,9 +198,9 @@ actor SchoologyAPI {
         let data = try await send(url: url, method: "GET", body: nil, auth: temporary, signed: true, extra: [])
         let values = parseForm(String(decoding: data, as: UTF8.self))
         guard let token = values["oauth_token"], let secret = values["oauth_token_secret"] else { throw SchoologyAPIError.invalidToken }
-        let provisional = SchoologyAuth(token: token, secret: secret, userID: "")
-        let profile = try await currentUser(auth: provisional)
-        return SchoologyAuth(token: token, secret: secret, userID: profile.id)
+        // The session layer performs one /users/me verification before it stores
+        // credentials. Keeping verification there avoids duplicate signed requests.
+        return SchoologyAuth(token: token, secret: secret, userID: "")
     }
 
     private func syncServerTime() async {
@@ -197,27 +211,79 @@ actor SchoologyAPI {
         }
     }
 
-    private func send(url: URL, method: String, body: String?, auth: SchoologyAuth?, signed: Bool, extra: [(String, String)]) async throws -> Data {
-        var request = URLRequest(url: url)
-        request.httpMethod = method
-        request.timeoutInterval = 45
-        request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
-        request.setValue("Android", forHTTPHeaderField: "X-Schoology-Client")
-        request.setValue("2026.10.0", forHTTPHeaderField: "X-Schoology-App-Version")
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
-        if auth != nil {
-            request.setValue(mobileCookie, forHTTPHeaderField: "Cookie")
+    private func send(
+        url: URL,
+        method: String,
+        body: String?,
+        auth: SchoologyAuth?,
+        signed: Bool,
+        extra: [(String, String)],
+        clientIdentity: Bool = true
+    ) async throws -> Data {
+        // Schoology can redirect API requests. Match the Tauri host's behavior:
+        // disable automatic redirect replay and create a fresh OAuth signature for
+        // every same-host HTTPS redirect.
+        let session = URLSession(configuration: .ephemeral)
+        let redirectDelegate = NoRedirectDelegate()
+        defer { session.invalidateAndCancel() }
+
+        var currentURL = url
+        var currentMethod = method.uppercased()
+        var currentBody = body
+
+        for redirectCount in 0...5 {
+            var request = URLRequest(url: currentURL)
+            request.httpMethod = currentMethod
+            request.timeoutInterval = 45
+            request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
+            request.setValue("application/json", forHTTPHeaderField: "Accept")
+
+            let isAPIHost = currentURL.host?.caseInsensitiveCompare(apiHost) == .orderedSame
+            if clientIdentity && isAPIHost {
+                request.setValue("Android", forHTTPHeaderField: "X-Schoology-Client")
+                request.setValue("2026.10.0", forHTTPHeaderField: "X-Schoology-App-Version")
+            }
+            if auth != nil && isAPIHost {
+                request.setValue(mobileCookie, forHTTPHeaderField: "Cookie")
+            }
+            if let currentBody {
+                request.httpBody = currentBody.data(using: .utf8)
+                request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+            }
+            if signed {
+                request.setValue(
+                    try authorization(method: currentMethod, url: currentURL, auth: auth, extra: extra),
+                    forHTTPHeaderField: "Authorization"
+                )
+            }
+
+            let (data, response) = try await session.data(for: request, delegate: redirectDelegate)
+            guard let http = response as? HTTPURLResponse else {
+                throw SchoologyAPIError.invalidResponse
+            }
+
+            if (300...399).contains(http.statusCode),
+               redirectCount < 5,
+               let location = http.value(forHTTPHeaderField: "Location"),
+               let nextURL = URL(string: location, relativeTo: currentURL)?.absoluteURL,
+               nextURL.scheme?.lowercased() == "https",
+               nextURL.host?.caseInsensitiveCompare(apiHost) == .orderedSame {
+                if http.statusCode == 303 ||
+                    ([301, 302, 307].contains(http.statusCode) && currentMethod != "GET" && currentMethod != "HEAD") {
+                    if http.statusCode != 307 {
+                        currentMethod = "GET"
+                        currentBody = nil
+                    }
+                }
+                currentURL = nextURL
+                continue
+            }
+
+            try validate(response, data: data)
+            return data
         }
-        if let body {
-            request.httpBody = body.data(using: .utf8)
-            request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
-        }
-        if signed {
-            request.setValue(try authorization(method: method, url: url, auth: auth, extra: extra), forHTTPHeaderField: "Authorization")
-        }
-        let (data, response) = try await URLSession.shared.data(for: request)
-        try validate(response, data: data)
-        return data
+
+        throw SchoologyAPIError.invalidResponse
     }
 
     private func authorization(method: String, url: URL, auth: SchoologyAuth?, extra: [(String, String)]) throws -> String {
