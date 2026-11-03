@@ -10,6 +10,9 @@ struct DestinationView: View {
             case .home: HomeView()
             case .courses: CourseListView()
             case .groups: GroupListView()
+            case .messages: MessagesView()
+            case .notifications: NotificationsView()
+            case .profile: SignedInProfileView()
             case .settings: SettingsView()
             default: PlaceholderView(destination: destination)
             }

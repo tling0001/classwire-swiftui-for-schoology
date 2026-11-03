@@ -65,6 +65,7 @@ private struct SchoologySidebar: View {
         }
 
         Section("More") {
+            destinationRow(.profile)
             ForEach([AppDestination.resources, .grades, .people, .settings]) { item in
                 destinationRow(item)
             }

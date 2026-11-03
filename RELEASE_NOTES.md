@@ -1,5 +1,13 @@
 # Schoology SwiftUI Release Notes
 
+## [2026.10.0-port.8]
+
+### Added
+- Add native Messages with Inbox, Unread (derived from inbox message status), and Sent folders, thread loading with attachments, and an adaptive wide-screen split layout.
+- Add native Notifications using the confirmed notifications endpoint and mark notifications read when Schoology reports unviewed items.
+- Add a signed-in Profile destination to the navigation sidebar.
+
+
 ## [2026.10.0-port.7]
 
 ### Changed

@@ -184,6 +184,11 @@ actor SchoologyAPI {
         return try await send(url: url, method: "GET", body: nil, auth: auth, signed: true, extra: [])
     }
 
+    func post(_ path: String, auth: SchoologyAuth) async throws -> Data {
+        let url = URL(string: "https://\(apiHost)/v1/\(path)")!
+        return try await send(url: url, method: "POST", body: nil, auth: auth, signed: true, extra: [])
+    }
+
     func imageData(_ url: URL, auth: SchoologyAuth) async throws -> Data? {
         guard url.scheme?.lowercased() == "https" || url.scheme?.lowercased() == "http" else { return nil }
         let session = URLSession(configuration: .ephemeral)

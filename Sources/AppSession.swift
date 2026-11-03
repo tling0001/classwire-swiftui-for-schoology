@@ -14,6 +14,8 @@ final class AppSession {
     var errorMessage: String?
     var courses: [SchoologyCourse] = []
     var groups: [SchoologyGroup] = []
+    var notifications: [SchoologyNotification] = []
+    var messageFolder = SchoologyMessageFolder.inbox
     var activities: [SchoologyActivity] = []
     var upcomingEvents: [SchoologyUpcomingEvent] = []
     var schoolNames: [String: String] = [:]
@@ -210,12 +212,90 @@ final class AppSession {
         (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] ?? [:]
     }
 
+
+    func loadMessages(folder: SchoologyMessageFolder, force: Bool = false) async -> [SchoologyMessage] {
+        guard let auth else { return [] }
+        messageFolder = folder
+        let endpoint = folder == .sent ? "messages/sent" : "messages/inbox"
+        do {
+            let data = try await api.get(endpoint, auth: auth, params: ["limit": "50"])
+            let rows = SchoologyMessage.decodeList(Self.object(data))
+            var hydrated = rows
+            let ids = Set(rows.compactMap { folder == .sent ? $0.recipientID : $0.authorID })
+            var users: [String: SchoologyUser] = [:]
+            for id in ids {
+                guard let userData = try? await api.get("users/\(id)", auth: auth) else { continue }
+                let userJSON = Self.object(userData)
+                let raw = (userJSON["user"] as? [String: Any]) ?? userJSON
+                guard raw["id"] != nil else { continue }
+                users[id] = SchoologyUser(
+                    id: id,
+                    nameDisplay: SchoologyValue.string(raw["name_display"] ?? raw["display_name"] ?? raw["name"], fallback: "Schoology user"),
+                    pictureURL: SchoologyValue.url(raw["picture_url"] ?? raw["pictureUrl"] ?? raw["picture"])
+                )
+            }
+            for index in hydrated.indices {
+                let id = folder == .sent ? hydrated[index].recipientID : hydrated[index].authorID
+                hydrated[index].personName = users[id ?? ""]?.nameDisplay ?? (id == auth.userID ? "You" : "Schoology")
+                hydrated[index].personPictureURL = users[id ?? ""]?.pictureURL
+            }
+            return folder == .unread ? hydrated.filter(\.isUnread) : hydrated
+        } catch {
+            errorMessage = error.localizedDescription
+            return []
+        }
+    }
+
+    func loadMessageThread(_ message: SchoologyMessage, folder: SchoologyMessageFolder) async -> [SchoologyMessage] {
+        guard let auth else { return [] }
+        let sourceFolder = folder == .sent ? "sent" : "inbox"
+        do {
+            let data = try await api.get("messages/\(sourceFolder)/\(message.id)", auth: auth, params: ["with_attachments": "TRUE"])
+            let json = Self.object(data)
+            let payload = (json["data"] as? [String: Any]) ?? (json["response"] as? [String: Any]) ?? json
+            let rows = SchoologyMessage.decodeList(payload)
+            var result = rows
+            for index in result.indices {
+                if result[index].personName.isEmpty, let id = result[index].authorID,
+                   let userData = try? await api.get("users/\(id)", auth: auth) {
+                    let userJSON = Self.object(userData)
+                    let raw = (userJSON["user"] as? [String: Any]) ?? userJSON
+                    result[index].personName = SchoologyValue.string(raw["name_display"] ?? raw["display_name"] ?? raw["name"], fallback: "Schoology")
+                    result[index].personPictureURL = SchoologyValue.url(raw["picture_url"] ?? raw["pictureUrl"] ?? raw["picture"])
+                }
+            }
+            return result
+        } catch {
+            errorMessage = error.localizedDescription
+            return []
+        }
+    }
+
+    func loadNotifications() async -> [SchoologyNotification] {
+        guard let auth else { return [] }
+        do {
+            let data = try await api.get("notifications", auth: auth, params: ["limit": "50"])
+            let json = Self.object(data)
+            notifications = SchoologyNotification.decodeList(json)
+            let wrapper = (json["notifications"] as? [String: Any]) ?? json
+            let unviewed = SchoologyValue.integer(wrapper["unviewed_count"] ?? wrapper["unviewedCount"] ?? json["unviewed_count"] ?? json["unviewedCount"])
+            if unviewed > 0 {
+                _ = try? await api.post("notifications/read", auth: auth)
+            }
+            return notifications
+        } catch {
+            errorMessage = error.localizedDescription
+            return []
+        }
+    }
+
     func signOut() {
         KeychainStore.clear()
         auth = nil
         user = nil
         courses = []
         groups = []
+        notifications = []
         activities = []
         upcomingEvents = []
         schoolNames = [:]

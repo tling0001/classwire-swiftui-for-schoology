@@ -33,6 +33,7 @@ enum AppDestination: String, CaseIterable, Identifiable {
     case grades = "Grades"
     case calendar = "Calendar"
     case people = "People"
+    case profile = "Profile"
     case settings = "Settings"
 
     var id: String { rawValue }
@@ -49,6 +50,7 @@ enum AppDestination: String, CaseIterable, Identifiable {
         case .grades: "chart.bar.fill"
         case .calendar: "calendar"
         case .people: "person.2.fill"
+        case .profile: "person.crop.circle"
         case .settings: "gearshape.fill"
         }
     }
