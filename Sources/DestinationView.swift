@@ -12,6 +12,9 @@ struct DestinationView: View {
             case .groups: GroupListView()
             case .messages: MessagesView()
             case .notifications: NotificationsView()
+            case .resources: SchoologyResourcesView()
+            case .grades: SchoologyGradesView()
+            case .calendar: SchoologyCalendarView()
             case .profile: SignedInProfileView()
             case .people: SchoologyPeopleDirectoryScreen()
             case .settings: SettingsView()
@@ -22,9 +25,18 @@ struct DestinationView: View {
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button("Refresh", systemImage: "arrow.clockwise") {
-                    Task { await session.refresh() }
+                    Task {
+                        switch destination {
+                        case .resources: await session.loadResources(force: true)
+                        case .grades: await session.loadUserGradeCourses(force: true)
+                        case .calendar:
+                            await session.loadCalendarUpcoming(force: true)
+                            await session.loadCalendarMonth(Date(), force: true)
+                        default: await session.refresh()
+                        }
+                    }
                 }
-                .disabled(session.isRefreshing)
+                .disabled(session.isRefreshing || session.isLoadingResources || session.isLoadingUserGrades || session.isLoadingCalendar)
             }
         }
     }

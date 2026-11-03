@@ -424,6 +424,3 @@ struct SchoologyWebCookie: Sendable {
     let domain: String
     let path: String
 }
-
-
-}
