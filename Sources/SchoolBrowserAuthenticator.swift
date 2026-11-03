@@ -38,21 +38,9 @@ final class SchoolBrowserAuthenticator: NSObject, ASWebAuthenticationPresentatio
             pendingContinuation = continuation
             let session = ASWebAuthenticationSession(
                 url: url,
-                callback: .customScheme("schoology")
-            ) { [weak self] callbackURL, error in
-                Task { @MainActor [weak self] in
-                    guard let self else { return }
-                    if self.isCancelling {
-                        self.finish(.failure(CancellationError()))
-                    } else if let error {
-                        self.finish(.failure(error))
-                    } else if let callbackURL {
-                        self.finish(.success(callbackURL))
-                    } else {
-                        self.finish(.failure(SchoolBrowserAuthenticatorError.missingCallback))
-                    }
-                }
-            }
+                callback: .customScheme("schoology"),
+                completionHandler: Self.makeCompletionHandler(for: self)
+            )
             session.presentationContextProvider = self
             session.prefersEphemeralWebBrowserSession = false
             activeSession = session
@@ -61,6 +49,31 @@ final class SchoolBrowserAuthenticator: NSObject, ASWebAuthenticationPresentatio
                 finish(.failure(SchoolBrowserAuthenticatorError.unableToStart))
                 return
             }
+        }
+    }
+
+    // This factory is deliberately nonisolated. AuthenticationServices may invoke
+    // its callback on Safari's XPC queue, so the callback itself must not inherit
+    // this type's MainActor isolation. Hop to MainActor before touching session state.
+    nonisolated private static func makeCompletionHandler(
+        for authenticator: SchoolBrowserAuthenticator
+    ) -> (URL?, Error?) -> Void {
+        { [weak authenticator] callbackURL, error in
+            Task { @MainActor [weak authenticator] in
+                authenticator?.receive(callbackURL: callbackURL, error: error)
+            }
+        }
+    }
+
+    private func receive(callbackURL: URL?, error: Error?) {
+        if isCancelling {
+            finish(.failure(CancellationError()))
+        } else if let error {
+            finish(.failure(error))
+        } else if let callbackURL {
+            finish(.success(callbackURL))
+        } else {
+            finish(.failure(SchoolBrowserAuthenticatorError.missingCallback))
         }
     }
 

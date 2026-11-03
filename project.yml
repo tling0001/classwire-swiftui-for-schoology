@@ -34,6 +34,7 @@ targets:
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         SUPPORTS_MACCATALYST: NO
     info:
+      path: Config/Generated-iOS-Info.plist
       properties:
         CFBundleURLTypes:
           - CFBundleURLName: com.schoologytauri.app
@@ -56,4 +57,9 @@ targets:
         ENABLE_APP_SANDBOX: NO
         ENABLE_HARDENED_RUNTIME: YES
     info:
-      path: Config/Info.plist
+      path: Config/Generated-macOS-Info.plist
+      properties:
+        CFBundleURLTypes:
+          - CFBundleURLName: com.schoologytauri.app
+            CFBundleURLSchemes:
+              - schoology
