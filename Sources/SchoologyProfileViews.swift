@@ -48,7 +48,12 @@ struct GroupProfileView: View {
                         groupHeader(profile)
                         ForEach([ProfileTab.updates,.members,.upcoming,.discussions,.albums,.resources]) { item in tabButton(item) }
                         Spacer()
-                        if !schoolName.isEmpty { Text(schoolName).font(.caption).foregroundStyle(.secondary).padding(8) }
+                        if !schoolName.isEmpty, let schoolID = profile.group.schoolID {
+                            NavigationLink { SchoolProfileView(schoolID: schoolID) } label: {
+                                Label(schoolName, systemImage: "building.2")
+                                    .font(.caption).foregroundStyle(SchoologyStyle.blue).padding(8)
+                            }.buttonStyle(.plain)
+                        }
                     }
                     .padding(14).frame(width: 230).background(.regularMaterial)
                     Divider()
@@ -179,7 +184,7 @@ struct GroupProfileView: View {
                 let schoolProfile = try? await session.loadSchoolProfile(id)
                 schoolName = schoolProfile?.school.title ?? ""
             }
-        } catch { error = error.localizedDescription }
+        } catch let loadError { error = loadError.localizedDescription }
         isLoading = false
     }
 }
@@ -304,7 +309,7 @@ struct SchoolProfileView: View {
     private func load() async {
         isLoading = true; error = nil
         do { profile = try await session.loadSchoolProfile(schoolID) }
-        catch { error = error.localizedDescription }
+        catch let loadError { error = loadError.localizedDescription }
         isLoading = false
     }
 
