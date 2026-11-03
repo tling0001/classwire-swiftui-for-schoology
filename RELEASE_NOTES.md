@@ -1,5 +1,11 @@
 # Schoology SwiftUI Release Notes
 
+## [2026.10.0-port.4]
+
+### Fixed
+- Corrected iOS Ad Hoc export validation to inspect the primary icon name at `CFBundleIcons.CFBundlePrimaryIcon.CFBundleIconName`, the location populated by Xcode's asset catalog compiler.
+- Removed the manually injected top-level `CFBundleIconName` value so each platform target uses its own configured app icon asset catalog.
+
 ## [2026.10.0-port.3]
 
 ### Sign-in
