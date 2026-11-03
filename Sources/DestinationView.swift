@@ -48,7 +48,7 @@ struct HomeView: View {
                                 Text(HomeSection.recent.rawValue).tag(HomeSection.recent)
                                 Text(HomeSection.dashboard.rawValue).tag(HomeSection.dashboard)
                             }
-                            .pickerStyle(.segmented)
+                            .schoologyNavigationTabPickerStyle()
                             .accessibilityLabel("Home section")
                             switch session.homeSection {
                             case .recent: RecentActivityView(activities: session.activities, isLoading: !session.hasLoadedHomeActivities, errorMessage: session.homeActivitiesError)
@@ -106,7 +106,7 @@ struct HomeView: View {
                 Picker("Home", selection: $model.homeSection) {
                     ForEach(HomeSection.allCases) { section in Text(section.rawValue).tag(section) }
                 }
-                .pickerStyle(.segmented)
+                .schoologyNavigationTabPickerStyle()
                 .accessibilityLabel("Home section")
                 switch session.homeSection {
                 case .recent: RecentActivityView(activities: session.activities)

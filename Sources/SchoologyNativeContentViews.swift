@@ -338,6 +338,7 @@ struct SchoologyEmbeddedWebView: View {
     @Environment(AppSession.self) private var session
     let url: URL
     let title: String
+    var requiresWebSession = true
     @State private var cookies: [SchoologyWebCookie] = []
     @State private var loading = true
     @State private var error: String?
@@ -351,9 +352,11 @@ struct SchoologyEmbeddedWebView: View {
             }
         }
         .navigationTitle(title)
-        .task {
-            do { cookies = try await session.loadWebSessionCookies() }
-            catch { self.error = error.localizedDescription }
+        .task(id: url) {
+            if requiresWebSession {
+                do { cookies = try await session.loadWebSessionCookies() }
+                catch { self.error = error.localizedDescription }
+            }
             loading = false
         }
     }

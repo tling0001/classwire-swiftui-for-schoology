@@ -1,4 +1,20 @@
-# Schoology SwiftUI Release Notes
+## [2026.10.0-port.17]
+
+### Authentication and course navigation
+- Match the official Android `sessionstart?domain=` web-session bootstrap and scope returned cookies to the Schoology parent domain.
+- Open Course Apps directly from their signed v2 launch URLs without an unnecessary cookie bootstrap.
+- Route course-material assignments, discussions, events, assessments, folders, and linked resources to their matching native or authenticated destinations.
+- Load course Grades using the official course grade-items, grading-period, grading-category, and per-user grade requests instead of the forbidden generic section grades request.
+- Send discussion and assignment comments with the official `comment` and `parent_id` fields.
+
+### Interface
+- Use macOS 26's tab-specific picker style for navigation pickers while retaining the segmented fallback on earlier macOS releases.
+- Add a Liquid Glass surface to post actions, an explicit close control to the comments sheet, and a full-height likes directory.
+- Make the course sidebar independently scrollable and correct the course-tab loading/error text interpolation.
+- Repair the School profile API path interpolation introduced in the previous release.
+
+### Build
+- Increment the iOS and macOS bundle build number to 17.
 
 ## [2026.10.0-port.16]
 

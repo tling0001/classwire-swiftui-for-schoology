@@ -51,11 +51,14 @@ struct SchoologyPostActionsView: View {
                         Label("\(likesCount)", systemImage: "hand.thumbsup")
                     }
                 }
-                Spacer()
             }
             .font(.caption)
             .buttonStyle(.plain)
             .foregroundStyle(isLiked ? AnyShapeStyle(SchoologyStyle.blue) : AnyShapeStyle(.secondary))
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .schoologyGlassSurface()
+            .frame(maxWidth: .infinity, alignment: .leading)
 
             if let errorMessage {
                 Text(errorMessage).font(.caption).foregroundStyle(.red)
@@ -75,7 +78,8 @@ struct SchoologyPostActionsView: View {
                     SchoologyLikesView(target: .update(activity.id))
                 }
             }
-            .presentationDetents([.medium, .large])
+            .presentationDetents(presentedSheet?.id == "likes" ? [.large] : [.medium, .large])
+            .presentationDragIndicator(.visible)
         }
     }
 

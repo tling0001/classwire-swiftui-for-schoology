@@ -61,6 +61,50 @@ enum SchoologyStyle {
     static let deepBlue = Color(red: 0.0, green: 0.13, blue: 0.22)
 }
 
+struct SchoologyNavigationTabPickerModifier: ViewModifier {
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        #if os(macOS)
+        if #available(macOS 26.0, *) {
+            content.pickerStyle(.tabs)
+        } else {
+            content.pickerStyle(.segmented)
+        }
+        #else
+        content.pickerStyle(.segmented)
+        #endif
+    }
+}
+
+struct SchoologyGlassSurfaceModifier: ViewModifier {
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        #if os(macOS)
+        if #available(macOS 26.0, *) {
+            content.glassEffect(.regular, in: Capsule())
+        } else {
+            content.background(.regularMaterial, in: Capsule())
+        }
+        #elseif os(iOS)
+        if #available(iOS 26.0, *) {
+            content.glassEffect(.regular, in: Capsule())
+        } else {
+            content.background(.regularMaterial, in: Capsule())
+        }
+        #endif
+    }
+}
+
+extension View {
+    func schoologyNavigationTabPickerStyle() -> some View {
+        modifier(SchoologyNavigationTabPickerModifier())
+    }
+
+    func schoologyGlassSurface() -> some View {
+        modifier(SchoologyGlassSurfaceModifier())
+    }
+}
+
 #if os(macOS)
 import AppKit
 

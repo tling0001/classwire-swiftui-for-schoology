@@ -247,8 +247,79 @@ final class AppSession {
 
     func loadCourseGrades(courseID: String) async throws -> [SchoologyProfileItem] {
         guard let auth else { throw SchoologyAPIError.notSignedIn }
-        let data = try await api.get("sections/\(courseID)/grades", auth: auth, params: ["start": "0", "limit": "100"])
-        return SchoologyProfileItem.decodeList(Self.object(data), keys: ["grade", "grades", "items"])
+        async let periodsRequest = api.get("sections/\(courseID)/grading_periods", auth: auth)
+        async let categoriesRequest = api.get("sections/\(courseID)/grading_categories", auth: auth)
+        async let itemsRequest = api.get("sections/\(courseID)/grade_items", auth: auth, params: ["limit": "2000"])
+        async let userGradesRequest = api.get("users/\(auth.userID)/grades", auth: auth, params: ["section_id": courseID])
+        let (periodsData, categoriesData, itemsData, userGradesData) = try await (periodsRequest, categoriesRequest, itemsRequest, userGradesRequest)
+
+        let gradeItems = SchoologyValue.list(Self.object(itemsData), keys: ["assignment", "assignments", "items"])
+        let userSections = SchoologyValue.list(Self.object(userGradesData), keys: ["section", "sections", "items"])
+        let currentGrades = userSections.first {
+            SchoologyValue.string($0["section_id"] ?? $0["sectionId"] ?? $0["id"]) == courseID
+        } ?? userSections.first
+
+        var gradeByAssignmentID: [String: [String: Any]] = [:]
+        let periods = SchoologyValue.list(currentGrades?["period"] ?? currentGrades?["periods"], keys: ["period", "periods", "items"])
+        for period in periods {
+            let rows = SchoologyValue.list(period["assignment"] ?? period["assignments"], keys: ["assignment", "assignments", "items"])
+            for row in rows {
+                let id = SchoologyValue.string(row["assignment_id"] ?? row["assignmentId"] ?? row["id"])
+                if !id.isEmpty { gradeByAssignmentID[id] = row }
+            }
+        }
+        let directRows = SchoologyValue.list(currentGrades?["assignment"] ?? currentGrades?["assignments"], keys: ["assignment", "assignments", "items"])
+        for row in directRows {
+            let id = SchoologyValue.string(row["assignment_id"] ?? row["assignmentId"] ?? row["id"])
+            if !id.isEmpty { gradeByAssignmentID[id] = row }
+        }
+
+        var categoryNames: [String: String] = [:]
+        for row in SchoologyValue.list(Self.object(categoriesData), keys: ["grading_category", "grading_categories", "category", "categories", "items"]) {
+            let id = SchoologyValue.string(row["id"]), name = SchoologyValue.string(row["title"] ?? row["name"])
+            if !id.isEmpty && !name.isEmpty { categoryNames[id] = name }
+        }
+        var periodNames: [String: String] = [:]
+        for row in SchoologyValue.list(Self.object(periodsData), keys: ["grading_period", "grading_periods", "period", "periods", "items"]) {
+            let id = SchoologyValue.string(row["id"]), name = SchoologyValue.string(row["title"] ?? row["name"])
+            if !id.isEmpty && !name.isEmpty { periodNames[id] = name }
+        }
+
+        var result: [SchoologyProfileItem] = []
+        if let currentGrades {
+            let rawFinal = currentGrades["final_grade"] ?? currentGrades["finalGrade"] ?? currentGrades["final_grades"] ?? currentGrades["finalGrades"]
+            let finalRecord = (rawFinal as? [[String: Any]])?.first ?? (rawFinal as? [String: Any])
+            let finalPeriods = SchoologyValue.list(finalRecord?["period"] ?? finalRecord?["periods"], keys: ["period", "periods", "items"])
+            let finalPeriod = finalPeriods.first { SchoologyValue.string($0["period_id"] ?? $0["periodId"]) == "final" } ?? finalPeriods.first
+            let overallValue = finalPeriod?["override_str"] ?? finalPeriod?["overrideStr"] ?? finalPeriod?["grade"] ??
+                finalRecord?["override_str"] ?? finalRecord?["overrideStr"] ?? finalRecord?["grade"] ??
+                finalRecord?["calculated_grade"] ?? finalRecord?["calculatedGrade"]
+            if let overallValue, !(overallValue is NSNull), !SchoologyValue.string(overallValue).isEmpty {
+                result.append(SchoologyProfileItem(id: "overall-grade", title: "Overall Grade", body: SchoologyValue.string(overallValue),
+                    subtitle: "Final grade", url: nil, isAdmin: false, kind: "overall_grade", collectionID: nil))
+            }
+        }
+        for item in gradeItems {
+            let id = SchoologyValue.string(item["id"] ?? item["assignment_id"] ?? item["assignmentId"])
+            guard !id.isEmpty else { continue }
+            let grade = gradeByAssignmentID[id]
+            let rawGrade = grade?["override_str"] ?? grade?["overrideStr"] ?? grade?["grade_str"] ??
+                grade?["gradeStr"] ?? grade?["grade"] ?? grade?["grade_value"] ?? grade?["gradeValue"]
+            let gradeText: String
+            if let rawGrade, !(rawGrade is NSNull), !SchoologyValue.string(rawGrade).isEmpty {
+                if let nested = rawGrade as? [String: Any] {
+                    gradeText = SchoologyValue.string(nested["grade"] ?? nested["value"] ?? nested["label"], fallback: "Graded")
+                } else { gradeText = SchoologyValue.string(rawGrade) }
+            } else { gradeText = "Not graded" }
+            let categoryID = SchoologyValue.string(item["grading_category_id"] ?? item["gradingCategoryId"] ?? grade?["grading_category_id"])
+            let periodID = SchoologyValue.string(item["grading_period_id"] ?? item["gradingPeriodId"] ?? grade?["grading_period_id"])
+            let due = SchoologyValue.string(item["due"] ?? item["due_date"] ?? item["dueDate"])
+            let metadata = [categoryNames[categoryID], periodNames[periodID], due.isEmpty ? nil : "Due " + due].compactMap { $0 }.filter { !$0.isEmpty }
+            result.append(SchoologyProfileItem(id: id, title: SchoologyValue.string(item["title"] ?? item["name"], fallback: "Assignment"),
+                body: gradeText, subtitle: metadata.joined(separator: " • "),
+                url: SchoologyValue.url(item["web_url"] ?? item["webUrl"] ?? item["url"]), isAdmin: false, kind: "assignment", collectionID: nil))
+        }
+        return result
     }
 
     func loadSchoolName(for course: SchoologyCourse) async -> String {
@@ -420,9 +491,12 @@ final class AppSession {
         return SchoologyProfileItem.decodeList(Self.object(data), keys: ["comment", "comments", "items"])
     }
 
-    func postComment(realm: String, realmID: String, entity: String, entityID: String, body: String) async throws {
+    func postComment(realm: String, realmID: String, entity: String, entityID: String, body: String, parentID: String? = nil) async throws {
         guard let auth else { throw SchoologyAPIError.notSignedIn }
-        _ = try await api.post("\(realm)/\(realmID)/\(entity)/\(entityID)/comments", auth: auth, params: ["body": body])
+        _ = try await api.post("\(realm)/\(realmID)/\(entity)/\(entityID)/comments", auth: auth, params: [
+            "comment": body,
+            "parent_id": parentID ?? "0"
+        ])
     }
 
     func loadGroupAlbum(groupID: String, albumID: String) async throws -> [SchoologyProfileItem] {
@@ -666,10 +740,10 @@ final class AppSession {
 
     func loadSchoolProfile(_ id: String) async throws -> SchoologySchoolProfile {
         guard let auth else { throw SchoologyAPIError.notSignedIn }
-        async let detail = api.get("schools/\\(id)", auth: auth)
-        async let updatesRequest = try? await api.get("schools/\\(id)/updates", auth: auth, params: ["start": "0", "limit": "50", "with_attachments": "TRUE", "richtext": "1"])
-        async let eventsRequest = try? await api.get("schools/\\(id)/events", auth: auth, params: ["start": Self.apiDate(Date()), "limit": "50"])
-        async let resourcesRequest = try? await api.get("schools/\\(id)/resources", auth: auth, params: ["start": "0", "limit": "200", "with_attachments": "TRUE"])
+        async let detail = api.get("schools/\(id)", auth: auth)
+        async let updatesRequest = try? await api.get("schools/\(id)/updates", auth: auth, params: ["start": "0", "limit": "50", "with_attachments": "TRUE", "richtext": "1"])
+        async let eventsRequest = try? await api.get("schools/\(id)/events", auth: auth, params: ["start": Self.apiDate(Date()), "limit": "50"])
+        async let resourcesRequest = try? await api.get("schools/\(id)/resources", auth: auth, params: ["start": "0", "limit": "200", "with_attachments": "TRUE"])
         let d = try await detail
         let (u, e, r) = await (updatesRequest, eventsRequest, resourcesRequest)
         let raw = Self.object(d)

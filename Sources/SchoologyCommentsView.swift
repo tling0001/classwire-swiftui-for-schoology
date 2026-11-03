@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SchoologyCommentsView: View {
     @Environment(AppSession.self) private var session
+    @Environment(\.dismiss) private var dismiss
     let realm: String
     let realmID: String
     let updateID: String
@@ -43,6 +44,9 @@ struct SchoologyCommentsView: View {
         }
         .navigationTitle("Comments")
         .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("Close", systemImage: "xmark") { dismiss() }
+            }
             ToolbarItem(placement: .primaryAction) {
                 Button("New comment", systemImage: "square.and.pencil") {
                     replyingToID = nil

@@ -44,7 +44,7 @@ struct MessagesView: View {
                     Text(item.rawValue).tag(item)
                 }
             }
-            .pickerStyle(.segmented)
+            .schoologyNavigationTabPickerStyle()
             .padding(.horizontal)
             .padding(.vertical, 10)
 

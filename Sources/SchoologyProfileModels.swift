@@ -19,9 +19,14 @@ struct SchoologyProfileItem: Identifiable, Sendable {
         SchoologyValue.list(value, keys: keys).enumerated().compactMap { index, item in
             let nestedPerson = (item["user"] as? [String: Any]) ?? (item["member"] as? [String: Any]) ?? (item["profile"] as? [String: Any])
             let person = nestedPerson ?? item
+            let rawKind = SchoologyValue.string(item["template_type"] ?? item["templateType"] ?? item["type"] ?? item["assignment_type"] ?? item["assignmentType"] ?? item["document_type"] ?? item["documentType"] ?? (item["template"] as? [String: Any])?["template_document_type"] ?? (item["template_fields"] as? [String: Any])?["document_type"]).lowercased()
             let rawID: Any?
             if nestedPerson != nil {
                 rawID = person["id"] ?? person["uid"] ?? person["user_id"] ?? item["user_id"] ?? item["userId"] ?? item["uid"] ?? item["id"]
+            } else if rawKind == "folder" {
+                rawID = item["id"] ?? item["folder_id"] ?? item["folderId"]
+            } else if !rawKind.isEmpty {
+                rawID = item["template_id"] ?? item["templateID"] ?? item["templateId"] ?? item["assignment_id"] ?? item["assignmentId"] ?? item["discussion_id"] ?? item["discussionId"] ?? item["event_id"] ?? item["eventId"] ?? item["id"]
             } else {
                 rawID = item["user_id"] ?? item["userId"] ?? item["uid"] ?? item["id"]
             }
@@ -35,8 +40,6 @@ struct SchoologyProfileItem: Identifiable, Sendable {
             let adminFlags: [Any?] = [item["admin"], item["is_admin"], item["isAdmin"], item["group_admin"], item["groupAdmin"], item["is_group_admin"], item["isGroupAdmin"], item["owner"], item["is_owner"], item["isOwner"], person["admin"], person["is_admin"], person["isAdmin"], person["group_admin"], person["groupAdmin"], person["is_group_admin"], person["isGroupAdmin"], person["owner"], person["is_owner"], person["isOwner"]]
             let normalizedRole = roleText.lowercased().replacingOccurrences(of: "_", with: " ").replacingOccurrences(of: "-", with: " ")
             let isAdmin = adminFlags.contains(where: { SchoologyValue.bool($0) }) || ["admin", "administrator", "owner"].contains { normalizedRole.contains($0) }
-            let nestedTemplate = item["template"] as? [String: Any] ?? [:]
-            let nestedFields = item["template_fields"] as? [String: Any] ?? [:]
             let rawTitle = SchoologyValue.string(item["title"] ?? item["subject"] ?? item["template_title"] ?? item["templateTitle"] ?? person["name_display"] ?? person["display_name"] ?? person["name"])
             return Self(
                 id: SchoologyValue.string(rawID, fallback: String(index)),
@@ -45,7 +48,7 @@ struct SchoologyProfileItem: Identifiable, Sendable {
                 subtitle: SchoologyValue.string(roleText.isEmpty ? (item["due"] ?? item["due_date"] ?? item["dueDate"] ?? item["created"] ?? item["timestamp"] ?? item["photo_count"]) : roleText),
                 url: SchoologyValue.url(item["link"] ?? item["url"] ?? item["web_url"] ?? item["webUrl"] ?? item["file_download_url"] ?? item["download_path"] ?? item["photo_url"] ?? item["photoUrl"] ?? item["original_url"] ?? item["originalUrl"] ?? ((item["attachments"] as? [String: Any])?["files"] as? [String: Any])?["file_download_url"] ?? ((item["attachment"] as? [String: Any])?["file"] as? [String: Any])?["file_download_url"]),
                 isAdmin: isAdmin,
-                kind: SchoologyValue.string(item["template_type"] ?? item["templateType"] ?? item["type"] ?? item["assignment_type"] ?? item["assignmentType"] ?? item["document_type"] ?? item["documentType"] ?? nestedTemplate["template_document_type"] ?? nestedFields["document_type"]).lowercased(),
+                kind: rawKind,
                 collectionID: SchoologyValue.optionalString(item["collection_id"] ?? item["collectionID"] ?? item["collectionId"]),
                 firstName: firstName, lastName: lastName, preferredName: preferredName,
                 pictureURL: SchoologyValue.url(person["picture_url"] ?? person["pictureUrl"] ?? person["picture"] ?? person["photo_url"] ?? person["photoUrl"]),

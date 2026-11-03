@@ -42,7 +42,7 @@ struct SchoologyCourseAppLaunchView: View {
     var body: some View {
         Group {
             if let launchURL {
-                SchoologyEmbeddedWebView(url: launchURL, title: app.title)
+                SchoologyEmbeddedWebView(url: launchURL, title: app.title, requiresWebSession: false)
             } else if isLoading {
                 ProgressView("Opening \(app.title)…").frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if let error {
@@ -55,8 +55,7 @@ struct SchoologyCourseAppLaunchView: View {
             isLoading = true
             error = nil
             do {
-                // Tauri prepares the authenticated web session before requesting the launch token.
-                _ = try await session.loadWebSessionCookies()
+                // The official v2 launch URL carries its own short-lived authentication token.
                 launchURL = try await session.launchCourseApp(app, courseID: courseID)
             } catch {
                 self.error = error.localizedDescription

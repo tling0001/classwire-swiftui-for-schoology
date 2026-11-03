@@ -52,7 +52,7 @@ struct SchoologyCourseProfileView: View {
             Picker("Course section", selection: $tab) {
                 ForEach(SchoologyCourseTab.allCases) { item in Text(item.rawValue).tag(item) }
             }
-            .pickerStyle(.segmented)
+            .schoologyNavigationTabPickerStyle()
             .padding(.horizontal)
             .padding(.vertical, 10)
             currentContent
@@ -61,30 +61,32 @@ struct SchoologyCourseProfileView: View {
 
     private func wideLayout(width: CGFloat) -> some View {
         HStack(spacing: 0) {
-            VStack(alignment: .leading, spacing: 10) {
-                SchoologyProfileHeroImage(url: course.profileURL, fallbackSymbol: "book.closed.fill")
-                Text(course.title).font(.headline).fixedSize(horizontal: false, vertical: true)
-                if !course.section.isEmpty { Text(course.section).font(.subheadline).foregroundStyle(.secondary) }
-                if !course.courseCode.isEmpty { Text(course.courseCode).font(.caption).foregroundStyle(.secondary) }
-                if !schoolName.isEmpty { Text(schoolName).font(.caption).foregroundStyle(SchoologyStyle.blue) }
-                Divider().padding(.vertical, 3)
-                ForEach([SchoologyCourseTab.materials, .updates, .grades, .members]) { item in
-                    courseTabButton(item)
-                }
-                if courseAppsLoading || !courseApps.isEmpty || courseAppsError != nil {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 10) {
+                    SchoologyProfileHeroImage(url: course.profileURL, fallbackSymbol: "book.closed.fill")
+                    Text(course.title).font(.headline).fixedSize(horizontal: false, vertical: true)
+                    if !course.section.isEmpty { Text(course.section).font(.subheadline).foregroundStyle(.secondary) }
+                    if !course.courseCode.isEmpty { Text(course.courseCode).font(.caption).foregroundStyle(.secondary) }
+                    if !schoolName.isEmpty { Text(schoolName).font(.caption).foregroundStyle(SchoologyStyle.blue) }
                     Divider().padding(.vertical, 3)
-                    Text("Course Apps").font(.caption.weight(.semibold)).foregroundStyle(.secondary).padding(.horizontal, 10)
-                    if courseAppsLoading && courseApps.isEmpty { ProgressView().controlSize(.small).padding(10) }
-                    if let courseAppsError, courseApps.isEmpty { Text(courseAppsError).font(.caption).foregroundStyle(.secondary).padding(10) }
-                    ForEach(courseApps) { app in
-                        NavigationLink { SchoologyCourseAppLaunchView(courseID: course.id, app: app) } label: { courseAppLabel(app) }
-                            .buttonStyle(.plain)
+                    ForEach([SchoologyCourseTab.materials, .updates, .grades, .members]) { item in
+                        courseTabButton(item)
+                    }
+                    if courseAppsLoading || !courseApps.isEmpty || courseAppsError != nil {
+                        Divider().padding(.vertical, 3)
+                        Text("Course Apps").font(.caption.weight(.semibold)).foregroundStyle(.secondary).padding(.horizontal, 10)
+                        if courseAppsLoading && courseApps.isEmpty { ProgressView().controlSize(.small).padding(10) }
+                        if let courseAppsError, courseApps.isEmpty { Text(courseAppsError).font(.caption).foregroundStyle(.secondary).padding(10) }
+                        ForEach(courseApps) { app in
+                            NavigationLink { SchoologyCourseAppLaunchView(courseID: course.id, app: app) } label: { courseAppLabel(app) }
+                                .buttonStyle(.plain)
+                        }
                     }
                 }
-                Spacer(minLength: 0)
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .topLeading)
             }
-            .padding(12)
-            .frame(width: max(190, width * 0.19), alignment: .topLeading)
+            .frame(width: max(190, width * 0.19))
             .background(.regularMaterial)
 
             Divider()
@@ -124,10 +126,10 @@ struct SchoologyCourseProfileView: View {
     private var currentContent: some View {
         Group {
             if loading && currentIsEmpty {
-                ProgressView("Loading \\(tab.rawValue.lowercased())…")
+                ProgressView("Loading \(tab.rawValue.lowercased())…")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if let error, currentIsEmpty {
-                ContentUnavailableView("Unable to load \\(tab.rawValue.lowercased())",
+                ContentUnavailableView("Unable to load \(tab.rawValue.lowercased())",
                     systemImage: "exclamationmark.triangle", description: Text(error))
             } else {
                 content
@@ -207,9 +209,9 @@ struct SchoologyCourseProfileView: View {
         case .materials:
             List(materials) { item in
                 NavigationLink {
-                    SchoologyCourseResourceFolderView(courseID: course.id, item: item)
+                    SchoologyCourseMaterialDestinationView(courseID: course.id, item: item)
                 } label: {
-                    Label(item.title, systemImage: item.kind == "folder" ? "folder" : "doc")
+                    Label(item.title, systemImage: item.kind == "folder" ? "folder" : item.kind.contains("discussion") ? "text.bubble" : item.kind.contains("assignment") ? "doc.text" : "doc")
                 }
             }
             .overlay { if materials.isEmpty && !loading { ContentUnavailableView("No materials", systemImage: "folder") } }
@@ -309,9 +311,9 @@ struct SchoologyCourseResourceFolderView: View {
             if item.kind == "folder" {
                 List(children) { child in
                     NavigationLink {
-                        SchoologyCourseResourceFolderView(courseID: courseID, item: child)
+                        SchoologyCourseMaterialDestinationView(courseID: courseID, item: child)
                     } label: {
-                        Label(child.title, systemImage: child.kind == "folder" ? "folder" : "doc")
+                        Label(child.title, systemImage: child.kind == "folder" ? "folder" : child.kind.contains("discussion") ? "text.bubble" : child.kind.contains("assignment") ? "doc.text" : "doc")
                     }
                 }
                 .overlay {
@@ -326,11 +328,39 @@ struct SchoologyCourseResourceFolderView: View {
                     loading = false
                 }
                 .navigationTitle(item.title)
-            } else if let url = item.url {
+            } else {
+                SchoologyCourseMaterialDestinationView(courseID: courseID, item: item)
+            }
+        }
+    }
+}
+
+struct SchoologyCourseMaterialDestinationView: View {
+    @Environment(AppSession.self) private var session
+    let courseID: String
+    let item: SchoologyProfileItem
+
+    @ViewBuilder
+    var body: some View {
+        if item.kind == "folder" {
+            SchoologyCourseResourceFolderView(courseID: courseID, item: item)
+        } else if item.kind.contains("assignment") {
+            SchoologyAssignmentDetailView(sectionID: courseID, assignmentID: item.id, title: item.title)
+        } else if item.kind.contains("discussion") {
+            SchoologyDiscussionDetailView(realm: "sections", realmID: courseID, itemID: item.id, title: item.title)
+        } else if item.kind.contains("event") {
+            SchoologyEventDetailView(realm: "sections", realmID: courseID, eventID: item.id, title: item.title)
+        } else if ["assessment", "assessment_v2", "managed_assessment", "quiz"].contains(item.kind) {
+            let host = session.canadianServer ? "app.schoologyca.com" : "app.schoology.com"
+            if let url = URL(string: "https://\(host)/assignment/\(item.id)") {
                 SchoologyEmbeddedWebView(url: url, title: item.title)
             } else {
                 SchoologyProfileItemDetailSheet(item: item)
             }
+        } else if let url = item.url {
+            SchoologyEmbeddedWebView(url: url, title: item.title)
+        } else {
+            SchoologyProfileItemDetailSheet(item: item)
         }
     }
 }

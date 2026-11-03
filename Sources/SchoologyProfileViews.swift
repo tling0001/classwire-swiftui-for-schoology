@@ -80,7 +80,7 @@ struct GroupProfileView: View {
                 VStack(spacing: 0) {
                     Picker("Group section", selection: $tab) {
                         ForEach([ProfileTab.updates,.members,.upcoming,.discussions,.albums,.resources]) { Text($0.rawValue).tag($0) }
-                    }.pickerStyle(.segmented).padding()
+                    }.schoologyNavigationTabPickerStyle().padding()
                     groupContent(profile)
                 }
             }
@@ -252,7 +252,7 @@ struct SchoolProfileView: View {
                 VStack(spacing: 0) {
                     Picker("School section", selection: $tab) {
                         ForEach([ProfileTab.updates,.info,.upcoming,.resources,.discussions]) { Text($0.rawValue).tag($0) }
-                    }.pickerStyle(.segmented).padding()
+                    }.schoologyNavigationTabPickerStyle().padding()
                     schoolContent(profile)
                 }
             }

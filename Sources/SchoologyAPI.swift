@@ -179,7 +179,7 @@ actor SchoologyAPI {
 
     func webSessionCookies(auth: SchoologyAuth) async throws -> [SchoologyWebCookie] {
         var components = URLComponents(string: "https://\(apiHost)/v1/sessionstart")!
-        components.queryItems = [URLQueryItem(name: "for_domain", value: webHost)]
+        components.queryItems = [URLQueryItem(name: "domain", value: webHost)]
         guard let url = components.url else { throw SchoologyAPIError.invalidResponse }
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
@@ -195,12 +195,13 @@ actor SchoologyAPI {
         try validate(response, data: data)
         guard let http = response as? HTTPURLResponse else { throw SchoologyAPIError.invalidResponse }
         let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] ?? [:]
+        let cookieDomain = useCanadianServer ? ".schoologyca.com" : ".schoology.com"
         let rawCookies = (json["cookie"] as? [[String: Any]]) ?? (json["cookies"] as? [[String: Any]]) ?? []
         var cookies: [SchoologyWebCookie] = rawCookies.compactMap { raw in
             let name = SchoologyValue.string(raw["key"] ?? raw["name"])
             let value = SchoologyValue.string(raw["value"] ?? raw["val"])
             guard !name.isEmpty && !value.isEmpty else { return nil }
-            return SchoologyWebCookie(name: name, value: value, domain: SchoologyValue.string(raw["domain"], fallback: ".\(webHost)"), path: SchoologyValue.string(raw["path"], fallback: "/"))
+            return SchoologyWebCookie(name: name, value: value, domain: SchoologyValue.string(raw["domain"], fallback: cookieDomain), path: SchoologyValue.string(raw["path"], fallback: "/"))
         }
         let headerFields = Dictionary(uniqueKeysWithValues: http.allHeaderFields.map { (String(describing: $0.key), String(describing: $0.value)) })
         for cookie in HTTPCookie.cookies(withResponseHeaderFields: headerFields, for: url) {
