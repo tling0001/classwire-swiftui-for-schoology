@@ -34,7 +34,11 @@ targets:
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         SUPPORTS_MACCATALYST: NO
     info:
-      path: Config/Info.plist
+      properties:
+        CFBundleURLTypes:
+          - CFBundleURLName: com.schoologytauri.app
+            CFBundleURLSchemes:
+              - schoology
   Schoology-macOS:
     type: application
     platform: macOS
