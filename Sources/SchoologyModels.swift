@@ -66,6 +66,8 @@ struct SchoologyCourse: Identifiable, Sendable {
 struct SchoologyGroup: Identifiable, Sendable {
     let id: String
     let title: String
+    var schoolID: String? = nil
+    var pictureURL: URL? = nil
 
     static func decodeList(_ value: Any?) -> [SchoologyGroup] {
         SchoologyValue.list(value, keys: ["group", "groups", "items", "data", "response"]).compactMap { item in

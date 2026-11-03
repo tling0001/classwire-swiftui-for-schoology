@@ -486,16 +486,13 @@ struct CourseListView: View {
 
 struct GroupListView: View {
     @Environment(AppSession.self) private var session
-
     var body: some View {
         List(session.groups) { group in
-            Label(group.title, systemImage: "person.3.fill")
-        }
-        .overlay {
-            if session.groups.isEmpty {
-                ContentUnavailableView("No groups yet", systemImage: "person.3")
+            NavigationLink { GroupProfileView(group: group) } label: {
+                Label(group.title, systemImage: "person.3.fill")
             }
         }
+        .overlay { if session.groups.isEmpty { ContentUnavailableView("No groups yet", systemImage:"person.3") } }
         .refreshable { await session.refresh() }
         .task { if session.groups.isEmpty { await session.refresh() } }
     }

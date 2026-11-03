@@ -289,6 +289,59 @@ final class AppSession {
         }
     }
 
+
+    func loadGroupProfile(_ group: SchoologyGroup) async throws -> SchoologyGroupProfile {
+        guard let auth else { throw SchoologyAPIError.notSignedIn }
+        async let detail = api.get("groups/\(group.id)", auth: auth)
+        async let members = api.get("groups/\(group.id)/enrollments", auth: auth, params: ["start":"0","limit":"200","enrollment_status":"1"])
+        async let updates = api.get("groups/\(group.id)/updates", auth: auth, params: ["start":"0","limit":"20","with_attachments":"TRUE","richtext":"1"])
+        async let events = api.get("groups/\(group.id)/events", auth: auth, params: ["start":Self.apiDate(Date()),"limit":"20"])
+        async let discussions = api.get("groups/\(group.id)/discussions", auth: auth, params: ["limit":"50"])
+        async let albums = api.get("groups/\(group.id)/albums", auth: auth, params: ["limit":"50"])
+        async let resources = api.get("groups/\(group.id)/resources", auth: auth, params: ["limit":"50","with_attachments":"TRUE"])
+        let (d,m,u,e,ds,a,r) = try await (detail,members,updates,events,discussions,albums,resources)
+        let raw = Self.object(d); let groupJSON = (raw["group"] as? [String:Any]) ?? raw
+        let requestPaths = ["updates","discussions","events","albums","resources"].map { "/v1/groups/\(group.id)/\($0)" }
+        let permissionData = try? await api.postMultiOptions(requestPaths, auth: auth)
+        let permissionJSON = permissionData.map(Self.object) ?? [:]
+        return SchoologyGroupProfile(
+            group: SchoologyGroup(id:SchoologyValue.string(groupJSON["id"] ?? groupJSON["group_id"],fallback:group.id),
+                title:SchoologyValue.string(groupJSON["title"] ?? groupJSON["name"],fallback:group.title),
+                schoolID:SchoologyValue.optionalString(groupJSON["school_id"] ?? groupJSON["schoolId"]),
+                pictureURL:SchoologyValue.url(groupJSON["picture_url"] ?? groupJSON["pictureUrl"])),
+            permissions:SchoologyGroupPermissions.decode(permissionJSON,groupID:group.id),
+            members:SchoologyProfileItem.decodeList(Self.object(m),keys:["enrollment","enrollments","member","members","user","users"]),
+            updates:SchoologyProfileItem.decodeList(Self.object(u),keys:["update","updates","update_list"]),
+            upcoming:SchoologyUpcomingEvent.decodeList(Self.object(e)),
+            discussions:SchoologyProfileItem.decodeList(Self.object(ds),keys:["discussion","discussions"]),
+            albums:SchoologyProfileItem.decodeList(Self.object(a),keys:["album","albums"]),
+            resources:SchoologyProfileItem.decodeList(Self.object(r),keys:["resource","resources","collection","items"]))
+    }
+
+    func loadSchoolProfile(_ id: String) async throws -> SchoologySchoolProfile {
+        guard let auth else { throw SchoologyAPIError.notSignedIn }
+        async let detail = api.get("schools/\(id)",auth:auth)
+        async let updates = api.get("schools/\(id)/updates",auth:auth,params:["start":"0","limit":"50","with_attachments":"TRUE","richtext":"1"])
+        async let events = api.get("schools/\(id)/events",auth:auth,params:["start":Self.apiDate(Date()),"limit":"50"])
+        async let resources = api.get("schools/\(id)/resources",auth:auth,params:["start":"0","limit":"200","with_attachments":"TRUE"])
+        let (d,u,e,r) = try await (detail,updates,events,resources)
+        let raw=Self.object(d); let school=(raw["school"] as? [String:Any]) ?? raw
+        return SchoologySchoolProfile(
+            school:SchoologyProfileSchool(id:id,title:SchoologyValue.string(school["title"] ?? school["name"],fallback:"School"),
+                pictureURL:SchoologyValue.url(school["picture_url"] ?? school["pictureUrl"] ?? school["picture"] ?? school["image"]),
+                address:["address1","address2","city","state","postal_code","country"].compactMap{school[$0] as? String}.filter{!$0.isEmpty}.joined(separator:", "),
+                phone:SchoologyValue.string(school["phone"])),
+            updates:SchoologyProfileItem.decodeList(Self.object(u),keys:["update","updates","update_list","results"]),
+            upcoming:SchoologyUpcomingEvent.decodeList(Self.object(e)),
+            resources:SchoologyProfileItem.decodeList(Self.object(r),keys:["resource","resources","resource_list"]))
+    }
+
+    func loadSchoolDiscussions(_ id: String) async throws -> [SchoologyProfileItem] {
+        guard let auth else { throw SchoologyAPIError.notSignedIn }
+        let data=try await api.get("schools/\(id)/discussions",auth:auth,params:["start":"0","limit":"50","with_attachments":"TRUE","richtext":"1"])
+        return SchoologyProfileItem.decodeList(Self.object(data),keys:["discussion","discussions"])
+    }
+
     func signOut() {
         KeychainStore.clear()
         auth = nil

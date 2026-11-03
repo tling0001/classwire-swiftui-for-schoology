@@ -185,8 +185,21 @@ actor SchoologyAPI {
     }
 
     func post(_ path: String, auth: SchoologyAuth) async throws -> Data {
+        try await post(path, auth: auth, params: [:])
+    }
+
+    func post(_ path: String, auth: SchoologyAuth, params: [String: String]) async throws -> Data {
         let url = URL(string: "https://\(apiHost)/v1/\(path)")!
-        return try await send(url: url, method: "POST", body: nil, auth: auth, signed: true, extra: [])
+        let body = formEncode(params)
+        let extra = params.map { ($0.key, oauthEncode($0.value)) }
+        return try await send(url: url, method: "POST", body: body, auth: auth, signed: true, extra: extra)
+    }
+
+    func postMultiOptions(_ paths: [String], auth: SchoologyAuth) async throws -> Data {
+        let url = URL(string: "https://\(apiHost)/v1/multioptions")!
+        let body = paths.map { "request=\(oauthEncode($0))" }.joined(separator: "&")
+        let extra = paths.map { ("request", oauthEncode($0)) }
+        return try await send(url: url, method: "POST", body: body, auth: auth, signed: true, extra: extra)
     }
 
     func imageData(_ url: URL, auth: SchoologyAuth) async throws -> Data? {
