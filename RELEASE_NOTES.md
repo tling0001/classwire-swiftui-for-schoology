@@ -1,5 +1,16 @@
 # Schoology SwiftUI Release Notes
 
+## [2026.10.0-port.16]
+
+### School profile posts
+- Render school updates through the shared native activity-post card so school posts have the same comments, replies, likes, and likes directory as home, course, and group posts.
+- Resolve school post comments against the official `schools/{schoolId}/updates/{updateId}/comments` route.
+- Hydrate school update authors using the same bounded profile lookup used by other activity feeds.
+
+### Quality
+- Remove the unused optional binding warning in the shared comments composer.
+- Increment the iOS and macOS bundle build number to 16.
+
 ## [2026.10.0-port.15]
 
 ### Shared comments and likes

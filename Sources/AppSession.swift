@@ -666,21 +666,35 @@ final class AppSession {
 
     func loadSchoolProfile(_ id: String) async throws -> SchoologySchoolProfile {
         guard let auth else { throw SchoologyAPIError.notSignedIn }
-        async let detail = api.get("schools/\(id)",auth:auth)
-        async let updatesRequest = try? await api.get("schools/\(id)/updates",auth:auth,params:["start":"0","limit":"50","with_attachments":"TRUE","richtext":"1"])
-        async let eventsRequest = try? await api.get("schools/\(id)/events",auth:auth,params:["start":Self.apiDate(Date()),"limit":"50"])
-        async let resourcesRequest = try? await api.get("schools/\(id)/resources",auth:auth,params:["start":"0","limit":"200","with_attachments":"TRUE"])
+        async let detail = api.get("schools/\\(id)", auth: auth)
+        async let updatesRequest = try? await api.get("schools/\\(id)/updates", auth: auth, params: ["start": "0", "limit": "50", "with_attachments": "TRUE", "richtext": "1"])
+        async let eventsRequest = try? await api.get("schools/\\(id)/events", auth: auth, params: ["start": Self.apiDate(Date()), "limit": "50"])
+        async let resourcesRequest = try? await api.get("schools/\\(id)/resources", auth: auth, params: ["start": "0", "limit": "200", "with_attachments": "TRUE"])
         let d = try await detail
-        let (u,e,r) = await (updatesRequest,eventsRequest,resourcesRequest)
-        let raw=Self.object(d); let school=(raw["school"] as? [String:Any]) ?? raw
+        let (u, e, r) = await (updatesRequest, eventsRequest, resourcesRequest)
+        let raw = Self.object(d)
+        let school = (raw["school"] as? [String: Any]) ?? raw
+        var updates = SchoologyActivity.decodeList(Self.object(u ?? Data()))
+        for index in updates.indices {
+            updates[index].commentRealm = "schools"
+            updates[index].commentRealmID = id
+        }
+        updates = await hydratedActivityAuthors(updates, auth: auth)
         return SchoologySchoolProfile(
-            school:SchoologyProfileSchool(id:id,title:SchoologyValue.string(school["title"] ?? school["name"],fallback:"School"),
-                pictureURL:SchoologyValue.url(school["picture_url"] ?? school["pictureUrl"] ?? school["picture"] ?? school["image"]),
-                address:["address1","address2","city","state","postal_code","country"].compactMap{school[$0] as? String}.filter{!$0.isEmpty}.joined(separator:", "),
-                phone:SchoologyValue.string(school["phone"])),
-            updates:SchoologyProfileItem.decodeList(Self.object(u ?? Data()),keys:["update","updates","update_list","results"]),
-            upcoming:SchoologyUpcomingEvent.decodeList(Self.object(e ?? Data())),
-            resources:SchoologyProfileItem.decodeList(Self.object(r ?? Data()),keys:["resource","resources","resource_list"]))
+            school: SchoologyProfileSchool(
+                id: id,
+                title: SchoologyValue.string(school["title"] ?? school["name"], fallback: "School"),
+                pictureURL: SchoologyValue.url(school["picture_url"] ?? school["pictureUrl"] ?? school["picture"] ?? school["image"]),
+                address: ["address1", "address2", "city", "state", "postal_code", "country"]
+                    .compactMap { school[$0] as? String }
+                    .filter { !$0.isEmpty }
+                    .joined(separator: ", "),
+                phone: SchoologyValue.string(school["phone"])
+            ),
+            updates: updates,
+            upcoming: SchoologyUpcomingEvent.decodeList(Self.object(e ?? Data())),
+            resources: SchoologyProfileItem.decodeList(Self.object(r ?? Data()), keys: ["resource", "resources", "resource_list"])
+        )
     }
 
     func loadSchoolDiscussions(_ id: String) async throws -> [SchoologyProfileItem] {

@@ -81,4 +81,4 @@ struct SchoologyGroupProfile: Sendable {
     let resources: [SchoologyProfileItem]
 }
 struct SchoologyProfileSchool: Sendable { let id: String; let title: String; let pictureURL: URL?; let address: String; let phone: String }
-struct SchoologySchoolProfile: Sendable { let school: SchoologyProfileSchool; let updates: [SchoologyProfileItem]; let upcoming: [SchoologyUpcomingEvent]; let resources: [SchoologyProfileItem] }
+struct SchoologySchoolProfile: Sendable { let school: SchoologyProfileSchool; let updates: [SchoologyActivity]; let upcoming: [SchoologyUpcomingEvent]; let resources: [SchoologyProfileItem] }

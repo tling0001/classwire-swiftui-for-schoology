@@ -60,7 +60,7 @@ struct SchoologyCommentsView: View {
             if let errorMessage {
                 Text(errorMessage).font(.caption).foregroundStyle(.red)
             }
-            if let replyingToID {
+            if replyingToID != nil {
                 HStack {
                     Text("Replying to \(replyingToName.isEmpty ? "comment" : replyingToName)")
                         .font(.caption)

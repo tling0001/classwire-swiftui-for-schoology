@@ -274,7 +274,7 @@ struct SchoolProfileView: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 12) {
                     switch tab {
-                    case .updates: rows(profile.updates, empty: "No school updates")
+                    case .updates: RecentActivityView(activities: profile.updates)
                     case .info:
                         if profile.school.address.isEmpty && profile.school.phone.isEmpty { ContentUnavailableView("No school information", systemImage: "info.circle") }
                         if !profile.school.address.isEmpty { LabeledContent("Address", value: profile.school.address) }
