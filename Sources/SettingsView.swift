@@ -123,7 +123,7 @@ struct SettingsView: View {
 
         let fileManager = FileManager.default
         let workDirectory = fileManager.temporaryDirectory
-            .appendingPathComponent("SchoologyUpdate-\\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent("SchoologyUpdate-\(UUID().uuidString)", isDirectory: true)
         do {
             try fileManager.createDirectory(at: workDirectory, withIntermediateDirectories: true)
             let (downloadedFile, response) = try await URLSession.shared.download(from: downloadURL)
@@ -145,10 +145,10 @@ struct SettingsView: View {
             let script = """
             #!/bin/zsh
             set -euo pipefail
-            APP_PID=\\(appPID)
-            DMG_PATH=\\(quote(dmgURL.path))
-            TARGET_APP=\\(quote(targetApp.path))
-            WORK_DIR=\\(quote(workDirectory.path))
+            APP_PID=\(appPID)
+            DMG_PATH=\(quote(dmgURL.path))
+            TARGET_APP=\(quote(targetApp.path))
+            WORK_DIR=\(quote(workDirectory.path))
             MOUNT_POINT="$WORK_DIR/mount"
             STAGED_APP="$TARGET_APP.update-new"
             BACKUP_APP="$TARGET_APP.update-backup"
@@ -193,19 +193,27 @@ struct SettingsView: View {
             try script.write(to: scriptURL, atomically: true, encoding: .utf8)
             try fileManager.setAttributes([.posixPermissions: 0o700], ofItemAtPath: scriptURL.path)
 
+            // Start a genuinely detached helper so app termination cannot reap it.
+            // The helper itself waits for this app's PID to exit before replacing it.
             let helper = Process()
-            helper.executableURL = URL(fileURLWithPath: "/usr/bin/nohup")
-            helper.arguments = ["/bin/zsh", scriptURL.path]
-            helper.standardOutput = FileHandle.nullDevice
-            helper.standardError = FileHandle.nullDevice
+            helper.executableURL = URL(fileURLWithPath: "/bin/sh")
+            helper.arguments = [
+                "-c",
+                "/usr/bin/nohup /bin/zsh '\(scriptURL.path.replacingOccurrences(of: "'", with: "'\\''"))' </dev/null >/dev/null 2>&1 &"
+            ]
             try helper.run()
+            helper.waitUntilExit()
+            guard helper.terminationStatus == 0 else {
+                throw NSError(domain: "SchoologyUpdater", code: Int(helper.terminationStatus),
+                              userInfo: [NSLocalizedDescriptionKey: "Could not start the update installer."])
+            }
 
             // The detached helper waits for this process to exit before mounting
             // the image and replacing the app bundle.
             NSApp.terminate(nil)
         } catch {
             try? fileManager.removeItem(at: workDirectory)
-            installError = "Could not install the update: \\(error.localizedDescription)"
+            installError = "Could not install the update: \(error.localizedDescription)"
             isInstallingUpdate = false
         }
     }
