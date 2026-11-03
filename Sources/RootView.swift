@@ -11,7 +11,13 @@ struct RootView: View {
                 NavigationSplitView(preferredCompactColumn: $preferredCompactColumn) {
                     SchoologySidebar()
                 } detail: {
-                    DestinationView(destination: session.destination)
+                    NavigationStack {
+                        DestinationView(destination: session.destination)
+                    }
+                    // Each sidebar destination owns a fresh detail stack. Deeper
+                    // course, group, assignment, and profile links then push instead
+                    // of replacing the split view's root detail content.
+                    .id(session.destination)
                 }
                 .navigationSplitViewStyle(.balanced)
             } else {
