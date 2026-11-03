@@ -51,9 +51,9 @@ struct HomeView: View {
                             .pickerStyle(.segmented)
                             .accessibilityLabel("Home section")
                             switch session.homeSection {
-                            case .recent: RecentActivityView(activities: session.activities)
-                            case .dashboard: CourseDashboardView(courses: session.courses)
-                            case .upcoming: RecentActivityView(activities: session.activities)
+                            case .recent: RecentActivityView(activities: session.activities, isLoading: !session.hasLoadedHomeActivities, errorMessage: session.homeActivitiesError)
+                            case .dashboard: CourseDashboardView(courses: session.courses, isLoading: !session.hasLoadedHomeCourses, errorMessage: session.homeCoursesError)
+                            case .upcoming: RecentActivityView(activities: session.activities, isLoading: !session.hasLoadedHomeActivities, errorMessage: session.homeActivitiesError)
                             }
                         }
                         .padding()
@@ -64,7 +64,7 @@ struct HomeView: View {
                     VStack(alignment: .leading, spacing: 0) {
                         Text("Upcoming").font(.headline).padding(14)
                         Divider()
-                        ScrollView { UpcomingEventList(events: session.upcomingEvents).padding(12) }
+                        ScrollView { UpcomingEventList(events: session.upcomingEvents, isLoading: !session.hasLoadedHomeUpcoming, errorMessage: session.homeUpcomingError).padding(12) }
                     }
                     .frame(width: max(270, proxy.size.width * 0.30))
                     .background(.thinMaterial)
@@ -74,15 +74,8 @@ struct HomeView: View {
             }
         }
         .refreshable { await session.refresh() }
-        .overlay {
-            if session.isRefreshing && session.activities.isEmpty && session.courses.isEmpty && session.upcomingEvents.isEmpty {
-                ProgressView("Loading Schoology…")
-                    .padding()
-                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
-            }
-        }
         .task {
-            if session.activities.isEmpty && session.courses.isEmpty && session.upcomingEvents.isEmpty {
+            if !session.hasLoadedHomeActivities || !session.hasLoadedHomeCourses || !session.hasLoadedHomeUpcoming {
                 await session.refresh()
             }
         }
@@ -130,9 +123,16 @@ struct HomeView: View {
 
 struct RecentActivityView: View {
     let activities: [SchoologyActivity]
+    var isLoading = false
+    var errorMessage: String?
 
     var body: some View {
-        if activities.isEmpty {
+        if isLoading {
+            ProgressView("Loading recent activity…").frame(maxWidth: .infinity, minHeight: 180)
+        } else if let errorMessage, activities.isEmpty {
+            ContentUnavailableView("Unable to load recent activity", systemImage: "exclamationmark.triangle", description: Text(errorMessage))
+                .frame(maxWidth: .infinity, minHeight: 180)
+        } else if activities.isEmpty {
             ContentUnavailableView(
                 "No recent activity",
                 systemImage: "text.bubble",
@@ -234,9 +234,16 @@ private struct SchoologyActivityCard: View {
 
 private struct CourseDashboardView: View {
     let courses: [SchoologyCourse]
+    var isLoading = false
+    var errorMessage: String?
 
     var body: some View {
-        if courses.isEmpty {
+        if isLoading {
+            ProgressView("Loading courses…").frame(maxWidth: .infinity, minHeight: 180)
+        } else if let errorMessage, courses.isEmpty {
+            ContentUnavailableView("Unable to load courses", systemImage: "exclamationmark.triangle", description: Text(errorMessage))
+                .frame(maxWidth: .infinity, minHeight: 180)
+        } else if courses.isEmpty {
             ContentUnavailableView(
                 "No courses found",
                 systemImage: "books.vertical",
@@ -265,14 +272,18 @@ private struct CourseDashboardCard: View {
             VStack(alignment: .leading, spacing: 0) {
                 ZStack(alignment: .bottomLeading) {
                     if let imageURL = course.profileURL {
-                        AuthenticatedSchoologyImage(url: imageURL)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 132)
-                            .clipped()
+                        GeometryReader { geometry in
+                            AuthenticatedSchoologyImage(url: imageURL)
+                                .frame(width: geometry.size.width, height: geometry.size.height)
+                                .clipped()
+                        }
                     } else {
-                        courseFallback.frame(height: 132)
+                        courseFallback
                     }
                 }
+                .frame(maxWidth: .infinity)
+                .frame(height: 132)
+                .clipped()
 
                 VStack(alignment: .leading, spacing: 5) {
                     Text(course.title)
@@ -290,6 +301,7 @@ private struct CourseDashboardCard: View {
             .background(.background, in: RoundedRectangle(cornerRadius: 15))
             .clipShape(RoundedRectangle(cornerRadius: 15))
             .overlay(RoundedRectangle(cornerRadius: 15).strokeBorder(.quaternary, lineWidth: 1))
+            .frame(maxWidth: .infinity, alignment: .topLeading)
         }
         .buttonStyle(.plain)
         .task { schoolName = await session.loadSchoolName(for: course) }
@@ -312,9 +324,16 @@ private struct CourseDashboardCard: View {
 private struct UpcomingEventList: View {
     @Environment(AppSession.self) private var session
     let events: [SchoologyUpcomingEvent]
+    var isLoading = false
+    var errorMessage: String?
 
     var body: some View {
-        if events.isEmpty {
+        if isLoading {
+            ProgressView("Loading upcoming events…").frame(maxWidth: .infinity, minHeight: 180)
+        } else if let errorMessage, events.isEmpty {
+            ContentUnavailableView("Unable to load upcoming events", systemImage: "exclamationmark.triangle", description: Text(errorMessage))
+                .frame(maxWidth: .infinity, minHeight: 180)
+        } else if events.isEmpty {
             ContentUnavailableView(
                 "No upcoming events",
                 systemImage: "calendar",

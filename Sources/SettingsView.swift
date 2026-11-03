@@ -6,6 +6,7 @@ import AppKit
 struct SettingsView: View {
     @Environment(AppSession.self) private var session
     @Environment(AppUpdateService.self) private var updates
+    @Environment(\.colorScheme) private var colorScheme
     @Environment(\.openURL) private var openURL
     @State private var isInstallingUpdate = false
     @State private var installError: String?
@@ -21,6 +22,8 @@ struct SettingsView: View {
                     Text("Light").tag(AppAppearance.light)
                     Text("Dark").tag(AppAppearance.dark)
                 }
+                .pickerStyle(.segmented)
+                .tint(settingsAccent)
             }
 
             Section("Software Update") {
@@ -28,6 +31,8 @@ struct SettingsView: View {
                 Button("Check for Updates", systemImage: "arrow.clockwise") {
                     Task { await updates.checkForUpdates(force: true) }
                 }
+                .buttonStyle(.borderedProminent)
+                .tint(settingsAccent)
                 .disabled(updates.isChecking)
 
                 if updates.isChecking {
@@ -106,6 +111,12 @@ struct SettingsView: View {
         .formStyle(.grouped)
         .padding()
         .frame(maxWidth: 720)
+    }
+
+    private var settingsAccent: Color {
+        colorScheme == .dark
+            ? Color(red: 0.28, green: 0.62, blue: 0.91)
+            : SchoologyStyle.blue
     }
 
     private var isUpdateInstallDisabled: Bool {

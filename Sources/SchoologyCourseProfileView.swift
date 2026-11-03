@@ -22,6 +22,8 @@ struct SchoologyCourseProfileView: View {
     @State private var grades: [SchoologyProfileItem] = []
     @State private var members: [SchoologyProfileItem] = []
     @State private var upcoming: [SchoologyUpcomingEvent] = []
+    @State private var upcomingLoading = true
+    @State private var upcomingLoaded = false
     @State private var loading = false
     @State private var error: String?
     @State private var schoolName = ""
@@ -60,16 +62,7 @@ struct SchoologyCourseProfileView: View {
     private func wideLayout(width: CGFloat) -> some View {
         HStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 10) {
-                if let image = course.profileURL {
-                    AuthenticatedSchoologyImage(url: image)
-                        .frame(maxWidth: .infinity).frame(height: min(210, width * 0.19))
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
-                } else {
-                    Image(systemName: "book.closed.fill")
-                        .font(.system(size: 42)).foregroundStyle(SchoologyStyle.blue)
-                        .frame(maxWidth: .infinity).frame(height: 112)
-                        .background(.quaternary, in: RoundedRectangle(cornerRadius: 10))
-                }
+                SchoologyProfileHeroImage(url: course.profileURL, fallbackSymbol: "book.closed.fill")
                 Text(course.title).font(.headline).fixedSize(horizontal: false, vertical: true)
                 if !course.section.isEmpty { Text(course.section).font(.subheadline).foregroundStyle(.secondary) }
                 if !course.courseCode.isEmpty { Text(course.courseCode).font(.caption).foregroundStyle(.secondary) }
@@ -113,7 +106,9 @@ struct SchoologyCourseProfileView: View {
                 Divider()
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 8) {
-                        if upcoming.isEmpty && !loading {
+                        if upcomingLoading && upcoming.isEmpty {
+                            ProgressView("Loading upcoming…").frame(maxWidth: .infinity).padding(.top, 24)
+                        } else if upcoming.isEmpty && upcomingLoaded {
                             ContentUnavailableView("Nothing upcoming", systemImage: "calendar").padding(.top, 24)
                         }
                         ForEach(upcoming) { event in courseUpcomingRow(event) }
@@ -283,7 +278,10 @@ struct SchoologyCourseProfileView: View {
         loading = true
         error = nil
         do {
+            upcomingLoading = !upcomingLoaded
             upcoming = await session.loadUpcomingEvents(for: course)
+            upcomingLoaded = true
+            upcomingLoading = false
             schoolName = await session.loadSchoolName(for: course)
             switch tab {
             case .materials: materials = try await session.loadCourseMaterials(courseID: course.id)

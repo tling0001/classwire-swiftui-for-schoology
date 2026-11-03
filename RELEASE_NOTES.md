@@ -1,5 +1,21 @@
 # Schoology SwiftUI Release Notes
 
+## [2026.10.0-port.14]
+
+### Home and dashboard
+- Track initial activity, course, and upcoming requests independently so empty states appear only after the corresponding request finishes.
+- Show distinct loading and request-error states for Recent Activity, Course Dashboard, and Upcoming.
+- Keep existing data visible during refreshes rather than flashing empty states.
+
+### Layout and appearance
+- Standardize course, group, and school sidebar hero images to centered 4:3 frames with bounded clipping.
+- Constrain dashboard course artwork to its card's actual width and height so panoramic images cannot expand or overlap neighboring cards.
+- Improve macOS dark-mode Settings controls with a brighter adaptive accent and a prominent Check for Updates button.
+- Add a loading state to the course Upcoming sidebar.
+
+### Build
+- Increment the iOS and macOS bundle build number to 14.
+
 ## [2026.10.0-port.13]
 
 ### Messages

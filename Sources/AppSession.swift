@@ -18,6 +18,12 @@ final class AppSession {
     var messageFolder = SchoologyMessageFolder.inbox
     var activities: [SchoologyActivity] = []
     var upcomingEvents: [SchoologyUpcomingEvent] = []
+    var hasLoadedHomeActivities = false
+    var hasLoadedHomeCourses = false
+    var hasLoadedHomeUpcoming = false
+    var homeActivitiesError: String?
+    var homeCoursesError: String?
+    var homeUpcomingError: String?
     var schoolNames: [String: String] = [:]
     var appearance: AppAppearance = .system
     var canadianServer = UserDefaults.standard.bool(forKey: "schoology.canadian")
@@ -117,34 +123,54 @@ final class AppSession {
         await refresh()
     }
 
+    private func fetchHomeData(path: String, auth: SchoologyAuth, params: [String: String] = [:]) async -> (Data?, String?) {
+        do {
+            return (try await api.get(path, auth: auth, params: params), nil)
+        } catch {
+            return (nil, error.localizedDescription)
+        }
+    }
+
     func refresh() async {
         guard let auth else { return }
         isRefreshing = true
         defer { isRefreshing = false }
 
-        async let activityRequest = try? api.get("recent", auth: auth, params: [
+        async let activityRequest = fetchHomeData(path: "recent", auth: auth, params: [
             "start": "0", "limit": "20", "with_attachments": "TRUE", "richtext": "1"
         ])
-        async let courseRequest = try? api.get("users/\(auth.userID)/sections", auth: auth, params: ["limit": "100"])
-        async let groupRequest = try? api.get("users/\(auth.userID)/groups", auth: auth, params: ["limit": "100"])
-        async let upcomingRequest = try? api.get("users/\(auth.userID)/events", auth: auth, params: [
+        async let courseRequest = fetchHomeData(path: "users/\(auth.userID)/sections", auth: auth, params: ["limit": "100"])
+        async let groupRequest = fetchHomeData(path: "users/\(auth.userID)/groups", auth: auth, params: ["limit": "100"])
+        async let upcomingRequest = fetchHomeData(path: "users/\(auth.userID)/events", auth: auth, params: [
             "start_date": Self.apiDate(Date()), "start": "0", "limit": "50"
         ])
 
-        let (activityData, courseData, groupData, upcomingData) = await (
+        let (activityResult, courseResult, groupResult, upcomingResult) = await (
             activityRequest, courseRequest, groupRequest, upcomingRequest
         )
 
+        let (activityData, activityError) = activityResult
+        hasLoadedHomeActivities = true
+        homeActivitiesError = activityError
         if let activityData {
             activities = SchoologyActivity.decodeList(Self.object(activityData))
             await hydrateActivityAuthors(auth: auth)
         }
+
+        let (courseData, courseError) = courseResult
+        hasLoadedHomeCourses = true
+        homeCoursesError = courseError
         if let courseData {
             courses = SchoologyCourse.decodeList(Self.object(courseData))
         }
-        if let groupData {
+
+        if let groupData = groupResult.0 {
             groups = SchoologyGroup.decodeList(Self.object(groupData))
         }
+
+        let (upcomingData, upcomingError) = upcomingResult
+        hasLoadedHomeUpcoming = true
+        homeUpcomingError = upcomingError
         if let upcomingData {
             upcomingEvents = SchoologyUpcomingEvent.decodeList(Self.object(upcomingData))
                 .sorted { ($0.date ?? .distantFuture) < ($1.date ?? .distantFuture) }
@@ -598,6 +624,12 @@ final class AppSession {
         notifications = []
         activities = []
         upcomingEvents = []
+        hasLoadedHomeActivities = false
+        hasLoadedHomeCourses = false
+        hasLoadedHomeUpcoming = false
+        homeActivitiesError = nil
+        homeCoursesError = nil
+        homeUpcomingError = nil
         schoolNames = [:]
         destination = .home
         homeSection = .recent

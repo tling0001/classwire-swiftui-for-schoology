@@ -17,6 +17,35 @@ private enum ProfileTab: String, CaseIterable, Identifiable {
     }
 }
 
+struct SchoologyProfileHeroImage: View {
+    let url: URL?
+    let fallbackSymbol: String
+
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack {
+                if let url {
+                    AuthenticatedSchoologyImage(url: url)
+                        .frame(width: geometry.size.width, height: geometry.size.height)
+                        .clipped()
+                } else {
+                    Image(systemName: fallbackSymbol)
+                        .font(.system(size: 40))
+                        .foregroundStyle(SchoologyStyle.blue)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .background(.quaternary)
+                }
+            }
+            .frame(width: geometry.size.width, height: geometry.size.height)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+        }
+        .aspectRatio(4.0 / 3.0, contentMode: .fit)
+        .frame(maxWidth: .infinity)
+        .accessibilityHidden(true)
+    }
+}
+
+
 struct GroupProfileView: View {
     @Environment(AppSession.self) private var session
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -89,11 +118,7 @@ struct GroupProfileView: View {
 
     private func groupHeader(_ profile: SchoologyGroupProfile) -> some View {
         VStack(spacing: 8) {
-            if let picture = profile.group.pictureURL {
-                AuthenticatedSchoologyImage(url: picture).frame(height: 105).clipShape(RoundedRectangle(cornerRadius: 12))
-            } else {
-                Image(systemName: "person.3.fill").font(.system(size: 38)).foregroundStyle(SchoologyStyle.blue).frame(maxWidth: .infinity).frame(height: 100).background(.quaternary, in: RoundedRectangle(cornerRadius: 12))
-            }
+            SchoologyProfileHeroImage(url: profile.group.pictureURL, fallbackSymbol: "person.3.fill")
             Text(profile.group.title).font(.headline).frame(maxWidth: .infinity, alignment: .leading)
         }
     }
@@ -239,11 +264,7 @@ struct SchoolProfileView: View {
             if proxy.size.width >= 900 {
                 HStack(spacing: 0) {
                     VStack(alignment: .leading, spacing: 12) {
-                        if let image = profile.school.pictureURL {
-                            AuthenticatedSchoologyImage(url: image).frame(height: 110).clipShape(RoundedRectangle(cornerRadius: 12))
-                        } else {
-                            Image(systemName: "building.2.crop.circle").font(.system(size: 40)).foregroundStyle(SchoologyStyle.blue).frame(maxWidth: .infinity).frame(height: 100)
-                        }
+                        SchoologyProfileHeroImage(url: profile.school.pictureURL, fallbackSymbol: "building.2.crop.circle")
                         Text(profile.school.title).font(.headline)
                         ForEach([ProfileTab.updates,.info,.upcoming,.resources,.discussions]) { item in tabButton(item) }
                         Spacer()
