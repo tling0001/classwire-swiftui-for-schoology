@@ -14,9 +14,6 @@ final class SchoolBrowserAuthenticator: NSObject, ASWebAuthenticationPresentatio
     private var isCancelling = false
 
     #if os(macOS)
-    // Keep a fallback anchor alive for the entire authentication session. Returning
-    // an unretained temporary NSWindow can leave AuthenticationServices with a
-    // deallocated presentation anchor when the app is reactivated for the callback.
     private var fallbackPresentationWindow: NSWindow?
     #endif
 
@@ -52,20 +49,20 @@ final class SchoolBrowserAuthenticator: NSObject, ASWebAuthenticationPresentatio
         }
     }
 
-    // This factory is deliberately nonisolated. AuthenticationServices may invoke
-    // its callback on Safari's XPC queue, so the callback itself must not inherit
-    // this type's MainActor isolation. Hop to MainActor before touching session state.
-    nonisolated private static func makeCompletionHandler(
+    // AuthenticationServices calls this handler from Safari's XPC queue.
+    // Keep the handler nonisolated and hop to MainActor before touching state.
+    private nonisolated static func makeCompletionHandler(
         for authenticator: SchoolBrowserAuthenticator
-    ) -> (URL?, Error?) -> Void {
+    ) -> ASWebAuthenticationSession.CompletionHandler {
         { [weak authenticator] callbackURL, error in
             Task { @MainActor [weak authenticator] in
-                authenticator?.receive(callbackURL: callbackURL, error: error)
+                guard let authenticator else { return }
+                authenticator.handleAuthenticationCompletion(callbackURL: callbackURL, error: error)
             }
         }
     }
 
-    private func receive(callbackURL: URL?, error: Error?) {
+    private func handleAuthenticationCompletion(callbackURL: URL?, error: Error?) {
         if isCancelling {
             finish(.failure(CancellationError()))
         } else if let error {
