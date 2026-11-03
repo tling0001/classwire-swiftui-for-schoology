@@ -22,7 +22,7 @@ final class SchoolBrowserAuthenticator: NSObject, ASWebAuthenticationPresentatio
             isCancelling = false
             throw CancellationError()
         }
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<URL, Error>) in
+        return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<URL, Error>) in
             let session = ASWebAuthenticationSession(
                 url: url,
                 callback: .customScheme("schoology")
