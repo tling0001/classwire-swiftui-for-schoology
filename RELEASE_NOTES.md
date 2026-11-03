@@ -1,3 +1,17 @@
+## [2026.10.0-port.18]
+
+### Notifications
+- Decode the notification envelope, `notification` list, `body_args` links, `realm_id`, viewed state, and Unix timestamps using the official Android response model.
+- Render notification text with related Schoology items rather than a stringified `body_args` array.
+- Add notification detail navigation for assignments, discussions, events, documents, pages, groups, schools, sections, users, and albums.
+- Mark notifications read only after the first response reports an unviewed count, matching Android behavior.
+- Add initial loading, explicit empty/error states, pull-to-refresh, and paginated loading of older notifications.
+
+### macOS build and appearance
+- Correct the tab-picker availability gate: `.tabs` requires macOS 27, not macOS 26.
+- Keep segmented navigation on earlier macOS versions and apply a Liquid Glass surface on macOS 26.
+- Increment the iOS and macOS bundle build number to 18.
+
 ## [2026.10.0-port.17]
 
 ### Authentication and course navigation

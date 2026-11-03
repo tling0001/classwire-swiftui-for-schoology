@@ -65,8 +65,12 @@ struct SchoologyNavigationTabPickerModifier: ViewModifier {
     @ViewBuilder
     func body(content: Content) -> some View {
         #if os(macOS)
-        if #available(macOS 26.0, *) {
+        if #available(macOS 27.0, *) {
             content.pickerStyle(.tabs)
+        } else if #available(macOS 26.0, *) {
+            content.pickerStyle(.segmented)
+                .padding(3)
+                .glassEffect(.regular, in: Capsule())
         } else {
             content.pickerStyle(.segmented)
         }

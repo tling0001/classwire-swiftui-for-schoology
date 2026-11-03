@@ -201,48 +201,54 @@ private struct MessageThreadView: View {
 
 struct NotificationsView: View {
     @Environment(AppSession.self) private var session
-    @State private var notifications: [SchoologyNotification] = []
-    @State private var isLoading = false
-
     var body: some View {
-        List(notifications) { item in
-            VStack(alignment: .leading, spacing: 6) {
-                HStack(alignment: .firstTextBaseline) {
-                    Text(item.title).font(.subheadline.weight(.semibold))
-                    Spacer()
-                    if let date = SchoologyValue.date(item.created) {
-                        Text(date, style: .relative).font(.caption).foregroundStyle(.tertiary)
-                    }
-                }
-                if !item.body.isEmpty {
-                    Text(item.body).font(.body).foregroundStyle(.secondary)
+        List {
+            if let error = session.notificationsError, !session.notifications.isEmpty {
+                Section {
+                    Label("Couldn't refresh notifications: \(error)", systemImage: "exclamationmark.triangle")
+                        .font(.footnote).foregroundStyle(.secondary)
                 }
             }
-            .padding(.vertical, 5)
+            ForEach(session.notifications) { notification in
+                NavigationLink {
+                    SchoologyNotificationDetailView(notification: notification)
+                } label: {
+                    SchoologyNotificationRow(notification: notification)
+                }
+                .task(id: notification.id) {
+                    if notification.id == session.notifications.last?.id {
+                        await session.loadNotifications()
+                    }
+                }
+            }
+            if session.isLoadingMoreNotifications {
+                HStack { Spacer(); ProgressView("Loading more…"); Spacer() }
+                    .listRowSeparator(.hidden)
+            }
         }
         .overlay {
-            if isLoading && notifications.isEmpty {
+            if session.isLoadingNotifications && session.notifications.isEmpty {
                 ProgressView("Loading notifications…")
-            } else if notifications.isEmpty {
+            } else if let error = session.notificationsError, session.notifications.isEmpty {
+                ContentUnavailableView("Unable to load notifications", systemImage: "exclamationmark.triangle", description: Text(error))
+            } else if session.hasLoadedNotifications && session.notifications.isEmpty {
                 ContentUnavailableView("No notifications", systemImage: "bell", description: Text("New Schoology notifications will appear here."))
             }
         }
+        .listStyle(.insetGrouped)
         .navigationTitle("Notifications")
-        .refreshable { await load() }
+        .refreshable { await session.loadNotifications(force: true) }
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                Button("Refresh", systemImage: "arrow.clockwise") { Task { await load() } }
-                    .disabled(isLoading)
+                Button("Refresh", systemImage: "arrow.clockwise") {
+                    Task { await session.loadNotifications(force: true) }
+                }
+                .disabled(session.isLoadingNotifications)
             }
         }
-        .task { if notifications.isEmpty { await load() } }
-    }
-
-    private func load() async {
-        guard !isLoading else { return }
-        isLoading = true
-        notifications = await session.loadNotifications()
-        isLoading = false
+        .task {
+            if !session.hasLoadedNotifications { await session.loadNotifications() }
+        }
     }
 }
 

@@ -425,30 +425,5 @@ struct SchoologyWebCookie: Sendable {
     let path: String
 }
 
-struct SchoologyNotification: Identifiable, Sendable {
-    let id: String
-    let title: String
-    let body: String
-    let type: String
-    let created: String
-    let realm: String
-    let realmID: String?
 
-    static func decodeList(_ value: Any?) -> [SchoologyNotification] {
-        let root = (value as? [String: Any])?["notifications"] ?? value
-        let rows = SchoologyValue.list(root, keys: ["notification", "notifications", "items", "data", "response"])
-        return rows.enumerated().map { index, item in
-            let realm = SchoologyValue.string(item["realm"])
-            let realmID = SchoologyValue.optionalString(item["realm_id"] ?? item["realmId"] ?? item["id"])
-            return SchoologyNotification(
-                id: SchoologyValue.string(item["id"] ?? item["notification_id"] ?? item["notificationId"], fallback: String(index)),
-                title: SchoologyValue.string(item["title"] ?? item["type"], fallback: "Schoology notification"),
-                body: SchoologyValue.plainText(SchoologyValue.string(item["body"] ?? item["message"] ?? item["body_args"])),
-                type: SchoologyValue.string(item["type"]),
-                created: SchoologyValue.string(item["created"] ?? item["timestamp"]),
-                realm: realm,
-                realmID: realmID
-            )
-        }
-    }
 }

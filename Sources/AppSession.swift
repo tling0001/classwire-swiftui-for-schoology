@@ -15,6 +15,11 @@ final class AppSession {
     var courses: [SchoologyCourse] = []
     var groups: [SchoologyGroup] = []
     var notifications: [SchoologyNotification] = []
+    var hasLoadedNotifications = false
+    var isLoadingNotifications = false
+    var isLoadingMoreNotifications = false
+    var notificationsHasMore = true
+    var notificationsError: String?
     var messageFolder = SchoologyMessageFolder.inbox
     var activities: [SchoologyActivity] = []
     var upcomingEvents: [SchoologyUpcomingEvent] = []
@@ -650,21 +655,36 @@ final class AppSession {
         }
     }
 
-    func loadNotifications() async -> [SchoologyNotification] {
-        guard let auth else { return [] }
+    func loadNotifications(force: Bool = false) async {
+        guard let auth, !isLoadingNotifications else { return }
+        if !force && hasLoadedNotifications && !notificationsHasMore { return }
+        let start = force ? 0 : notifications.count
+        isLoadingNotifications = true
+        isLoadingMoreNotifications = !force && start > 0
+        if force { notificationsError = nil }
+        defer {
+            isLoadingNotifications = false
+            isLoadingMoreNotifications = false
+        }
         do {
-            let data = try await api.get("notifications", auth: auth, params: ["limit": "50"])
-            let json = Self.object(data)
-            notifications = SchoologyNotification.decodeList(json)
-            let wrapper = (json["notifications"] as? [String: Any]) ?? json
-            let unviewed = SchoologyValue.integer(wrapper["unviewed_count"] ?? wrapper["unviewedCount"] ?? json["unviewed_count"] ?? json["unviewedCount"])
-            if unviewed > 0 {
+            let data = try await api.get("notifications", auth: auth, params: ["start": String(start), "limit": "50"])
+            let page = SchoologyNotificationPage.decode(data, start: start, limit: 50)
+            if force {
+                notifications = page.notifications
+            } else {
+                var knownIDs = Set(notifications.map(\.id))
+                notifications.append(contentsOf: page.notifications.filter { knownIDs.insert($0.id).inserted })
+            }
+            notificationsHasMore = page.hasMore
+            notificationsError = nil
+            hasLoadedNotifications = true
+            // Android marks the collection read after the first response reports unread items.
+            if start == 0 && page.unviewedCount > 0 {
                 _ = try? await api.post("notifications/read", auth: auth)
             }
-            return notifications
         } catch {
-            errorMessage = error.localizedDescription
-            return []
+            notificationsError = error.localizedDescription
+            hasLoadedNotifications = true
         }
     }
 
@@ -784,6 +804,11 @@ final class AppSession {
         courses = []
         groups = []
         notifications = []
+        hasLoadedNotifications = false
+        isLoadingNotifications = false
+        isLoadingMoreNotifications = false
+        notificationsHasMore = true
+        notificationsError = nil
         activities = []
         upcomingEvents = []
         hasLoadedHomeActivities = false
