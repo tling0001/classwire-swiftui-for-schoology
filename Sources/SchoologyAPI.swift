@@ -184,6 +184,47 @@ actor SchoologyAPI {
         return try await send(url: url, method: "GET", body: nil, auth: auth, signed: true, extra: [])
     }
 
+    func imageData(_ url: URL, auth: SchoologyAuth) async throws -> Data? {
+        guard url.scheme?.lowercased() == "https" || url.scheme?.lowercased() == "http" else { return nil }
+        let session = URLSession(configuration: .ephemeral)
+        let redirectDelegate = NoRedirectDelegate()
+        defer { session.invalidateAndCancel() }
+
+        var currentURL = url
+        for redirectCount in 0...5 {
+            var request = URLRequest(url: currentURL)
+            request.httpMethod = "GET"
+            request.timeoutInterval = 20
+            request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
+            request.setValue("image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8", forHTTPHeaderField: "Accept")
+            request.setValue("https://\(webHost)/", forHTTPHeaderField: "Referer")
+            if currentURL.host?.caseInsensitiveCompare(apiHost) == .orderedSame {
+                request.setValue("Android", forHTTPHeaderField: "X-Schoology-Client")
+                request.setValue("2026.10.0", forHTTPHeaderField: "X-Schoology-App-Version")
+                request.setValue(mobileCookie, forHTTPHeaderField: "Cookie")
+                request.setValue(
+                    try authorization(method: "GET", url: currentURL, auth: auth, extra: []),
+                    forHTTPHeaderField: "Authorization"
+                )
+            }
+
+            let (data, response) = try await session.data(for: request, delegate: redirectDelegate)
+            guard let http = response as? HTTPURLResponse else { throw SchoologyAPIError.invalidResponse }
+            if (300...399).contains(http.statusCode),
+               redirectCount < 5,
+               let location = http.value(forHTTPHeaderField: "Location"),
+               let nextURL = URL(string: location, relativeTo: currentURL)?.absoluteURL,
+               nextURL.scheme?.lowercased() == "https" {
+                currentURL = nextURL
+                continue
+            }
+            guard (200..<300).contains(http.statusCode), data.count <= 12 * 1024 * 1024 else { return nil }
+            let mime = http.value(forHTTPHeaderField: "Content-Type")?.lowercased() ?? ""
+            return mime.hasPrefix("image/") ? data : nil
+        }
+        return nil
+    }
+
     private func requestToken() async throws -> SchoologyAuth {
         let url = URL(string: "https://\(apiHost)/v1/oauth/request_token")!
         let emptyAuth = SchoologyAuth(token: "", secret: "", userID: "")

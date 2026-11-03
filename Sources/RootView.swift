@@ -35,7 +35,10 @@ private struct SchoologySidebar: View {
                 sidebarSections
             }
             #else
-            List {
+            List(selection: Binding<AppDestination?>(
+                get: { session.destination },
+                set: { if let destination = $0 { session.destination = destination } }
+            )) {
                 sidebarSections
             }
             #endif
@@ -75,10 +78,7 @@ private struct SchoologySidebar: View {
             Label(item.rawValue, systemImage: item.symbol)
         }
         #else
-        NavigationLink {
-            DestinationView(destination: item)
-                .onAppear { session.destination = item }
-        } label: {
+        NavigationLink(value: item) {
             Label(item.rawValue, systemImage: item.symbol)
         }
         #endif

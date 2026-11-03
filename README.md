@@ -35,7 +35,7 @@ This is an incremental native port. Messages, notifications, requests, resources
 
 GitHub Actions builds the native macOS app as a universal Apple Silicon/Intel Developer ID package, notarizes the app and DMG, and exports a signed iOS Ad Hoc IPA for registered devices. A versioned GitHub Release is published whenever at least one platform package succeeds.
 
-The release version is stored in `VERSION` as `2026.10.0-port.6`. Increment the `-port.N` value for each new port release and add a matching `## [version]` section to `RELEASE_NOTES.md`. The workflow uses the numeric marketing version and port number as the Apple bundle version/build number, while GitHub release tags retain the complete `-port.N` suffix.
+The release version is stored in `VERSION` as `2026.10.0-port.7`. Increment the `-port.N` value for each new port release and add a matching `## [version]` section to `RELEASE_NOTES.md`. The workflow uses the numeric marketing version and port number as the Apple bundle version/build number, while GitHub release tags retain the complete `-port.N` suffix.
 
 The iOS update action opens Apple's `itms-services` installation flow for the Ad Hoc manifest. iOS requires a registered device and user confirmation; the app cannot silently replace itself. On macOS, Download Update opens the signed DMG for the user to install.
 

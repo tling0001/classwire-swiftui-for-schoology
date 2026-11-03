@@ -37,14 +37,9 @@ struct HomeView: View {
                 if let user = session.user {
                     HStack(spacing: 12) {
                         if let avatar = user.pictureURL {
-                            AsyncImage(url: avatar) { image in
-                                image.resizable().scaledToFill()
-                            } placeholder: {
-                                Image(systemName: "person.crop.circle.fill")
-                                    .resizable().scaledToFit().foregroundStyle(SchoologyStyle.blue)
-                            }
-                            .frame(width: 48, height: 48)
-                            .clipShape(Circle())
+                            AuthenticatedSchoologyImage(url: avatar)
+                                .frame(width: 48, height: 48)
+                                .clipShape(Circle())
                         } else {
                             Image(systemName: "person.crop.circle.fill")
                                 .font(.system(size: 42)).foregroundStyle(SchoologyStyle.blue)
@@ -122,13 +117,9 @@ private struct SchoologyActivityCard: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 10) {
                 if let avatar = activity.avatarURL {
-                    AsyncImage(url: avatar) { image in
-                        image.resizable().scaledToFill()
-                    } placeholder: {
-                        avatarPlaceholder
-                    }
-                    .frame(width: 42, height: 42)
-                    .clipShape(Circle())
+                    AuthenticatedSchoologyImage(url: avatar)
+                        .frame(width: 42, height: 42)
+                        .clipShape(Circle())
                 } else {
                     avatarPlaceholder
                 }
@@ -153,6 +144,13 @@ private struct SchoologyActivityCard: View {
                     .font(.body)
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            ForEach(activity.imageURLs, id: \.absoluteString) { imageURL in
+                AuthenticatedSchoologyImage(url: imageURL, contentMode: .fit)
+                    .frame(maxWidth: .infinity)
+                    .frame(maxHeight: 420)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
             }
 
             if !activity.attachments.isEmpty {
@@ -228,26 +226,13 @@ private struct CourseDashboardCard: View {
             VStack(alignment: .leading, spacing: 0) {
                 ZStack(alignment: .bottomLeading) {
                     if let imageURL = course.profileURL {
-                        AsyncImage(url: imageURL) { image in
-                            image.resizable().scaledToFill()
-                        } placeholder: {
-                            courseFallback
-                        }
-                        .frame(height: 132)
-                        .frame(maxWidth: .infinity)
-                        .clipped()
+                        AuthenticatedSchoologyImage(url: imageURL)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 132)
+                            .clipped()
                     } else {
                         courseFallback.frame(height: 132)
                     }
-                    LinearGradient(
-                        colors: [.clear, .black.opacity(0.32)],
-                        startPoint: .center,
-                        endPoint: .bottom
-                    )
-                    Text(String(course.title.prefix(1)).uppercased())
-                        .font(.title.bold())
-                        .foregroundStyle(.white)
-                        .padding(12)
                 }
 
                 VStack(alignment: .leading, spacing: 5) {

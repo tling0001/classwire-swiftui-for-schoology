@@ -1,5 +1,16 @@
 # Schoology SwiftUI Release Notes
 
+## [2026.10.0-port.7]
+
+### Changed
+- Use native Liquid Glass button styles for login actions on iOS 26 and macOS 26, retaining bordered fallbacks on earlier systems.
+- Remove the decorative course initial that previously overlaid course dashboard images.
+
+### Fixed
+- Use NavigationSplitView selection for compact sidebar navigation so destination changes and returning to the sidebar use the system navigation stack and animation.
+- Load Schoology-hosted avatars and post images through authenticated image requests, matching the Tauri host's signed image-fetch behavior.
+- Preserve inline rich-text image URLs and image attachment URLs when decoding recent activity posts.
+
 ## [2026.10.0-port.6]
 
 ### Fixed
@@ -20,8 +31,8 @@
 ## [2026.10.0-port.4]
 
 ### Fixed
-- Corrected iOS Ad Hoc export validation to inspect the primary icon name at `CFBundleIcons.CFBundlePrimaryIcon.CFBundleIconName`, the location populated by Xcode's asset catalog compiler.
-- Removed the manually injected top-level `CFBundleIconName` value so each platform target uses its own configured app icon asset catalog.
+- Corrected iOS Ad Hoc export validation to inspect the primary icon name at CFBundleIcons.CFBundlePrimaryIcon.CFBundleIconName, the location populated by Xcode's asset catalog compiler.
+- Removed the manually injected top-level CFBundleIconName value so each platform target uses its own configured app icon asset catalog.
 
 ## [2026.10.0-port.3]
 
@@ -30,7 +41,7 @@
 - Updated the Schoology wordmark treatment and made sign-in controls respond to system appearance.
 
 ### Home
-- Fixed recent activity decoding to handle the official `recent` response wrappers and update-list shapes.
+- Fixed recent activity decoding to handle the official recent response wrappers and update-list shapes.
 - Added author and attachment parsing for activity posts.
 - Added the Home Recent Activity, Course Dashboard, and Upcoming sections.
 - Added course images, school names, and course-specific upcoming events.
@@ -62,5 +73,5 @@
 - Add version-specific GitHub release notes.
 
 ### Changed
-- Reset the SwiftUI port release sequence to `2026.10.0-port.1`.
-- Keep the `com.schoologytauri.app` bundle identifier for continuity with the existing Ad Hoc App ID and provisioning profile.
+- Reset the SwiftUI port release sequence to 2026.10.0-port.1.
+- Keep the com.schoologytauri.app bundle identifier for continuity with the existing Ad Hoc App ID and provisioning profile.

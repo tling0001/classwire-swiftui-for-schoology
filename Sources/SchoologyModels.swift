@@ -87,6 +87,7 @@ struct SchoologyActivity: Identifiable, Sendable {
     let created: String
     let contextLabel: String
     let attachments: [SchoologyAttachment]
+    let imageURLs: [URL]
     let likes: Int
     let comments: Int
 
@@ -97,8 +98,9 @@ struct SchoologyActivity: Identifiable, Sendable {
             let authorID = SchoologyValue.optionalString(item["user_id"] ?? item["uid"] ?? item["author_id"] ?? item["authorId"])
             let avatar = item["user_photo"] ?? item["photo_url"] ?? item["picture_url"] ?? item["pictureUrl"]
             let rawBody = SchoologyValue.string(item["body"] ?? item["message"] ?? item["description"] ?? item["title"])
+            let rawAttachments = item["attachments"] ?? item["attachment"] ?? item["files"]
             let attachments = SchoologyValue.list(
-                item["attachments"] ?? item["attachment"] ?? item["files"],
+                rawAttachments,
                 keys: ["files", "file", "links", "link", "attachment", "attachments", "items", "data"]
             ).compactMap { attachment -> SchoologyAttachment? in
                 let rawURL = attachment["linkURL"] ?? attachment["linkUrl"] ?? attachment["href"] ??
@@ -121,10 +123,44 @@ struct SchoologyActivity: Identifiable, Sendable {
                 created: SchoologyValue.string(item["created"] ?? item["timestamp"] ?? item["created_at"] ?? item["createdAt"]),
                 contextLabel: SchoologyValue.string(item["group_name"] ?? item["groupName"] ?? item["realm_title"] ?? item["realmTitle"]),
                 attachments: attachments,
+                imageURLs: imageURLs(in: rawBody, attachments: rawAttachments),
                 likes: SchoologyValue.integer(item["likes"] ?? item["like_count"] ?? item["likeCount"]),
                 comments: SchoologyValue.integer(item["num_comments"] ?? item["comment_count"] ?? item["commentCount"])
             )
         }
+    }
+
+    private static func imageURLs(in html: String, attachments: Any?) -> [URL] {
+        var urls: [URL] = []
+        let pattern = #"(?is)<img\b[^>]*?\bsrc\s*=\s*["']([^"']+)["']"#
+        if let regex = try? NSRegularExpression(pattern: pattern) {
+            let range = NSRange(html.startIndex..<html.endIndex, in: html)
+            for match in regex.matches(in: html, range: range) {
+                guard let valueRange = Range(match.range(at: 1), in: html),
+                      let url = SchoologyValue.url(String(html[valueRange])) else { continue }
+                urls.append(url)
+            }
+        }
+
+        let items = SchoologyValue.list(
+            attachments,
+            keys: ["files", "file", "links", "link", "attachment", "attachments", "items", "data"]
+        )
+        for item in items {
+            let mime = SchoologyValue.string(item["filemime"] ?? item["fileMIME"] ?? item["mime"] ?? item["type"]).lowercased()
+            let thumbnail = item["thumbnail"] ?? item["fileThumbnailURL"] ?? item["file_thumbnail_url"] ??
+                item["image_url"] ?? item["imageUrl"]
+            if let url = SchoologyValue.url(thumbnail) {
+                urls.append(url)
+            } else if mime.hasPrefix("image/") {
+                let rawURL = item["file_download_url"] ?? item["fileDownloadURL"] ??
+                    item["download_path"] ?? item["downloadPath"] ?? item["url"]
+                if let url = SchoologyValue.url(rawURL) { urls.append(url) }
+            }
+        }
+
+        var seen = Set<String>()
+        return urls.filter { seen.insert($0.absoluteString).inserted }
     }
 }
 

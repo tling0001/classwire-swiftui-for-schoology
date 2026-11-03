@@ -495,7 +495,15 @@ private struct LoginActionButton: View {
 
     var body: some View {
         Group {
-            if style == .primary {
+            if #available(iOS 26, macOS 26, *) {
+                if style == .primary {
+                    Button(action: action) { buttonLabel }
+                        .buttonStyle(.glassProminent)
+                } else {
+                    Button(action: action) { buttonLabel }
+                        .buttonStyle(.glass)
+                }
+            } else if style == .primary {
                 Button(action: action) { buttonLabel }
                     .buttonStyle(.borderedProminent)
             } else {
