@@ -279,7 +279,7 @@ jobs:
   release:
     name: Publish versioned Schoology release
     if: >-
-      ${{ always() && github.ref == 'refs/heads/main' && needs['build-ios'].result == 'success' && (needs['build-macos'].result == 'success' || needs['build-macos'].result == 'skipped') }}
+      ${{ always() && github.ref == 'refs/heads/main' && (needs['build-macos'].result == 'success' || needs['build-ios'].result == 'success') }}
     needs: [build-macos, build-ios]
     runs-on: ubuntu-latest
     steps:
@@ -311,13 +311,27 @@ jobs:
         run: |
           set -euo pipefail
           VERSION="$(tr -d '[:space:]' < VERSION)"
-          test -s "release-assets/Schoology-$VERSION-iOS-AdHoc.ipa"
-          test -s "release-assets/Schoology-$VERSION-iOS-AdHoc.plist"
-          test -s "release-assets/Schoology-$VERSION-iOS-Install-QR.png"
-          if [ "${{ inputs.ios_adhoc_only }}" != "true" ]; then
-            test -s "release-assets/Schoology-$VERSION-macOS.dmg"
+          HAS_MACOS=false
+          HAS_IOS=false
+
+          if [ -s "release-assets/Schoology-$VERSION-macOS.dmg" ]; then
+            HAS_MACOS=true
           fi
-          find release-assets -maxdepth 1 -type f -printf '%f\n' | sort
+
+          if [ -s "release-assets/Schoology-$VERSION-iOS-AdHoc.ipa" ] \
+            && [ -s "release-assets/Schoology-$VERSION-iOS-AdHoc.plist" ] \
+            && [ -s "release-assets/Schoology-$VERSION-iOS-Install-QR.png" ]; then
+            HAS_IOS=true
+          fi
+
+          if [ "$HAS_MACOS" != "true" ] && [ "$HAS_IOS" != "true" ]; then
+            echo "No complete macOS or iOS release package was produced." >&2
+            find release-assets -maxdepth 2 -type f -print || true
+            exit 1
+          fi
+
+          echo "Publishing successful platform artifacts (macOS=$HAS_MACOS, iOS=$HAS_IOS)."
+          find release-assets -maxdepth 2 -type f -print | sort
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:

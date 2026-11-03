@@ -47,7 +47,9 @@ struct SignInView: View {
             .frame(maxWidth: 520)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(LoginPalette.background.ignoresSafeArea())
+            #if os(iOS)
             .toolbar(.hidden, for: .navigationBar)
+            #endif
         }
         .tint(LoginPalette.blue)
         .onAppear { canadian = session.canadianServer }
