@@ -263,6 +263,21 @@ actor SchoologyAPI {
         return destination
     }
 
+
+    func launchResourceApp(appID: String, auth: SchoologyAuth) async throws -> URL {
+        guard Int(appID) != nil else { throw SchoologyAPIError.invalidResponse }
+        let data = try await getV2("resources/applications/\\(appID)/launch", auth: auth)
+        let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] ?? [:]
+        let payload = (json["data"] as? [String: Any]) ?? (json["response"] as? [String: Any]) ?? json
+        guard let rawURL = payload["url"] as? String, let destination = URL(string: rawURL),
+              let target = URLComponents(url: destination, resolvingAgainstBaseURL: false),
+              target.scheme?.lowercased() == "https", target.host != nil,
+              target.user == nil, target.password == nil else {
+            throw SchoologyAPIError.invalidResponse
+        }
+        return destination
+    }
+
     func post(_ path: String, auth: SchoologyAuth) async throws -> Data {
         try await post(path, auth: auth, params: [:])
     }

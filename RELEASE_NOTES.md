@@ -1,3 +1,15 @@
+## [2026.10.0-port.19]
+
+### Standalone Schoology pages
+- Add a native Resources destination with My Resources, Shared, Groups, and Resource Apps categories, collection browsing, folder navigation, and authenticated resource links.
+- Add a standalone Grades destination with course grade summaries and expandable course grade-item details, reusing the corrected course-grade API implementation.
+- Add a standalone Calendar destination with month navigation, event-day indicators, selected-day details, and an Upcoming view.
+- Base Schoology API paths and response fields on the official Android 2026.10.0 source and classic Tauri port.28 implementation.
+
+### Build
+- Remove the unmatched closing brace in SchoologyModels.swift that prevented both iOS and macOS targets from compiling.
+- Increment the iOS and macOS bundle build number to 19.
+
 ## [2026.10.0-port.18]
 
 ### Notifications

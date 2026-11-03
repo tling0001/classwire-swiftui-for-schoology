@@ -235,7 +235,7 @@ struct NotificationsView: View {
                 ContentUnavailableView("No notifications", systemImage: "bell", description: Text("New Schoology notifications will appear here."))
             }
         }
-        .listStyle(.insetGrouped)
+        .schoologyInsetGroupedListStyle()
         .navigationTitle("Notifications")
         .refreshable { await session.loadNotifications(force: true) }
         .toolbar {

@@ -15,6 +15,21 @@ final class AppSession {
     var courses: [SchoologyCourse] = []
     var groups: [SchoologyGroup] = []
     var notifications: [SchoologyNotification] = []
+    var resourceCollections: [SchoologyResourceCollection] = []
+    var resourceApps: [SchoologyResourceCollection] = []
+    var hasLoadedResources = false
+    var isLoadingResources = false
+    var resourcesError: String?
+    var userGradeCourses: [SchoologyUserGradeCourse] = []
+    var hasLoadedUserGrades = false
+    var isLoadingUserGrades = false
+    var userGradesError: String?
+    var calendarMonthEvents: [SchoologyUpcomingEvent] = []
+    var calendarUpcomingEvents: [SchoologyUpcomingEvent] = []
+    var calendarLoadedMonth = ""
+    var hasLoadedCalendarUpcoming = false
+    var isLoadingCalendar = false
+    var calendarError: String?
     var hasLoadedNotifications = false
     var isLoadingNotifications = false
     var isLoadingMoreNotifications = false
@@ -223,6 +238,11 @@ final class AppSession {
         return try await api.launchCourseApp(launchURL, sectionID: courseID, auth: auth)
     }
 
+    func launchResourceApp(_ app: SchoologyResourceCollection) async throws -> URL {
+        guard let auth else { throw SchoologyAPIError.notSignedIn }
+        return try await api.launchResourceApp(appID: app.id, auth: auth)
+    }
+
     func loadPeopleDirectory() async throws -> [SchoologyProfileItem] {
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         do {
@@ -325,6 +345,106 @@ final class AppSession {
                 url: SchoologyValue.url(item["web_url"] ?? item["webUrl"] ?? item["url"]), isAdmin: false, kind: "assignment", collectionID: nil))
         }
         return result
+    }
+
+
+    func loadResources(force: Bool = false) async {
+        guard let auth, !isLoadingResources else { return }
+        if hasLoadedResources && !force { return }
+        isLoadingResources = true
+        resourcesError = nil
+        defer { isLoadingResources = false }
+        do {
+            async let collectionsRequest = api.get("collections", auth: auth, params: ["limit": "200"])
+            async let appsRequest = try? await api.get("resource_apps", auth: auth, params: ["limit": "200"])
+            let (collectionsData, appsData) = try await (collectionsRequest, appsRequest)
+            let all = SchoologyResourceCollection.decodeList(Self.object(collectionsData), keys: ["collection", "collections", "collection_list", "items"])
+            let apps = SchoologyResourceCollection.decodeList(Self.object(appsData ?? Data()), keys: ["resource_apps", "resourceApps", "collection", "collections", "items"])
+            var mine: [SchoologyResourceCollection] = []
+            var shared: [SchoologyResourceCollection] = []
+            var groups: [SchoologyResourceCollection] = []
+            for item in all {
+                if item.ownerID == auth.userID && item.realm.isEmpty {
+                    mine.append(item.withCategory(.mine))
+                } else if item.sharedCount > 0 {
+                    shared.append(item.withCategory(.shared))
+                } else if item.realm == "group" {
+                    groups.append(item.withCategory(.groups))
+                }
+            }
+            resourceCollections = mine + shared + groups
+            resourceApps = apps.map { $0.withCategory(.apps) }
+            hasLoadedResources = true
+        } catch {
+            resourcesError = error.localizedDescription
+            hasLoadedResources = true
+        }
+    }
+
+    func loadResourceItems(collectionID: String, folderID: String? = nil) async throws -> [SchoologyProfileItem] {
+        guard let auth else { throw SchoologyAPIError.notSignedIn }
+        var params = ["start": "0", "limit": "200", "with_attachments": "TRUE"]
+        if let folderID, !folderID.isEmpty, folderID != "0" { params["f"] = folderID }
+        let data = try await api.get("collections/\(collectionID)/resources", auth: auth, params: params)
+        return SchoologyProfileItem.decodeList(Self.object(data), keys: ["resource", "resources", "resource_list", "items"])
+    }
+
+    func loadUserGradeCourses(force: Bool = false) async {
+        guard let auth, !isLoadingUserGrades else { return }
+        if hasLoadedUserGrades && !force { return }
+        isLoadingUserGrades = true
+        userGradesError = nil
+        defer { isLoadingUserGrades = false }
+        do {
+            let data = try await api.get("users/\(auth.userID)/grades", auth: auth)
+            userGradeCourses = SchoologyUserGradeCourse.decodeList(Self.object(data))
+            hasLoadedUserGrades = true
+        } catch {
+            userGradesError = error.localizedDescription
+            hasLoadedUserGrades = true
+        }
+    }
+
+    func loadCalendarMonth(_ month: Date, force: Bool = false) async {
+        guard let auth, !isLoadingCalendar else { return }
+        let calendar = Calendar.current
+        guard let interval = calendar.dateInterval(of: .month, for: month),
+              let lastDay = calendar.date(byAdding: .day, value: -1, to: interval.end) else { return }
+        let key = String(Self.apiDate(interval.start).prefix(7))
+        if !force && calendarLoadedMonth == key { return }
+        isLoadingCalendar = true
+        calendarError = nil
+        defer { isLoadingCalendar = false }
+        do {
+            let data = try await api.get("users/\(auth.userID)/events", auth: auth, params: [
+                "start": Self.apiDate(interval.start), "end": Self.apiDate(lastDay), "limit": "200"
+            ])
+            calendarMonthEvents = SchoologyUpcomingEvent.decodeList(Self.object(data))
+                .sorted { ($0.date ?? .distantFuture) < ($1.date ?? .distantFuture) }
+            calendarLoadedMonth = key
+        } catch {
+            calendarError = error.localizedDescription
+        }
+    }
+
+    func loadCalendarUpcoming(force: Bool = false) async {
+        guard let auth, !isLoadingCalendar else { return }
+        if hasLoadedCalendarUpcoming && !force { return }
+        isLoadingCalendar = true
+        calendarError = nil
+        defer { isLoadingCalendar = false }
+        do {
+            let data = try await api.get("users/\(auth.userID)/events", auth: auth, params: [
+                "start_date": Self.apiDate(Date()), "start": "0", "limit": "100"
+            ])
+            calendarUpcomingEvents = SchoologyUpcomingEvent.decodeList(Self.object(data))
+                .filter { ($0.date ?? .distantPast) >= Calendar.current.startOfDay(for: Date()) }
+                .sorted { ($0.date ?? .distantFuture) < ($1.date ?? .distantFuture) }
+            hasLoadedCalendarUpcoming = true
+        } catch {
+            calendarError = error.localizedDescription
+            hasLoadedCalendarUpcoming = true
+        }
     }
 
     func loadSchoolName(for course: SchoologyCourse) async -> String {
@@ -809,6 +929,18 @@ final class AppSession {
         isLoadingMoreNotifications = false
         notificationsHasMore = true
         notificationsError = nil
+        resourceCollections = []
+        resourceApps = []
+        hasLoadedResources = false
+        resourcesError = nil
+        userGradeCourses = []
+        hasLoadedUserGrades = false
+        userGradesError = nil
+        calendarMonthEvents = []
+        calendarUpcomingEvents = []
+        calendarLoadedMonth = ""
+        hasLoadedCalendarUpcoming = false
+        calendarError = nil
         activities = []
         upcomingEvents = []
         hasLoadedHomeActivities = false

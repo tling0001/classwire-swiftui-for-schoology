@@ -107,6 +107,10 @@ extension View {
     func schoologyGlassSurface() -> some View {
         modifier(SchoologyGlassSurfaceModifier())
     }
+
+    func schoologyInsetGroupedListStyle() -> some View {
+        modifier(SchoologyInsetGroupedListStyleModifier())
+    }
 }
 
 #if os(macOS)
@@ -136,3 +140,14 @@ struct SchoologyCommands: Commands {
     }
 }
 #endif
+
+struct SchoologyInsetGroupedListStyleModifier: ViewModifier {
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        #if os(iOS)
+        content.listStyle(.insetGrouped)
+        #else
+        content.listStyle(.inset)
+        #endif
+    }
+}
