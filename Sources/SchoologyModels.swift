@@ -308,9 +308,8 @@ enum SchoologyValue {
             .replacingOccurrences(of: "[ \\t]+", with: " ", options: .regularExpression)
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
-}    let isUnread: Bool
+}
 
-    static func decodeList(_ value: Any?) -> [SchoologyCourse] {
         SchoologyValue.list(value, keys: ["section", "sections", "items", "data", "response"]).compactMap { item in
             guard let rawID = item["id"] ?? item["section_id"] ?? item["sectionId"] else { return nil }
             let image = item["profile_url"] ?? item["profileUrl"] ?? item["course_profile_url"] ??
