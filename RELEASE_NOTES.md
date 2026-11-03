@@ -1,5 +1,13 @@
 # Schoology SwiftUI Release Notes
 
+## [2026.10.0-port.9]
+
+### Groups and schools
+- Add permission-gated native group actions for updates, discussions, events, albums, and resource attachment using the official Tauri request parameters.
+- Make group and school profile rows open native detail sheets, retaining any supplied attachment or resource link.
+- Keep school profile tabs and the group-to-school navigation available across compact and wide layouts.
+
+
 ## [2026.10.0-port.8]
 
 ### Added

@@ -290,6 +290,40 @@ final class AppSession {
     }
 
 
+    func createGroupUpdate(groupID: String, body: String) async throws {
+        guard let auth else { throw SchoologyAPIError.notSignedIn }
+        _ = try await api.post("groups/\(groupID)/updates", auth: auth, params: ["body": body])
+    }
+
+    func createGroupDiscussion(groupID: String, title: String, body: String) async throws {
+        guard let auth else { throw SchoologyAPIError.notSignedIn }
+        _ = try await api.post("groups/\(groupID)/discussions", auth: auth, params: [
+            "title": title, "body": body, "published": "1"
+        ])
+    }
+
+    func createGroupEvent(groupID: String, title: String, description: String, start: Date, allDay: Bool) async throws {
+        guard let auth else { throw SchoologyAPIError.notSignedIn }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone.current
+        formatter.dateFormat = allDay ? "yyyy-MM-dd '00:00:00'" : "yyyy-MM-dd HH:mm:ss"
+        _ = try await api.post("groups/\(groupID)/events", auth: auth, params: [
+            "title": title, "description": description, "start": formatter.string(from: start),
+            "is_all_day": allDay ? "1" : "0", "rsvp": "0", "comments_enabled": "1"
+        ])
+    }
+
+    func createGroupAlbum(groupID: String, title: String) async throws {
+        guard let auth else { throw SchoologyAPIError.notSignedIn }
+        _ = try await api.post("groups/\(groupID)/albums", auth: auth, params: ["title": title])
+    }
+
+    func addGroupResource(groupID: String, resourceID: String) async throws {
+        guard let auth else { throw SchoologyAPIError.notSignedIn }
+        _ = try await api.post("groups/\(groupID)/resources", auth: auth, params: ["resource": resourceID])
+    }
+
     func loadGroupProfile(_ group: SchoologyGroup) async throws -> SchoologyGroupProfile {
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         async let detail = api.get("groups/\(group.id)", auth: auth)

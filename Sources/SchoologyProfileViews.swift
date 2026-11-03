@@ -26,6 +26,8 @@ struct GroupProfileView: View {
     @State private var isLoading = true
     @State private var error: String?
     @State private var schoolName = ""
+    @State private var presentedAction: GroupProfileAction?
+    @State private var selectedDetail: SchoologyProfileItem?
 
     var body: some View {
         Group {
@@ -38,6 +40,14 @@ struct GroupProfileView: View {
             Button("Refresh", systemImage: "arrow.clockwise") { Task { await load() } }.disabled(isLoading)
         }}
         .task { await load() }
+        .sheet(item: $presentedAction) { action in
+            GroupProfileActionSheet(groupID: group.id, action: action) {
+                Task { await load() }
+            }
+        }
+        .sheet(item: $selectedDetail) { item in
+            SchoologyProfileItemDetailSheet(item: item)
+        }
     }
 
     private func groupLayout(_ profile: SchoologyGroupProfile) -> some View {
@@ -99,14 +109,20 @@ struct GroupProfileView: View {
 
     private func groupContent(_ profile: SchoologyGroupProfile) -> some View {
         VStack(spacing: 0) {
-            if profile.permissions.canPostUpdates || profile.permissions.canCreateDiscussion || profile.permissions.canCreateEvent || profile.permissions.canCreateAlbum || profile.permissions.canAddResources {
-                HStack {
-                    if profile.permissions.canPostUpdates { Label("Can post updates", systemImage: "square.and.pencil") }
-                    if profile.permissions.canCreateDiscussion { Label("Can create discussions", systemImage: "bubble.left") }
-                    if profile.permissions.canCreateEvent { Label("Can create events", systemImage: "calendar.badge.plus") }
-                    if profile.permissions.canCreateAlbum { Label("Can create albums", systemImage: "photo.badge.plus") }
-                    if profile.permissions.canAddResources { Label("Can add resources", systemImage: "folder.badge.plus") }
-                }.font(.caption).foregroundStyle(.secondary).padding(.horizontal).padding(.top, 8)
+            if hasGroupActions(profile.permissions) {
+                Menu {
+                    if profile.permissions.canPostUpdates { Button("Post update", systemImage: "square.and.pencil") { presentedAction = .update } }
+                    if profile.permissions.canCreateDiscussion { Button("Create discussion", systemImage: "bubble.left") { presentedAction = .discussion } }
+                    if profile.permissions.canCreateEvent { Button("Create event", systemImage: "calendar.badge.plus") { presentedAction = .event } }
+                    if profile.permissions.canCreateAlbum { Button("Create album", systemImage: "photo.badge.plus") { presentedAction = .album } }
+                    if profile.permissions.canAddResources { Button("Add resource", systemImage: "folder.badge.plus") { presentedAction = .resource } }
+                } label: {
+                    Label("Create", systemImage: "plus.circle.fill")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 14).padding(.vertical, 10)
+                }
+                .accessibilityHint("Shows actions allowed by this group's permissions")
             }
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 12) {
@@ -122,6 +138,11 @@ struct GroupProfileView: View {
                 }.padding()
             }
         }
+    }
+
+    private func hasGroupActions(_ permissions: SchoologyGroupPermissions) -> Bool {
+        permissions.canPostUpdates || permissions.canCreateDiscussion || permissions.canCreateEvent ||
+        permissions.canCreateAlbum || permissions.canAddResources
     }
 
     @ViewBuilder private func memberRows(_ items: [SchoologyProfileItem]) -> some View {
@@ -154,7 +175,7 @@ struct GroupProfileView: View {
         else {
             ForEach(items) { item in
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(item.title).font(.headline)
+                    Button { selectedDetail = item } label: { Text(item.title).font(.headline).frame(maxWidth: .infinity, alignment: .leading) }.buttonStyle(.plain)
                     if !item.body.isEmpty { Text(item.body).foregroundStyle(.secondary).textSelection(.enabled) }
                     if !item.subtitle.isEmpty { Text(item.subtitle).font(.caption).foregroundStyle(.tertiary) }
                     if let url = item.url { Link(destination: url) { Label("Open attachment", systemImage: "paperclip") }.font(.subheadline) }
@@ -198,6 +219,7 @@ struct SchoolProfileView: View {
     @State private var isLoading = true
     @State private var error: String?
     @State private var discussionForbidden = false
+    @State private var selectedDetail: SchoologyProfileItem?
 
     var body: some View {
         Group {
@@ -210,6 +232,9 @@ struct SchoolProfileView: View {
             Button("Refresh", systemImage: "arrow.clockwise") { Task { await load() } }.disabled(isLoading)
         }}
         .task { await load() }
+        .sheet(item: $selectedDetail) { item in
+            SchoologyProfileItemDetailSheet(item: item)
+        }
     }
 
     private func schoolLayout(_ profile: SchoologySchoolProfile) -> some View {
@@ -288,7 +313,7 @@ struct SchoolProfileView: View {
         if items.isEmpty { ContentUnavailableView(empty, systemImage: "tray") }
         else { ForEach(items) { item in
             VStack(alignment: .leading, spacing: 6) {
-                Text(item.title).font(.headline)
+                Button { selectedDetail = item } label: { Text(item.title).font(.headline).frame(maxWidth: .infinity, alignment: .leading) }.buttonStyle(.plain)
                 if !item.body.isEmpty { Text(item.body).foregroundStyle(.secondary).textSelection(.enabled) }
                 if let url = item.url { Link(destination: url) { Label("Open", systemImage: "arrow.up.right") } }
             }.padding(14).frame(maxWidth: .infinity, alignment: .leading)
