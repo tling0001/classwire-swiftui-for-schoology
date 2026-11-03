@@ -15,20 +15,20 @@ private final class QRScannerController: NSObject, @unchecked Sendable, AVCaptur
             guard let self else { return }
             switch AVCaptureDevice.authorizationStatus(for: .video) {
             case .authorized:
-                configureAndStart()
+                self.configureAndStart()
             case .notDetermined:
                 AVCaptureDevice.requestAccess(for: .video) { [weak self] granted in
                     guard let self else { return }
                     queue.async {
                         if granted {
-                            configureAndStart()
+                            self.configureAndStart()
                         } else {
-                            report("Camera access is disabled. Allow Schoology to use the camera in System Settings.")
+                            self.report("Camera access is disabled. Allow Schoology to use the camera in System Settings.")
                         }
                     }
                 }
             default:
-                report("Camera access is disabled. Allow Schoology to use the camera in System Settings.")
+                self.report("Camera access is disabled. Allow Schoology to use the camera in System Settings.")
             }
         }
     }
@@ -58,20 +58,20 @@ private final class QRScannerController: NSObject, @unchecked Sendable, AVCaptur
             session.sessionPreset = .high
             guard session.canAddInput(input) else {
                 session.commitConfiguration()
-                report("Schoology couldn’t access the camera input.")
+                self.report("Schoology couldn’t access the camera input.")
                 return
             }
             session.addInput(input)
             guard session.canAddOutput(output) else {
                 session.commitConfiguration()
-                report("Schoology couldn’t start QR code scanning.")
+                self.report("Schoology couldn’t start QR code scanning.")
                 return
             }
             session.addOutput(output)
             output.setMetadataObjectsDelegate(self, queue: queue)
             guard output.availableMetadataObjectTypes.contains(.qr) else {
                 session.commitConfiguration()
-                report("QR code scanning isn’t supported by this camera.")
+                self.report("QR code scanning isn’t supported by this camera.")
                 return
             }
             output.metadataObjectTypes = [.qr]

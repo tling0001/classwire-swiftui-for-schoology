@@ -76,7 +76,12 @@ final class AppSession {
         }
     }
 
+    func cancelSchoolSignIn() {
+        schoolBrowserAuthenticator.cancel()
+    }
+
     func signInThroughSchool(domain: String, canadian: Bool) async {
+        guard !isLoading else { return }
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
@@ -88,6 +93,8 @@ final class AppSession {
             let callback = try await schoolBrowserAuthenticator.authenticate(using: pending.authorizationURL)
             let credentials = try await api.completeSchoolBrowserLogin(pending, callbackURL: callback)
             try await establishSession(credentials)
+        } catch is CancellationError {
+            // Returning to the school picker cancels authentication intentionally.
         } catch {
             errorMessage = error.localizedDescription
         }

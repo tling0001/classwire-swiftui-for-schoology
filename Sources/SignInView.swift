@@ -460,7 +460,9 @@ struct SignInView: View {
         case .welcome: break
         case .school: mode = .welcome
         case .credentials: mode = .welcome
-        case .schoolBrowser: mode = .school
+        case .schoolBrowser:
+            session.cancelSchoolSignIn()
+            mode = .school
         case .qr: mode = .welcome
         }
     }

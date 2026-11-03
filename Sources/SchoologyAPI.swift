@@ -32,7 +32,12 @@ actor SchoologyAPI {
 
     func searchSchools(_ query: String) async throws -> [SchoologySchool] {
         guard !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return [] }
-        let url = URL(string: "https://\(apiHost)/v1/login/school_search?query=\(query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")")!
+        var components = URLComponents()
+        components.scheme = "https"
+        components.host = apiHost
+        components.path = "/v1/login/school_search"
+        components.queryItems = [URLQueryItem(name: "query", value: query)]
+        guard let url = components.url else { throw SchoologyAPIError.invalidResponse }
         let data = try await send(url: url, method: "GET", body: nil, auth: nil, signed: false, extra: [])
         let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
         return (json?["school"] as? [[String: Any]] ?? []).compactMap(SchoologySchool.init)
@@ -88,26 +93,27 @@ actor SchoologyAPI {
         guard !rawDomain.isEmpty,
               let parsed = URL(string: rawDomain.contains("://") ? rawDomain : "https://\(rawDomain)"),
               ["http", "https"].contains(parsed.scheme?.lowercased() ?? ""),
+              parsed.user == nil,
+              parsed.password == nil,
               let host = parsed.host, !host.isEmpty else {
             throw SchoologyAPIError.invalidResponse
         }
 
         await syncServerTime()
         let temporary = try await requestToken()
-        let callback = "https://\(host)/mobile_login_success?os=android&os_version=34&app_version=600000478"
-        let encodedCallback = androidURIEncode(callback)
-        let landingPath = "oauth/authorize?oauth_token=\(temporary.token)&oauth_callback=\(encodedCallback)"
+        guard !temporary.token.isEmpty, !temporary.secret.isEmpty else {
+            throw SchoologyAPIError.invalidToken
+        }
 
-        var components = URLComponents()
-        components.scheme = "https"
-        components.host = host
-        components.path = "/oauth/authorize"
-        components.queryItems = [
-            URLQueryItem(name: "oauth_token", value: temporary.token),
-            URLQueryItem(name: "oauth_callback", value: callback),
-            URLQueryItem(name: "login_landing_dest", value: landingPath)
-        ]
-        guard let authorizationURL = components.url else { throw SchoologyAPIError.invalidResponse }
+        // Match LoginOAuthManagementActivity.R0() from the official Tauri port.
+        let callback = "https://\(host)/mobile_login_success?os=android&os_version=34&app_version=600000478"
+        let oauthPath = "oauth/authorize?oauth_token=\(temporary.token)&oauth_callback=\(androidURIEncode(callback))"
+        let authorizationString = "https://\(host)/\(oauthPath)&login_landing_dest=\(androidURIEncode(oauthPath))"
+        guard let authorizationURL = URL(string: authorizationString),
+              authorizationURL.scheme == "https",
+              authorizationURL.host == host else {
+            throw SchoologyAPIError.invalidResponse
+        }
         return SchoologyPendingSchoolLogin(credential: temporary, authorizationURL: authorizationURL)
     }
 
@@ -115,19 +121,35 @@ actor SchoologyAPI {
         _ pending: SchoologyPendingSchoolLogin,
         callbackURL: URL
     ) async throws -> SchoologyAuth {
-        let callbackToken = URLComponents(url: callbackURL, resolvingAgainstBaseURL: false)?
-            .queryItems?.first(where: { $0.name == "request_token" })?.value
+        let queryItems = URLComponents(url: callbackURL, resolvingAgainstBaseURL: false)?.queryItems ?? []
+        let callbackToken = queryItems.first {
+            ($0.name == "request_token" || $0.name == "oauth_token") && !($0.value ?? "").isEmpty
+        }?.value
         guard callbackURL.scheme?.lowercased() == "schoology",
               callbackURL.host?.lowercased() == "external_login_callback",
               callbackToken == pending.credential.token else {
             throw SchoologyAPIError.invalidToken
         }
+
+        // Exchange only the request token created for this browser session.
+        // exchangeToken() verifies /v1/users/me before returning credentials.
         return try await exchangeToken(pending.credential)
     }
 
     private func androidURIEncode(_ value: String) -> String {
-        let allowed = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_.!~*'()")
-        return value.addingPercentEncoding(withAllowedCharacters: allowed) ?? value
+        // Matches url::form_urlencoded::byte_serialize() in the Tauri port.
+        var encoded = ""
+        for byte in value.utf8 {
+            switch byte {
+            case 65...90, 97...122, 48...57, 45, 46, 95, 42:
+                encoded += String(decoding: [byte], as: UTF8.self)
+            case 32:
+                encoded.append("+")
+            default:
+                encoded += String(format: "%%%02X", byte)
+            }
+        }
+        return encoded
     }
 
     func currentUser(auth: SchoologyAuth) async throws -> SchoologyUser {

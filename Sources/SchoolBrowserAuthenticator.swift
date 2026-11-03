@@ -10,16 +10,30 @@ import AppKit
 @MainActor
 final class SchoolBrowserAuthenticator: NSObject, ASWebAuthenticationPresentationContextProviding {
     private var activeSession: ASWebAuthenticationSession?
+    private var isCancelling = false
+
+    func cancel() {
+        isCancelling = true
+        activeSession?.cancel()
+    }
 
     func authenticate(using url: URL) async throws -> URL {
+        if isCancelling {
+            isCancelling = false
+            throw CancellationError()
+        }
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<URL, Error>) in
             let session = ASWebAuthenticationSession(
                 url: url,
                 callback: .customScheme("schoology")
             ) { [weak self] callbackURL, error in
                 Task { @MainActor in
+                    let wasCancelledByApp = self?.isCancelling == true
+                    self?.isCancelling = false
                     self?.activeSession = nil
-                    if let error {
+                    if wasCancelledByApp {
+                        continuation.resume(throwing: CancellationError())
+                    } else if let error {
                         continuation.resume(throwing: error)
                     } else if let callbackURL {
                         continuation.resume(returning: callbackURL)
