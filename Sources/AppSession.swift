@@ -177,7 +177,7 @@ final class AppSession {
 
     func loadCourseApps(courseID: String) async throws -> [SchoologyCourseApp] {
         guard let auth else { throw SchoologyAPIError.notSignedIn }
-        let data = try await api.getV2("sections/\\(courseID)/applications", auth: auth)
+        let data = try await api.getV2("sections/\(courseID)/applications", auth: auth)
         return SchoologyCourseApp.decodeList(data)
     }
 
@@ -196,7 +196,7 @@ final class AppSession {
         } catch let error as SchoologyAPIError {
             guard case .http(403, _) = error else { throw error }
         }
-        let sectionData = try await api.get("users/\\(auth.userID)/sections", auth: auth, params: ["limit": "100"])
+        let sectionData = try await api.get("users/\(auth.userID)/sections", auth: auth, params: ["limit": "100"])
         let sections = SchoologyCourse.decodeList(Self.object(sectionData))
         var peopleByID: [String: SchoologyProfileItem] = [:]
         if let user {
@@ -206,7 +206,7 @@ final class AppSession {
             )
         }
         for section in sections.prefix(30) {
-            guard let data = try? await api.get("sections/\\(section.id)/enrollments", auth: auth,
+            guard let data = try? await api.get("sections/\(section.id)/enrollments", auth: auth,
                 params: ["enrollment_status": "1", "limit": "200"]) else { continue }
             let members = SchoologyProfileItem.decodeList(Self.object(data), keys: ["enrollment", "enrollments", "user", "users"])
             for member in members where !member.id.isEmpty { peopleByID[member.id] = member }
