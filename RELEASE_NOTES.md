@@ -1,5 +1,18 @@
 # Schoology SwiftUI Release Notes
 
+## [2026.10.0-port.11]
+
+### Adaptive wide-screen layouts
+- Add a Tauri-inspired two-pane homepage with Upcoming alongside Recent Activity or Course Dashboard on wide iPad and Mac windows.
+- Add a three-pane course layout with course identity and section navigation, selected section content, and Upcoming.
+- Make group and school profile panes use proportional widths and a wider-screen breakpoint.
+- Keep compact iPhone layouts stacked with segmented section navigation.
+
+### Build workflow
+- Move iOS and macOS release jobs to the Apple Silicon Xcode 27 runner image.
+- Select Xcode 27.2 explicitly and fail early unless both iOS and macOS SDK 27.2 are available.
+
+
 ## [2026.10.0-port.10]
 
 ### Groups, posts, and profiles

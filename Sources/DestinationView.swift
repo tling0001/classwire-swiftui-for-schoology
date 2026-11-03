@@ -34,47 +34,43 @@ struct HomeView: View {
 
     var body: some View {
         @Bindable var model = session
-
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 18) {
-                if let user = session.user {
-                    HStack(spacing: 12) {
-                        if let avatar = user.pictureURL {
-                            AuthenticatedSchoologyImage(url: avatar)
-                                .frame(width: 48, height: 48)
-                                .clipShape(Circle())
-                        } else {
-                            Image(systemName: "person.crop.circle.fill")
-                                .font(.system(size: 42)).foregroundStyle(SchoologyStyle.blue)
+        GeometryReader { proxy in
+            if proxy.size.width >= 900 {
+                HStack(spacing: 0) {
+                    ScrollView {
+                        LazyVStack(alignment: .leading, spacing: 18) {
+                            welcomeHeader
+                            Picker("Home", selection: Binding(
+                                get: { model.homeSection == .upcoming ? HomeSection.recent : model.homeSection },
+                                set: { model.homeSection = $0 }
+                            )) {
+                                Text(HomeSection.recent.rawValue).tag(HomeSection.recent)
+                                Text(HomeSection.dashboard.rawValue).tag(HomeSection.dashboard)
+                            }
+                            .pickerStyle(.segmented)
+                            .accessibilityLabel("Home section")
+                            switch session.homeSection {
+                            case .recent: RecentActivityView(activities: session.activities)
+                            case .dashboard: CourseDashboardView(courses: session.courses)
+                            case .upcoming: RecentActivityView(activities: session.activities)
+                            }
                         }
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text("Welcome back").font(.subheadline).foregroundStyle(.secondary)
-                            Text(user.nameDisplay).font(.title2.bold())
-                        }
+                        .padding()
+                        .frame(maxWidth: 980)
+                        .frame(maxWidth: .infinity)
                     }
-                    .padding(.bottom, 4)
-                }
-
-                Picker("Home", selection: $model.homeSection) {
-                    ForEach(HomeSection.allCases) { section in
-                        Text(section.rawValue).tag(section)
+                    Divider()
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text("Upcoming").font(.headline).padding(14)
+                        Divider()
+                        ScrollView { UpcomingEventList(events: session.upcomingEvents).padding(12) }
                     }
+                    .frame(width: max(270, proxy.size.width * 0.30))
+                    .background(.thinMaterial)
                 }
-                .pickerStyle(.segmented)
-                .accessibilityLabel("Home section")
-
-                switch session.homeSection {
-                case .recent:
-                    RecentActivityView(activities: session.activities)
-                case .dashboard:
-                    CourseDashboardView(courses: session.courses)
-                case .upcoming:
-                    UpcomingEventList(events: session.upcomingEvents)
-                }
+            } else {
+                compactHome
             }
-            .padding()
-            .frame(maxWidth: 980)
-            .frame(maxWidth: .infinity)
         }
         .refreshable { await session.refresh() }
         .overlay {
@@ -88,6 +84,45 @@ struct HomeView: View {
             if session.activities.isEmpty && session.courses.isEmpty && session.upcomingEvents.isEmpty {
                 await session.refresh()
             }
+        }
+    }
+
+    private var welcomeHeader: some View {
+        HStack(spacing: 12) {
+            if let user = session.user {
+                if let avatar = user.pictureURL {
+                    AuthenticatedSchoologyImage(url: avatar).frame(width: 48, height: 48).clipShape(Circle())
+                } else {
+                    Image(systemName: "person.crop.circle.fill").font(.system(size: 42)).foregroundStyle(SchoologyStyle.blue)
+                }
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Welcome back").font(.subheadline).foregroundStyle(.secondary)
+                    Text(user.nameDisplay).font(.title2.bold())
+                }
+            }
+        }
+        .padding(.bottom, 4)
+    }
+
+    private var compactHome: some View {
+        @Bindable var model = session
+        return ScrollView {
+            LazyVStack(alignment: .leading, spacing: 18) {
+                welcomeHeader
+                Picker("Home", selection: $model.homeSection) {
+                    ForEach(HomeSection.allCases) { section in Text(section.rawValue).tag(section) }
+                }
+                .pickerStyle(.segmented)
+                .accessibilityLabel("Home section")
+                switch session.homeSection {
+                case .recent: RecentActivityView(activities: session.activities)
+                case .dashboard: CourseDashboardView(courses: session.courses)
+                case .upcoming: UpcomingEventList(events: session.upcomingEvents)
+                }
+            }
+            .padding()
+            .frame(maxWidth: 980)
+            .frame(maxWidth: .infinity)
         }
     }
 }

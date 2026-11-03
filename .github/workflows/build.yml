@@ -27,9 +27,19 @@ jobs:
   build-macos:
     if: ${{ inputs.ios_adhoc_only != true }}
     name: Build, sign and notarize macOS
-    runs-on: macos-26
+    runs-on: xcode-27
     steps:
       - uses: actions/checkout@v4
+      - name: Select Xcode 27.2 and verify Apple SDKs
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo xcode-select --switch /Applications/Xcode_27.2.app/Contents/Developer
+          xcodebuild -version
+          IOS_SDK="$(xcrun --sdk iphoneos --show-sdk-version)"
+          MACOS_SDK="$(xcrun --sdk macosx --show-sdk-version)"
+          [[ "$IOS_SDK" == "27.2" ]] || { echo "Expected iOS SDK 27.2, found $IOS_SDK" >&2; exit 1; }
+          [[ "$MACOS_SDK" == "27.2" ]] || { echo "Expected macOS SDK 27.2, found $MACOS_SDK" >&2; exit 1; }
       - name: Prepare Schoology app icons
         run: swift Scripts/prepare-app-icons.swift
       - name: Read release version
@@ -125,9 +135,19 @@ jobs:
 
   build-ios:
     name: Build signed iOS Ad Hoc IPA
-    runs-on: macos-26
+    runs-on: xcode-27
     steps:
       - uses: actions/checkout@v4
+      - name: Select Xcode 27.2 and verify Apple SDKs
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo xcode-select --switch /Applications/Xcode_27.2.app/Contents/Developer
+          xcodebuild -version
+          IOS_SDK="$(xcrun --sdk iphoneos --show-sdk-version)"
+          MACOS_SDK="$(xcrun --sdk macosx --show-sdk-version)"
+          [[ "$IOS_SDK" == "27.2" ]] || { echo "Expected iOS SDK 27.2, found $IOS_SDK" >&2; exit 1; }
+          [[ "$MACOS_SDK" == "27.2" ]] || { echo "Expected macOS SDK 27.2, found $MACOS_SDK" >&2; exit 1; }
       - name: Prepare Schoology app icons
         run: swift Scripts/prepare-app-icons.swift
       - name: Read release version

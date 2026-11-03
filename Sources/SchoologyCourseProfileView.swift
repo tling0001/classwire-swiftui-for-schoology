@@ -22,24 +22,14 @@ struct SchoologyCourseProfileView: View {
     @State private var upcoming: [SchoologyUpcomingEvent] = []
     @State private var loading = false
     @State private var error: String?
+    @State private var schoolName = ""
 
     var body: some View {
-        VStack(spacing: 0) {
-            Picker("Course section", selection: $tab) {
-                ForEach(SchoologyCourseTab.allCases) { item in Text(item.rawValue).tag(item) }
-            }
-            .pickerStyle(.segmented)
-            .padding(.horizontal)
-            .padding(.vertical, 10)
-
-            Group {
-                if loading && currentIsEmpty {
-                    ProgressView("Loading \(tab.rawValue.lowercased())…").frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if let error, currentIsEmpty {
-                    ContentUnavailableView("Unable to load \(tab.rawValue.lowercased())", systemImage: "exclamationmark.triangle", description: Text(error))
-                } else {
-                    content
-                }
+        GeometryReader { proxy in
+            if proxy.size.width >= 900 {
+                wideLayout(width: proxy.size.width)
+            } else {
+                compactLayout
             }
         }
         .navigationTitle(course.title)
@@ -50,6 +40,138 @@ struct SchoologyCourseProfileView: View {
         }
         .task(id: tab) { await load() }
         .refreshable { await load() }
+    }
+
+    private var compactLayout: some View {
+        VStack(spacing: 0) {
+            Picker("Course section", selection: $tab) {
+                ForEach(SchoologyCourseTab.allCases) { item in Text(item.rawValue).tag(item) }
+            }
+            .pickerStyle(.segmented)
+            .padding(.horizontal)
+            .padding(.vertical, 10)
+            currentContent
+        }
+    }
+
+    private func wideLayout(width: CGFloat) -> some View {
+        HStack(spacing: 0) {
+            VStack(alignment: .leading, spacing: 10) {
+                if let image = course.profileURL {
+                    AuthenticatedSchoologyImage(url: image)
+                        .frame(maxWidth: .infinity).frame(height: min(210, width * 0.19))
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                } else {
+                    Image(systemName: "book.closed.fill")
+                        .font(.system(size: 42)).foregroundStyle(SchoologyStyle.blue)
+                        .frame(maxWidth: .infinity).frame(height: 112)
+                        .background(.quaternary, in: RoundedRectangle(cornerRadius: 10))
+                }
+                Text(course.title).font(.headline).fixedSize(horizontal: false, vertical: true)
+                if !course.section.isEmpty { Text(course.section).font(.subheadline).foregroundStyle(.secondary) }
+                if !course.courseCode.isEmpty { Text(course.courseCode).font(.caption).foregroundStyle(.secondary) }
+                if !schoolName.isEmpty { Text(schoolName).font(.caption).foregroundStyle(SchoologyStyle.blue) }
+                Divider().padding(.vertical, 3)
+                ForEach([SchoologyCourseTab.materials, .assignments, .updates, .grades, .members]) { item in
+                    courseTabButton(item)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(12)
+            .frame(width: max(190, width * 0.19), alignment: .topLeading)
+            .background(.regularMaterial)
+
+            Divider()
+            VStack(spacing: 0) {
+                HStack {
+                    Text(tab.rawValue).font(.headline)
+                    Spacer()
+                    if loading { ProgressView().controlSize(.small) }
+                }
+                .padding(.horizontal, 16).padding(.vertical, 12)
+                Divider()
+                currentContent
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+            Divider()
+            VStack(alignment: .leading, spacing: 0) {
+                Text("Upcoming").font(.headline).padding(14)
+                Divider()
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 8) {
+                        if upcoming.isEmpty && !loading {
+                            ContentUnavailableView("Nothing upcoming", systemImage: "calendar").padding(.top, 24)
+                        }
+                        ForEach(upcoming) { event in courseUpcomingRow(event) }
+                    }
+                    .padding(10)
+                }
+            }
+            .frame(width: max(250, width * 0.2743))
+            .background(.thinMaterial)
+        }
+    }
+
+    private var currentContent: some View {
+        Group {
+            if loading && currentIsEmpty {
+                ProgressView("Loading \\(tab.rawValue.lowercased())…")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if let error, currentIsEmpty {
+                ContentUnavailableView("Unable to load \\(tab.rawValue.lowercased())",
+                    systemImage: "exclamationmark.triangle", description: Text(error))
+            } else {
+                content
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private func courseTabButton(_ item: SchoologyCourseTab) -> some View {
+        Button { tab = item } label: {
+            Label(item.rawValue, systemImage: courseTabSymbol(item))
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(10)
+                .background(tab == item ? SchoologyStyle.blue.opacity(0.14) : .clear,
+                            in: RoundedRectangle(cornerRadius: 9))
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(tab == item ? SchoologyStyle.blue : .primary)
+    }
+
+    private func courseTabSymbol(_ item: SchoologyCourseTab) -> String {
+        switch item {
+        case .materials: "folder"
+        case .assignments: "doc.text"
+        case .updates: "text.bubble"
+        case .grades: "chart.bar"
+        case .members: "person.2"
+        case .upcoming: "calendar"
+        }
+    }
+
+    private func courseUpcomingRow(_ event: SchoologyUpcomingEvent) -> some View {
+        NavigationLink {
+            if event.type == "assignment", let assignmentID = event.assignmentID {
+                SchoologyAssignmentDetailView(sectionID: event.sectionID ?? course.id, assignmentID: assignmentID, title: event.title)
+            } else if event.type == "discussion", let discussionID = event.discussionID {
+                SchoologyDiscussionDetailView(realm: "sections", realmID: course.id, itemID: discussionID, title: event.title)
+            } else {
+                SchoologyEventDetailView(realm: "sections", realmID: course.id, eventID: event.id, title: event.title)
+            }
+        } label: {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(event.title).font(.subheadline.weight(.semibold)).foregroundStyle(.primary)
+                Text([event.typeLabel, event.timeLabel].filter { !$0.isEmpty }.joined(separator: " • "))
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(11)
+            .background(.background, in: RoundedRectangle(cornerRadius: 10))
+            .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(.quaternary))
+        }
+        .buttonStyle(.plain)
     }
 
     @ViewBuilder private var content: some View {
@@ -131,6 +253,8 @@ struct SchoologyCourseProfileView: View {
         loading = true
         error = nil
         do {
+            upcoming = await session.loadUpcomingEvents(for: course)
+            schoolName = await session.loadSchoolName(for: course)
             switch tab {
             case .materials: materials = try await session.loadCourseMaterials(courseID: course.id)
             case .assignments: assignments = try await session.loadCourseAssignments(courseID: course.id)

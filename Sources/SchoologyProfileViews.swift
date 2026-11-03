@@ -52,7 +52,7 @@ struct GroupProfileView: View {
 
     private func groupLayout(_ profile: SchoologyGroupProfile) -> some View {
         GeometryReader { proxy in
-            if proxy.size.width >= 820 {
+            if proxy.size.width >= 900 {
                 HStack(spacing: 0) {
                     VStack(alignment: .leading, spacing: 12) {
                         groupHeader(profile)
@@ -65,7 +65,7 @@ struct GroupProfileView: View {
                             }.buttonStyle(.plain)
                         }
                     }
-                    .padding(14).frame(width: 230).background(.regularMaterial)
+                    .padding(14).frame(width: max(176, proxy.size.width * 0.19), alignment: .topLeading).background(.regularMaterial)
                     Divider()
                     groupContent(profile).frame(maxWidth: .infinity)
                     Divider()
@@ -74,7 +74,7 @@ struct GroupProfileView: View {
                         ScrollView { LazyVStack(alignment: .leading, spacing: 8) {
                             ForEach(profile.upcoming) { event in eventCard(event) }
                         }}
-                    }.padding(14).frame(width: 250).background(.thinMaterial)
+                    }.padding(14).frame(width: max(250, proxy.size.width * 0.2743)).background(.thinMaterial)
                 }
             } else {
                 VStack(spacing: 0) {
@@ -261,7 +261,7 @@ struct SchoolProfileView: View {
 
     private func schoolLayout(_ profile: SchoologySchoolProfile) -> some View {
         GeometryReader { proxy in
-            if proxy.size.width >= 820 {
+            if proxy.size.width >= 900 {
                 HStack(spacing: 0) {
                     VStack(alignment: .leading, spacing: 12) {
                         if let image = profile.school.pictureURL {
@@ -272,14 +272,14 @@ struct SchoolProfileView: View {
                         Text(profile.school.title).font(.headline)
                         ForEach([ProfileTab.updates,.info,.upcoming,.resources,.discussions]) { item in tabButton(item) }
                         Spacer()
-                    }.padding(14).frame(width: 230).background(.regularMaterial)
+                    }.padding(14).frame(width: max(176, proxy.size.width * 0.19), alignment: .topLeading).background(.regularMaterial)
                     Divider()
                     schoolContent(profile).frame(maxWidth: .infinity)
                     Divider()
                     VStack(alignment: .leading) {
                         Text("Upcoming").font(.headline)
                         ForEach(profile.upcoming) { event in eventCard(event) }
-                    }.padding(14).frame(width: 250).background(.thinMaterial)
+                    }.padding(14).frame(width: max(250, proxy.size.width * 0.2743)).background(.thinMaterial)
                 }
             } else {
                 VStack(spacing: 0) {
