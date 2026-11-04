@@ -10,7 +10,7 @@ struct SchoologyProfileItemDetailSheet: View {
                 VStack(alignment: .leading, spacing: 14) {
                     Text(item.title).font(.title2.weight(.semibold))
                     if !item.subtitle.isEmpty { Text(item.subtitle).font(.subheadline).foregroundStyle(.secondary) }
-                    if !item.body.isEmpty { Text(item.body).textSelection(.enabled) }
+                    if !item.body.isEmpty { SchoologyRichTextText(item.body).textSelection(.enabled) }
                     if let url = item.url {
                         Link(destination: url) {
                             Label("Open in Schoology", systemImage: "arrow.up.right")

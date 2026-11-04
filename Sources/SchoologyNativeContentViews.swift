@@ -22,7 +22,7 @@ struct SchoologyDiscussionDetailView: View {
                     VStack(alignment: .leading, spacing: 10) {
                         Text(discussion.title).font(.title2.weight(.semibold))
                         if !discussion.subtitle.isEmpty { Text(discussion.subtitle).font(.caption).foregroundStyle(.secondary) }
-                        Text(discussion.body.isEmpty ? "No discussion content." : discussion.body).textSelection(.enabled)
+                        SchoologyRichTextText(discussion.body.isEmpty ? "No discussion content." : discussion.body).textSelection(.enabled)
                         if let url = discussion.url { Link(destination: url) { Label("Open attachment", systemImage: "paperclip") } }
                     }.padding(16).frame(maxWidth: .infinity, alignment: .leading)
                         .background(.background, in: RoundedRectangle(cornerRadius: 14))
@@ -32,7 +32,7 @@ struct SchoologyDiscussionDetailView: View {
                 ForEach(comments) { comment in
                     VStack(alignment: .leading, spacing: 6) {
                         Text(comment.title).font(.subheadline.weight(.semibold))
-                        Text(comment.body).textSelection(.enabled)
+                        SchoologyRichTextText(comment.body).textSelection(.enabled)
                         if !comment.subtitle.isEmpty { Text(comment.subtitle).font(.caption).foregroundStyle(.secondary) }
                     }.padding(13).frame(maxWidth: .infinity, alignment: .leading)
                         .background(.background, in: RoundedRectangle(cornerRadius: 12))
@@ -92,7 +92,7 @@ struct SchoologyEventDetailView: View {
                     VStack(alignment: .leading, spacing: 10) {
                         Text(event.title).font(.title2.weight(.semibold))
                         if !event.subtitle.isEmpty { Label(event.subtitle, systemImage: "calendar").font(.subheadline).foregroundStyle(.secondary) }
-                        Text(event.body.isEmpty ? "No event description." : event.body).textSelection(.enabled)
+                        SchoologyRichTextText(event.body.isEmpty ? "No event description." : event.body).textSelection(.enabled)
                         if let url = event.url { Link(destination: url) { Label("Open attachment", systemImage: "paperclip") } }
                     }.padding(16).frame(maxWidth: .infinity, alignment: .leading)
                         .background(.background, in: RoundedRectangle(cornerRadius: 14))
@@ -101,7 +101,7 @@ struct SchoologyEventDetailView: View {
                 ForEach(comments) { comment in
                     VStack(alignment: .leading, spacing: 6) {
                         Text(comment.title).font(.subheadline.weight(.semibold))
-                        Text(comment.body)
+                        SchoologyRichTextText(comment.body)
                     }.padding(12).frame(maxWidth: .infinity, alignment: .leading)
                         .background(.background, in: RoundedRectangle(cornerRadius: 12))
                 }
@@ -238,7 +238,7 @@ struct SchoologyPersonProfileView: View {
             if let person {
                 Section {
                     Text(person.title).font(.title2.weight(.semibold))
-                    if !person.body.isEmpty { Text(person.body).textSelection(.enabled) }
+                    if !person.body.isEmpty { SchoologyRichTextText(person.body).textSelection(.enabled) }
                     if !person.subtitle.isEmpty { Text(person.subtitle).foregroundStyle(.secondary) }
                 }
                 if let url = person.url { Section { Link("Open profile in Schoology", destination: url) } }

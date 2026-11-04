@@ -57,7 +57,7 @@ struct SchoologyAssignmentDetailView: View {
                             }
                             if context.canSubmit {
                                 Tab(context.isTeacher ? "Submissions" : "Submit", systemImage: "doc.text", value: SchoologyAssignmentTab.submissions) {
-                                    SchoologyAssignmentSubmissionView(sectionID: sectionID, context: context)
+                                    SchoologyAssignmentSubmissionView(sectionID: sectionID, context: context, showingTextComposer: $showingSubmissionTextComposer, showingFileImporter: $showingSubmissionFileImporter, showingResourcePicker: $showingSubmissionResourcePicker)
                                 }
                             }
                         }
@@ -97,12 +97,12 @@ struct SchoologyAssignmentDetailView: View {
                         Label("\(SchoologyGradeValueFormatter.display(context.maxPoints)) points", systemImage: "chart.bar")
                             .font(.subheadline).foregroundStyle(.secondary)
                     }
-                    Text(context.assignment.body.isEmpty ? "No assignment description." : context.assignment.body)
+                    SchoologyRichTextText(context.assignment.body.isEmpty ? "No assignment description." : context.assignment.body)
                         .textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
                     if !context.teacherComment.isEmpty {
                         Divider()
                         Label("Teacher Comment", systemImage: "text.bubble").font(.headline)
-                        Text(context.teacherComment).textSelection(.enabled)
+                        SchoologyRichTextText(context.teacherComment).textSelection(.enabled)
                     }
                 }
                 .padding(16).frame(maxWidth: .infinity, alignment: .leading)
@@ -130,7 +130,7 @@ struct SchoologyAssignmentDetailView: View {
                         ForEach(comments) { comment in
                             VStack(alignment: .leading, spacing: 6) {
                                 Text(comment.title).font(.subheadline.bold())
-                                Text(comment.body).textSelection(.enabled)
+                                SchoologyRichTextText(comment.body).textSelection(.enabled)
                                 if !comment.subtitle.isEmpty { Text(comment.subtitle).font(.caption).foregroundStyle(.secondary) }
                             }
                             .padding(12).frame(maxWidth: .infinity, alignment: .leading)

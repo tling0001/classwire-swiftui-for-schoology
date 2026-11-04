@@ -1,5 +1,17 @@
 # Release Notes
 
+## [2026.10.0-port.31]
+
+### Build and navigation
+- Fix the missing assignment submission composer bindings that broke both iOS and macOS Actions builds.
+- Add expandable Courses and Groups sections to the navigation sidebar, with direct links to individual profiles and All views.
+
+### Rich content and attachments
+- Preserve inline anchor links when converting Schoology HTML content for display.
+- Render rich links in posts, messages, comments, assignment descriptions, teacher comments, and submission revisions.
+- Route course-material file URLs through the shared View/Download attachment actions.
+
+
 ## [2026.10.0-port.30]
 
 ### Build reliability

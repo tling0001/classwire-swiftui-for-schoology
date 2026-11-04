@@ -193,7 +193,7 @@ private struct SchoologyActivityCard: View {
             }
 
             if !activity.body.isEmpty {
-                Text(activity.body)
+                SchoologyRichTextText(activity.body)
                     .font(.body)
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)

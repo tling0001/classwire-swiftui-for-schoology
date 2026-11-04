@@ -89,7 +89,7 @@ struct SchoologyAssignmentSubmissionView: View {
                                             Text(revision.status).font(.caption).foregroundStyle(.secondary)
                                         }
                                         if !revision.created.isEmpty { Text(revision.created).font(.caption).foregroundStyle(.secondary) }
-                                        if !revision.body.isEmpty { Text(revision.body).textSelection(.enabled) }
+                                        if !revision.body.isEmpty { SchoologyRichTextText(revision.body).textSelection(.enabled) }
                                         ForEach(revision.attachments) { attachment in SchoologyAttachmentPreviewButton(attachment: attachment) }
                                     }
                                     .padding(13).frame(maxWidth: .infinity, alignment: .leading)

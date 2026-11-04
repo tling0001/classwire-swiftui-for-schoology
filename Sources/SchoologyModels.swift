@@ -333,10 +333,34 @@ enum SchoologyValue {
         return date.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day().year().hour().minute())
     }
 
+    /// Converts Schoology HTML to lightweight Markdown while retaining anchor destinations.
+    /// Render the result with SchoologyRichTextText instead of a plain Text view.
     static func plainText(_ value: String) -> String {
-        value
-            .replacingOccurrences(of: "<br\\s*/?>", with: "\n", options: .regularExpression)
-            .replacingOccurrences(of: "</(?:p|div|li|h[1-6])\\s*>", with: "\n", options: .regularExpression)
+        var result = value
+        let anchorPattern = #"(?is)<a\b[^>]*?href\s*=\s*["']([^"']+)["'][^>]*>(.*?)</a>"#
+        if let regex = try? NSRegularExpression(pattern: anchorPattern) {
+            let range = NSRange(result.startIndex..<result.endIndex, in: result)
+            for match in regex.matches(in: result, range: range).reversed() {
+                guard let full = Range(match.range, in: result),
+                      let hrefRange = Range(match.range(at: 1), in: result),
+                      let labelRange = Range(match.range(at: 2), in: result) else { continue }
+                let href = String(result[hrefRange]).replacingOccurrences(of: "&amp;", with: "&")
+                let label = String(result[labelRange])
+                    .replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression)
+                    .replacingOccurrences(of: "&nbsp;|&#160;", with: " ", options: .regularExpression)
+                    .replacingOccurrences(of: "&amp;", with: "&")
+                    .replacingOccurrences(of: "&quot;", with: "\"")
+                    .replacingOccurrences(of: "&#39;|&apos;", with: "'")
+                    .replacingOccurrences(of: "&lt;", with: "<")
+                    .replacingOccurrences(of: "&gt;", with: ">")
+                let safeLabel = label.replacingOccurrences(of: "[", with: "\\[")
+                    .replacingOccurrences(of: "]", with: "\\]")
+                result.replaceSubrange(full, with: "[\(safeLabel)](<\(href)>)")
+            }
+        }
+        return result
+            .replacingOccurrences(of: "<br\s*/?>", with: "\n", options: .regularExpression)
+            .replacingOccurrences(of: "</(?:p|div|li|h[1-6])\s*>", with: "\n", options: .regularExpression)
             .replacingOccurrences(of: "<[^>]+>", with: " ", options: .regularExpression)
             .replacingOccurrences(of: "&nbsp;|&#160;", with: " ", options: .regularExpression)
             .replacingOccurrences(of: "&amp;", with: "&")
@@ -344,7 +368,7 @@ enum SchoologyValue {
             .replacingOccurrences(of: "&#39;|&apos;", with: "'")
             .replacingOccurrences(of: "&lt;", with: "<")
             .replacingOccurrences(of: "&gt;", with: ">")
-            .replacingOccurrences(of: "[ \\t]+", with: " ", options: .regularExpression)
+            .replacingOccurrences(of: "[ \t]+", with: " ", options: .regularExpression)
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }

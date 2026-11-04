@@ -52,7 +52,7 @@ struct SchoologyCommentRow: View {
                 }
             }
 
-            Text(comment.isDeleted ? "Comment deleted" : comment.body)
+            SchoologyRichTextText(comment.isDeleted ? "Comment deleted" : comment.body)
                 .font(.body)
                 .foregroundStyle(comment.isDeleted ? .secondary : .primary)
                 .textSelection(.enabled)

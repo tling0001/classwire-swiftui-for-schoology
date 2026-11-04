@@ -333,10 +333,22 @@ struct SchoologyCourseMaterialDestinationView: View {
             } else {
                 SchoologyProfileItemDetailSheet(item: item)
             }
+        } else if let url = item.url, isFileAttachment {
+            SchoologyAttachmentPreviewButton(attachment: SchoologyAttachment(title: item.title, url: url))
+                .padding()
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         } else if let url = item.url {
             SchoologyEmbeddedWebView(url: url, title: item.title)
         } else {
             SchoologyProfileItemDetailSheet(item: item)
         }
+    }
+
+    private var isFileAttachment: Bool {
+        let kind = item.kind.lowercased()
+        if ["file", "document", "attachment", "file_attachment"].contains(kind) { return true }
+        let ext = item.url?.pathExtension.lowercased() ?? ""
+        return ["pdf", "doc", "docx", "ppt", "pptx", "xls", "xlsx", "csv", "txt", "rtf",
+                "jpg", "jpeg", "png", "gif", "heic", "webp"].contains(ext)
     }
 }

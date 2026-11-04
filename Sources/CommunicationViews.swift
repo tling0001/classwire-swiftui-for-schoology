@@ -106,7 +106,7 @@ struct MessagesView: View {
                 }
                 Text(message.subject).font(.subheadline.weight(message.isUnread ? .bold : .medium)).lineLimit(1)
                 if !message.body.isEmpty {
-                    Text(message.body).font(.caption).foregroundStyle(.secondary).lineLimit(2)
+                    SchoologyRichTextText(message.body).font(.caption).foregroundStyle(.secondary).lineLimit(2)
                 }
             }
             if message.isUnread {
@@ -171,7 +171,7 @@ private struct MessageThreadView: View {
                                     }
                                     Spacer()
                                 }
-                                Text(item.body.isEmpty ? " " : item.body)
+                                SchoologyRichTextText(item.body.isEmpty ? " " : item.body)
                                     .frame(maxWidth: .infinity, alignment: .leading)
                                     .textSelection(.enabled)
                                 ForEach(item.attachments) { attachment in

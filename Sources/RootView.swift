@@ -59,9 +59,24 @@ private struct SchoologySidebar: View {
     @ViewBuilder
     private var sidebarSections: some View {
         Section("Learning") {
-            ForEach([AppDestination.home, .courses, .groups, .calendar]) { item in
-                destinationRow(item)
-            }
+            destinationRow(.home)
+            DisclosureGroup {
+                NavigationLink { CourseListView() } label: { Label("All Courses", systemImage: "books.vertical") }
+                ForEach(session.courses) { course in
+                    NavigationLink { SchoologyCourseProfileView(course: course) } label: {
+                        Label(course.title, systemImage: "book.closed").lineLimit(1)
+                    }
+                }
+            } label: { Label("Courses", systemImage: "book.closed") }
+            DisclosureGroup {
+                NavigationLink { GroupListView() } label: { Label("All Groups", systemImage: "person.3") }
+                ForEach(session.groups) { group in
+                    NavigationLink { GroupProfileView(group: group) } label: {
+                        Label(group.title, systemImage: "person.3").lineLimit(1)
+                    }
+                }
+            } label: { Label("Groups", systemImage: "person.3") }
+            destinationRow(.calendar)
         }
 
         Section("Communication") {

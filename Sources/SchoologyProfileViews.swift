@@ -174,7 +174,7 @@ struct GroupProfileView: View {
                 } label: {
                     VStack(alignment: .leading, spacing: 6) {
                         Text(item.title).font(.headline).frame(maxWidth: .infinity, alignment: .leading)
-                        if !item.body.isEmpty { Text(item.body).foregroundStyle(.secondary).textSelection(.enabled) }
+                        if !item.body.isEmpty { SchoologyRichTextText(item.body).foregroundStyle(.secondary).textSelection(.enabled) }
                         if !item.subtitle.isEmpty { Text(item.subtitle).font(.caption).foregroundStyle(.tertiary) }
                         if item.kind == "folder" { Label("Folder", systemImage: "folder").font(.caption).foregroundStyle(.secondary) }
                         else if let url = item.url { Label(url.host ?? "Attachment", systemImage: "paperclip").font(.caption).foregroundStyle(.secondary) }
@@ -371,7 +371,7 @@ struct SchoolProfileView: View {
         else { ForEach(items) { item in
             VStack(alignment: .leading, spacing: 6) {
                 Button { selectedDetail = item } label: { Text(item.title).font(.headline).frame(maxWidth: .infinity, alignment: .leading) }.buttonStyle(.plain)
-                if !item.body.isEmpty { Text(item.body).foregroundStyle(.secondary).textSelection(.enabled) }
+                if !item.body.isEmpty { SchoologyRichTextText(item.body).foregroundStyle(.secondary).textSelection(.enabled) }
                 if let url = item.url { Link(destination: url) { Label("Open", systemImage: "arrow.up.right") } }
             }.padding(14).frame(maxWidth: .infinity, alignment: .leading)
                 .background(.background, in: RoundedRectangle(cornerRadius: 12))
