@@ -38,3 +38,9 @@ struct SchoologyAssignmentSubmissionSummary: Sendable {
     let revisions: [SchoologyAssignmentRevision]
     let students: [SchoologyAssignmentStudent]
 }
+
+struct SchoologyTeacherGrade: Sendable {
+    let grade: String
+    let comment: String
+    let commentVisible: Bool
+}

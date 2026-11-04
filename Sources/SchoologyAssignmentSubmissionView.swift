@@ -9,6 +9,8 @@ struct SchoologyAssignmentSubmissionView: View {
     @State private var error: String?
     @State private var showingTextComposer = false
     @State private var showingFileImporter = false
+    @State private var showingResourcePicker = false
+    @State private var selectedStudent: SchoologyAssignmentStudent?
     @State private var isUploading = false
     @State private var uploadError: String?
     @State private var refreshID = UUID()
@@ -38,14 +40,21 @@ struct SchoologyAssignmentSubmissionView: View {
                             else {
                                 VStack(spacing: 0) {
                                     ForEach(summary.students) { student in
-                                        HStack(spacing: 12) {
-                                            VStack(alignment: .leading, spacing: 3) {
-                                                Text(student.name).font(.subheadline.weight(.semibold))
-                                                Text(student.status).font(.caption).foregroundStyle(.secondary)
+                                        Button {
+                                            selectedStudent = student
+                                        } label: {
+                                            HStack(spacing: 12) {
+                                                VStack(alignment: .leading, spacing: 3) {
+                                                    Text(student.name).font(.subheadline.weight(.semibold))
+                                                    Text(student.status).font(.caption).foregroundStyle(.secondary)
+                                                }
+                                                Spacer()
+                                                Text(SchoologyGradeValueFormatter.display(student.grade)).font(.subheadline.monospacedDigit()).foregroundStyle(.secondary)
+                                                Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.tertiary)
                                             }
-                                            Spacer()
-                                            Text(SchoologyGradeValueFormatter.display(student.grade)).font(.subheadline.monospacedDigit()).foregroundStyle(.secondary)
+                                            .contentShape(Rectangle())
                                         }
+                                        .buttonStyle(.plain)
                                         .padding(.vertical, 10)
                                         if student.id != summary.students.last?.id { Divider() }
                                     }
@@ -97,13 +106,16 @@ struct SchoologyAssignmentSubmissionView: View {
         .task(id: refreshID) { await load() }
         .toolbar {
             if !context.isTeacher {
-                ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItem(placement: .primaryAction) {
                     Menu("Create submission", systemImage: "plus") {
                         Button("Create Text Submission", systemImage: "square.and.pencil") {
                             showingTextComposer = true
                         }
                         Button("Upload Submission", systemImage: "arrow.up.doc") {
                             showingFileImporter = true
+                        }
+                        Button("Submit Schoology Resource", systemImage: "folder") {
+                            showingResourcePicker = true
                         }
                     }
                 }
@@ -128,6 +140,26 @@ struct SchoologyAssignmentSubmissionView: View {
         }
         .sheet(isPresented: $showingTextComposer) {
             SchoologyTextSubmissionComposerView(sectionID: sectionID, context: context) { refreshID = UUID() }
+        }
+        .sheet(isPresented: $showingResourcePicker) {
+            SchoologyResourcePickerView { resourceID, _ in
+                Task {
+                    isUploading = true
+                    defer { isUploading = false }
+                    do {
+                        try await session.submitAssignmentResource(sectionID: sectionID, assignmentID: context.assignment.id, resourceID: resourceID)
+                        await load()
+                    } catch {
+                        uploadError = error.localizedDescription
+                    }
+                }
+            }
+        }
+        .sheet(item: $selectedStudent) { student in
+            SchoologyTeacherGradeEditorView(sectionID: sectionID, assignmentID: context.gradeItemID,
+                enrollmentID: student.enrollmentID, studentName: student.name, maxPoints: context.maxPoints) {
+                    refreshID = UUID()
+                }
         }
     }
     private func load() async {

@@ -301,6 +301,17 @@ actor SchoologyAPI {
         return try await send(url: url, method: "POST", body: payload, auth: auth, signed: true, extra: [], contentType: "application/json")
     }
 
+    func putJSON(_ path: String, auth: SchoologyAuth, params: [String: String] = [:], body: [String: Any]) async throws -> Data {
+        await syncServerTime()
+        var components = URLComponents(string: "https://\(apiHost)/v1/\(path)")!
+        components.queryItems = params.sorted { $0.key < $1.key }.map { URLQueryItem(name: $0.key, value: $0.value) }
+        guard let url = components.url, JSONSerialization.isValidJSONObject(body),
+              let data = try? JSONSerialization.data(withJSONObject: body, options: [.sortedKeys]),
+              let payload = String(data: data, encoding: .utf8) else { throw SchoologyAPIError.invalidResponse }
+        return try await send(url: url, method: "PUT", body: payload, auth: auth, signed: false, extra: [], contentType: "application/json")
+    }
+
+
     func postMultiOptions(_ paths: [String], auth: SchoologyAuth) async throws -> Data {
         let url = URL(string: "https://\(apiHost)/v1/multioptions")!
         let body = paths.map { "request=\(oauthEncode($0))" }.joined(separator: "&")

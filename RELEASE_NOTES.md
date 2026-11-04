@@ -1,3 +1,15 @@
+# Release Notes
+
+## [2026.10.0-port.26]
+
+### Assignments
+- Fix the assignment-submissions toolbar placement so the native toolbar compiles on macOS and remains a semantic primary action on iOS.
+- Add Schoology resource selection and resource-based assignment submissions alongside file and text submissions.
+- Allow teachers to open a student's grade editor and save grades, overall comments, and comment visibility.
+
+### Build
+- Increment the iOS and macOS bundle build number to 26.
+
 ## 2026.10.0-port.25
 - Match official Tauri JSON request bodies for post and comment likes, and strengthen OAuth nonce uniqueness with a random-plus-sequence value.
 - Ignore cancelled recipient-search requests instead of displaying a red error in the message composer.

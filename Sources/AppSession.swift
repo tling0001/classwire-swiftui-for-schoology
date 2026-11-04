@@ -862,6 +862,34 @@ final class AppSession {
         try await api.submitAssignmentFile(data: data, filename: filename, mime: mime, sectionID: sectionID, assignmentID: assignmentID, auth: auth)
     }
 
+
+    func submitAssignmentResource(sectionID: String, assignmentID: String, resourceID: String) async throws {
+        guard let auth else { throw SchoologyAPIError.notSignedIn }
+        guard !sectionID.isEmpty, !assignmentID.isEmpty, !resourceID.isEmpty else { throw SchoologyAPIError.invalidResponse }
+        _ = try await api.postJSON("course/\(sectionID)/materials/assignments/\(assignmentID)/dropbox/create_resource_submission",
+            auth: auth, body: ["files": [["schoology_resource_id": resourceID]]])
+    }
+
+    func loadTeacherAssignmentGrade(sectionID: String, assignmentID: String, enrollmentID: String) async throws -> SchoologyTeacherGrade {
+        guard let auth else { throw SchoologyAPIError.notSignedIn }
+        let data = try await api.get("sections/\(sectionID)/grades", auth: auth, params: ["assignment_id": assignmentID, "enrollment_id": enrollmentID])
+        let row = SchoologyValue.list(Self.object(data), keys: ["grade", "grades", "items"]).first ?? [:]
+        let rawComment = row["comment"] ?? row["teacher_comment"] ?? row["teacherComment"]
+        let comment = SchoologyValue.plainText(SchoologyValue.string((rawComment as? [String: Any])?["comment"] ?? (rawComment as? [String: Any])?["body"] ?? rawComment))
+        return SchoologyTeacherGrade(grade: SchoologyValue.string(row["grade"] ?? row["calculated_grade"]), comment: comment,
+            commentVisible: SchoologyValue.bool(row["comment_status"] ?? row["commentStatus"]))
+    }
+
+    func updateTeacherAssignmentGrade(sectionID: String, assignmentID: String, enrollmentID: String, grade: String, comment: String, commentVisible: Bool) async throws {
+        guard let auth else { throw SchoologyAPIError.notSignedIn }
+        let value = grade.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !value.isEmpty && Double(value) == nil { throw SchoologyAPIError.invalidResponse }
+        guard let enrollment = Int(enrollmentID), enrollment > 0 else { throw SchoologyAPIError.invalidResponse }
+        _ = try await api.putJSON("sections/\(sectionID)/grades/\(assignmentID)", auth: auth, body: [
+            "enrollment_id": enrollment, "grade": value, "comment": comment, "comment_status": commentVisible ? 1 : 0
+        ])
+    }
+
     func searchMessageRecipients(_ query: String) async throws -> [SchoologyMessageRecipient] {
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         let data = try await api.get("messages/recipients", auth: auth, params: ["name": query, "limit": "10"])
