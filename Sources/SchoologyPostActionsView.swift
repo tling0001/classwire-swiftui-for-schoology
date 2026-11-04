@@ -9,6 +9,9 @@ struct SchoologyPostActionsView: View {
     @State private var isUpdatingLike = false
     @State private var errorMessage: String?
     @State private var presentedSheet: PresentedSheet?
+    @State private var recentComments: [SchoologyComment] = []
+    @State private var recentCommentTotal = 0
+    @State private var isLoadingRecentComments = false
 
     private enum PresentedSheet: String, Identifiable {
         case comments, likes
@@ -60,10 +63,38 @@ struct SchoologyPostActionsView: View {
             .schoologyGlassSurface()
             .frame(maxWidth: .infinity, alignment: .leading)
 
+            if !recentComments.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(recentComments) { comment in
+                        SchoologyCommentRow(
+                            comment: comment,
+                            updateID: activity.id,
+                            onReply: { _ in presentedSheet = .comments },
+                            onOpenProfile: { userID in session.showPersonProfile(userID: userID) }
+                        )
+                    }
+                    if recentCommentTotal > 2 {
+                        Button("View more comments", systemImage: "ellipsis") {
+                            presentedSheet = .comments
+                        }
+                        .font(.caption.weight(.semibold))
+                        .buttonStyle(.plain)
+                        .foregroundStyle(SchoologyStyle.blue)
+                        .padding(.leading, 8)
+                    }
+                }
+                .padding(.leading, 12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            } else if isLoadingRecentComments && commentsCount > 0 {
+                ProgressView("Loading comments…")
+                    .controlSize(.small)
+                    .padding(.leading, 14)
+            }
             if let errorMessage {
                 Text(errorMessage).font(.caption).foregroundStyle(.red)
             }
         }
+        .task(id: activity.id) { await loadRecentComments() }
         .sheet(item: $presentedSheet) { sheet in
             NavigationStack {
                 switch sheet {
@@ -72,7 +103,10 @@ struct SchoologyPostActionsView: View {
                         realm: activity.commentRealm ?? "sections",
                         realmID: activity.commentRealmID ?? "",
                         updateID: activity.id,
-                        onCommentPosted: { commentsCount += 1 }
+                        onCommentPosted: {
+                            commentsCount += 1
+                            Task { await loadRecentComments() }
+                        }
                     )
                 case .likes:
                     SchoologyLikesView(target: .update(activity.id)) { userID in
@@ -92,6 +126,26 @@ struct SchoologyPostActionsView: View {
     private var canComment: Bool {
         guard let realm = activity.commentRealm, let realmID = activity.commentRealmID else { return false }
         return ["sections", "groups", "schools", "users"].contains(realm) && !realmID.isEmpty
+    }
+
+    private func loadRecentComments() async {
+        guard commentsCount > 0, canComment,
+              let realm = activity.commentRealm, let realmID = activity.commentRealmID else {
+            recentComments = []
+            recentCommentTotal = 0
+            return
+        }
+        isLoadingRecentComments = true
+        defer { isLoadingRecentComments = false }
+        do {
+            let all = try await session.loadUpdateComments(realm: realm, realmID: realmID, updateID: activity.id)
+            let ordered = SchoologyComment.ordered(all)
+            recentCommentTotal = ordered.count
+            recentComments = Array(ordered.suffix(2))
+        } catch {
+            recentComments = []
+            recentCommentTotal = 0
+        }
     }
 
     private func toggleLike() {

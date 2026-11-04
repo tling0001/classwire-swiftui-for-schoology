@@ -45,7 +45,22 @@ struct SchoologyMessageComposerView: View {
                 }
                 Section("Message") {
                     TextField("Subject", text: $subject)
-                    TextField("Write a message…", text: $message, axis: .vertical).lineLimit(6...16)
+                    ZStack(alignment: .topLeading) {
+                        TextEditor(text: $message)
+                            .scrollContentBackground(.hidden)
+                            .frame(minHeight: 132)
+                        if message.isEmpty {
+                            Text("Write a message…")
+                                .foregroundStyle(.tertiary)
+                                .padding(.top, 8)
+                                .padding(.leading, 5)
+                                .allowsHitTesting(false)
+                        }
+                    }
+                    .padding(8)
+                    .background(.quaternary.opacity(0.22), in: RoundedRectangle(cornerRadius: 9))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 5)
                 }
                 Section("Attachments") {
                     Button("Attach File", systemImage: "paperclip") { showingFileImporter = true }

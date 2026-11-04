@@ -34,6 +34,7 @@ enum HomeSection: String, CaseIterable, Identifiable {
 struct SchoologyAttachment: Identifiable, Hashable, Sendable {
     let title: String
     let url: URL
+    var viewURL: URL? = nil
     var id: String { url.absoluteString }
 }
 

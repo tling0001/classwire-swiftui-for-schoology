@@ -14,6 +14,12 @@ struct SchoologyProfileItem: Identifiable, Sendable {
     var preferredName: String = ""
     var pictureURL: URL? = nil
     var role: String = ""
+    var email: String = ""
+    var username: String = ""
+    var schoolName: String = ""
+    var fileViewURL: URL? = nil
+    var fileName: String = ""
+    var fileMIME: String = ""
 
     static func decodeList(_ value: Any?, keys: [String]) -> [Self] {
         SchoologyValue.list(value, keys: keys).enumerated().compactMap { index, item in
@@ -41,18 +47,34 @@ struct SchoologyProfileItem: Identifiable, Sendable {
             let normalizedRole = roleText.lowercased().replacingOccurrences(of: "_", with: " ").replacingOccurrences(of: "-", with: " ")
             let isAdmin = adminFlags.contains(where: { SchoologyValue.bool($0) }) || ["admin", "administrator", "owner"].contains { normalizedRole.contains($0) }
             let rawTitle = SchoologyValue.string(item["title"] ?? item["subject"] ?? item["template_title"] ?? item["templateTitle"] ?? person["name_display"] ?? person["display_name"] ?? person["name"])
+            let file = SchoologyValue.list(item["attachments"] ?? item["attachment"], keys: ["files", "file", "items"]).first ?? item
+            let fileViewURL = SchoologyValue.url(
+                file["file_converted_download_url"] ?? file["fileConvertedDownloadURL"] ??
+                file["converted_download_path"] ?? file["convertedDownloadPath"] ??
+                item["file_converted_download_url"] ?? item["fileConvertedDownloadURL"] ??
+                item["converted_download_path"] ?? item["convertedDownloadPath"]
+            )
+            let fileName = SchoologyValue.string(file["filename"] ?? file["fileName"] ?? item["filename"] ?? item["fileName"], fallback: rawTitle)
+            let fileMIME = SchoologyValue.string(file["filemime"] ?? file["fileMIME"] ?? file["mime"] ?? item["filemime"] ?? item["fileMIME"])
+            let school = (person["school"] as? [String: Any]) ?? [:]
             return Self(
                 id: SchoologyValue.string(rawID, fallback: String(index)),
                 title: rawTitle.isEmpty ? (displayName.isEmpty ? "Schoology" : displayName) : rawTitle,
-                body: SchoologyValue.plainText(SchoologyValue.string(item["body"] ?? item["description"] ?? item["message"])),
+                body: SchoologyValue.plainText(SchoologyValue.string(item["body"] ?? item["description"] ?? item["folder_description"] ?? item["folderDescription"] ?? item["message"] ?? person["bio"] ?? person["about"])),
                 subtitle: SchoologyValue.string(roleText.isEmpty ? (item["due"] ?? item["due_date"] ?? item["dueDate"] ?? item["created"] ?? item["timestamp"] ?? item["photo_count"]) : roleText),
-                url: SchoologyValue.url(item["link"] ?? item["url"] ?? item["web_url"] ?? item["webUrl"] ?? item["file_download_url"] ?? item["download_path"] ?? item["photo_url"] ?? item["photoUrl"] ?? item["original_url"] ?? item["originalUrl"] ?? ((item["attachments"] as? [String: Any])?["files"] as? [String: Any])?["file_download_url"] ?? ((item["attachment"] as? [String: Any])?["file"] as? [String: Any])?["file_download_url"]),
+                url: SchoologyValue.url(person["profile_url"] ?? person["profileUrl"] ?? item["link"] ?? item["url"] ?? item["web_url"] ?? item["webUrl"] ?? file["file_download_url"] ?? file["fileDownloadURL"] ?? file["download_path"] ?? file["downloadPath"] ?? item["file_download_url"] ?? item["download_path"] ?? item["photo_url"] ?? item["photoUrl"] ?? item["original_url"] ?? item["originalUrl"]),
                 isAdmin: isAdmin,
                 kind: rawKind,
                 collectionID: SchoologyValue.optionalString(item["collection_id"] ?? item["collectionID"] ?? item["collectionId"]),
                 firstName: firstName, lastName: lastName, preferredName: preferredName,
                 pictureURL: SchoologyValue.url(person["picture_url"] ?? person["pictureUrl"] ?? person["picture"] ?? person["photo_url"] ?? person["photoUrl"]),
-                role: roleText
+                role: roleText,
+                email: SchoologyValue.string(person["primary_email"] ?? person["primaryEmail"] ?? person["email"]),
+                username: SchoologyValue.string(person["username"] ?? person["user_name"] ?? person["userName"]),
+                schoolName: SchoologyValue.string(person["school_name"] ?? person["schoolName"] ?? school["school_name"] ?? school["name"] ?? school["title"]),
+                fileViewURL: fileViewURL,
+                fileName: fileName,
+                fileMIME: fileMIME
             )
         }
     }

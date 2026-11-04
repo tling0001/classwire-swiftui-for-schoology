@@ -27,40 +27,17 @@ struct SchoologyAssignmentDetailView: View {
                 GeometryReader { geometry in
                     if geometry.size.width >= 801 && context.canSubmit {
                         HStack(spacing: 0) {
-                            TabView(selection: $selectedTab) {
-                                Tab("Info", systemImage: "info.circle", value: SchoologyAssignmentTab.info) {
-                                    infoPane(context: context)
-                                }
-                                if context.allowComments {
-                                    Tab("Comments", systemImage: "bubble.left", value: SchoologyAssignmentTab.comments) {
-                                        commentsPane
-                                    }
-                                }
-                            }
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            assignmentTabs(context: context, includeSubmission: false)
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
                             Divider()
-                            SchoologyAssignmentSubmissionView(sectionID: sectionID, context: context, showingTextComposer: $showingSubmissionTextComposer, showingFileImporter: $showingSubmissionFileImporter, showingResourcePicker: $showingSubmissionResourcePicker)
+                            submissionPane(context: context)
                                 .frame(minWidth: 300, idealWidth: 390, maxWidth: .infinity, maxHeight: .infinity)
                         }
                         .onAppear {
                             if selectedTab == .submissions { selectedTab = .info }
                         }
                     } else {
-                        TabView(selection: $selectedTab) {
-                            Tab("Info", systemImage: "info.circle", value: SchoologyAssignmentTab.info) {
-                                infoPane(context: context)
-                            }
-                            if context.allowComments {
-                                Tab("Comments", systemImage: "bubble.left", value: SchoologyAssignmentTab.comments) {
-                                    commentsPane
-                                }
-                            }
-                            if context.canSubmit {
-                                Tab(context.isTeacher ? "Submissions" : "Submit", systemImage: "doc.text", value: SchoologyAssignmentTab.submissions) {
-                                    SchoologyAssignmentSubmissionView(sectionID: sectionID, context: context, showingTextComposer: $showingSubmissionTextComposer, showingFileImporter: $showingSubmissionFileImporter, showingResourcePicker: $showingSubmissionResourcePicker)
-                                }
-                            }
-                        }
+                        assignmentTabs(context: context, includeSubmission: context.canSubmit)
                     }
                 }
                 .onChange(of: selectedTab) { _, next in
@@ -83,6 +60,66 @@ struct SchoologyAssignmentDetailView: View {
         }
         .task(id: assignmentID) { await load() }
         .refreshable { await load() }
+    }
+
+    @ViewBuilder
+    private func assignmentTabs(context: SchoologyAssignmentContext, includeSubmission: Bool) -> some View {
+        #if os(macOS)
+        if #available(macOS 15.0, *) {
+            modernAssignmentTabs(context: context, includeSubmission: includeSubmission)
+        } else {
+            legacyAssignmentTabs(context: context, includeSubmission: includeSubmission)
+        }
+        #else
+        modernAssignmentTabs(context: context, includeSubmission: includeSubmission)
+        #endif
+    }
+
+    @available(macOS 15.0, *)
+    private func modernAssignmentTabs(context: SchoologyAssignmentContext, includeSubmission: Bool) -> some View {
+        TabView(selection: $selectedTab) {
+            Tab("Info", systemImage: "info.circle", value: SchoologyAssignmentTab.info) {
+                infoPane(context: context)
+            }
+            if context.allowComments {
+                Tab("Comments", systemImage: "bubble.left", value: SchoologyAssignmentTab.comments) {
+                    commentsPane
+                }
+            }
+            if includeSubmission {
+                Tab(context.isTeacher ? "Submissions" : "Submit", systemImage: "doc.text", value: SchoologyAssignmentTab.submissions) {
+                    submissionPane(context: context)
+                }
+            }
+        }
+    }
+
+    private func legacyAssignmentTabs(context: SchoologyAssignmentContext, includeSubmission: Bool) -> some View {
+        TabView(selection: $selectedTab) {
+            infoPane(context: context)
+                .tabItem { Label("Info", systemImage: "info.circle") }
+                .tag(SchoologyAssignmentTab.info)
+            if context.allowComments {
+                commentsPane
+                    .tabItem { Label("Comments", systemImage: "bubble.left") }
+                    .tag(SchoologyAssignmentTab.comments)
+            }
+            if includeSubmission {
+                submissionPane(context: context)
+                    .tabItem { Label(context.isTeacher ? "Submissions" : "Submit", systemImage: "doc.text") }
+                    .tag(SchoologyAssignmentTab.submissions)
+            }
+        }
+    }
+
+    private func submissionPane(context: SchoologyAssignmentContext) -> some View {
+        SchoologyAssignmentSubmissionView(
+            sectionID: sectionID,
+            context: context,
+            showingTextComposer: $showingSubmissionTextComposer,
+            showingFileImporter: $showingSubmissionFileImporter,
+            showingResourcePicker: $showingSubmissionResourcePicker
+        )
     }
 
     private func infoPane(context: SchoologyAssignmentContext) -> some View {

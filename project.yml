@@ -3,13 +3,13 @@ options:
   bundleIdPrefix: com.schoologytauri
   deploymentTarget:
     iOS: "18.0"
-    macOS: "15.0"
+    macOS: "14.0"
   createIntermediateGroups: true
 settings:
   base:
     SWIFT_VERSION: "6.0"
     MARKETING_VERSION: "2026.10.0"
-    CURRENT_PROJECT_VERSION: "37"
+    CURRENT_PROJECT_VERSION: "38"
     PRODUCT_NAME: Schoology
     INFOPLIST_KEY_CFBundleDisplayName: Schoology
     GENERATE_INFOPLIST_FILE: YES
@@ -51,7 +51,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.schoologytauri.app
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIconMac
-        MACOSX_DEPLOYMENT_TARGET: "15.0"
+        MACOSX_DEPLOYMENT_TARGET: "14.0"
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.education
         INFOPLIST_KEY_NSCameraUsageDescription: Scan a Schoology QR code to sign in.
         ENABLE_APP_SANDBOX: NO

@@ -26,7 +26,7 @@ struct SettingsView: View {
                     Text("Light").tag(AppAppearance.light)
                     Text("Dark").tag(AppAppearance.dark)
                 }
-                .pickerStyle(.segmented)
+                .schoologyNavigationTabPickerStyle()
                 .tint(settingsAccent)
             }
 

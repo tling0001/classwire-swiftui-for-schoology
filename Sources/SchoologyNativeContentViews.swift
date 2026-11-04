@@ -179,32 +179,232 @@ struct SchoologyAlbumDetailView: View {
     }
 }
 
+private enum SchoologyPersonProfileTab: String, CaseIterable, Identifiable {
+    case updates = "Updates"
+    case info = "Info"
+    case badges = "Badges"
+    var id: String { rawValue }
+}
+
 struct SchoologyPersonProfileView: View {
     @Environment(AppSession.self) private var session
     let userID: String
     @State private var person: SchoologyProfileItem?
+    @State private var updates: [SchoologyActivity] = []
+    @State private var badges: [SchoologyProfileItem] = []
+    @State private var tab: SchoologyPersonProfileTab = .updates
     @State private var loading = true
+    @State private var loadingUpdates = false
+    @State private var loadingBadges = false
     @State private var error: String?
+    @State private var updatesError: String?
+    @State private var badgesError: String?
 
     var body: some View {
-        List {
-            if loading { ProgressView("Loading profile…") }
-            if let error { ContentUnavailableView("Unable to load profile", systemImage: "exclamationmark.triangle", description: Text(error)) }
-            if let person {
-                Section {
-                    Text(person.title).font(.title2.weight(.semibold))
-                    if !person.body.isEmpty { SchoologyRichTextText(person.body).textSelection(.enabled) }
-                    if !person.subtitle.isEmpty { Text(person.subtitle).foregroundStyle(.secondary) }
+        Group {
+            if loading {
+                ProgressView("Loading profile…")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if let error {
+                ContentUnavailableView("Unable to load profile", systemImage: "exclamationmark.triangle", description: Text(error))
+            } else if let person {
+                GeometryReader { proxy in
+                    if proxy.size.width >= 900 {
+                        wideProfile(person)
+                    } else {
+                        compactProfile(person)
+                    }
                 }
-                if let url = person.url { Section { Link("Open profile in Schoology", destination: url) } }
             }
         }
-        .navigationTitle("Profile")
-        .task(id: userID) {
-            loading = true; error = nil
-            do { person = try await session.loadPersonProfile(userID: userID) }
-            catch { self.error = error.localizedDescription }
+        .navigationTitle(person?.title ?? "Profile")
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button("Refresh", systemImage: "arrow.clockwise") { Task { await load() } }
+                    .disabled(loading || loadingUpdates || loadingBadges)
+            }
+        }
+        .task(id: userID) { await load() }
+        .onChange(of: tab) { _, selected in
+            Task { await loadTab(selected) }
+        }
+    }
+
+    private func compactProfile(_ person: SchoologyProfileItem) -> some View {
+        VStack(spacing: 0) {
+            profileHeader(person)
+                .padding(.horizontal)
+                .padding(.top, 12)
+            Picker("Profile section", selection: $tab) {
+                ForEach(SchoologyPersonProfileTab.allCases) { Text($0.rawValue).tag($0) }
+            }
+            .schoologyNavigationTabPickerStyle()
+            .padding()
+            profileTabContent(person)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+    }
+
+    private func wideProfile(_ person: SchoologyProfileItem) -> some View {
+        VStack(spacing: 0) {
+            profileHeader(person)
+                .padding(14)
+            HStack(alignment: .top, spacing: 0) {
+                profilePane("Updates") { profileTabContent(person, selected: .updates) }
+                Divider()
+                profilePane("Info") { profileTabContent(person, selected: .info) }
+                Divider()
+                profilePane("Badges") { profileTabContent(person, selected: .badges) }
+            }
+        }
+    }
+
+    private func profileHeader(_ person: SchoologyProfileItem) -> some View {
+        SchoologyProfileInfobox(
+            title: person.title,
+            subtitle: person.schoolName.isEmpty ? nil : person.schoolName,
+            imageURL: person.pictureURL,
+            fallbackSymbol: "person.crop.circle.fill",
+            details: [person.preferredName, person.role]
+        )
+    }
+
+    private func profilePane<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(title).font(.headline).padding(.horizontal, 14).padding(.top, 14)
+            content().frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    @ViewBuilder
+    private func profileTabContent(_ person: SchoologyProfileItem, selected: SchoologyPersonProfileTab? = nil) -> some View {
+        let selectedTab = selected ?? tab
+        switch selectedTab {
+        case .updates:
+            if loadingUpdates && updates.isEmpty {
+                ProgressView("Loading updates…").frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if let updatesError, updates.isEmpty {
+                ContentUnavailableView("Unable to load updates", systemImage: "exclamationmark.triangle", description: Text(updatesError))
+            } else if updates.isEmpty {
+                ContentUnavailableView("No updates", systemImage: "text.bubble")
+            } else {
+                ScrollView {
+                    RecentActivityView(activities: updates)
+                        .padding(12)
+                }
+            }
+        case .info:
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    if !person.body.isEmpty {
+                        VStack(alignment: .leading, spacing: 7) {
+                            Text("About").font(.headline)
+                            SchoologyRichTextText(person.body).textSelection(.enabled)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(14)
+                        .background(.background, in: RoundedRectangle(cornerRadius: 12))
+                    }
+                    VStack(spacing: 0) {
+                        profileInfoRow("Email", value: person.email, symbol: "envelope")
+                        profileInfoRow("Username", value: person.username, symbol: "person.text.rectangle")
+                        profileInfoRow("First Name", value: person.firstName, symbol: "person")
+                        profileInfoRow("Last Name", value: person.lastName, symbol: "person")
+                        profileInfoRow("Role", value: person.role, symbol: "person.badge")
+                        profileInfoRow("School", value: person.schoolName, symbol: "building.2")
+                    }
+                    .padding(14)
+                    .background(.background, in: RoundedRectangle(cornerRadius: 12))
+                    if let url = person.url {
+                        Link(destination: url) { Label("Open profile in Schoology", systemImage: "arrow.up.right") }
+                            .padding(.horizontal, 4)
+                    }
+                }
+                .padding(14)
+                .frame(maxWidth: 720, alignment: .leading)
+                .frame(maxWidth: .infinity)
+            }
+        case .badges:
+            if loadingBadges && badges.isEmpty {
+                ProgressView("Loading badges…").frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if let badgesError, badges.isEmpty {
+                ContentUnavailableView("Unable to load badges", systemImage: "exclamationmark.triangle", description: Text(badgesError))
+            } else if badges.isEmpty {
+                ContentUnavailableView("No badges", systemImage: "rosette")
+            } else {
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 10) {
+                        ForEach(badges) { badge in
+                            VStack(alignment: .leading, spacing: 6) {
+                                Label(badge.title, systemImage: "rosette")
+                                    .font(.headline)
+                                if !badge.body.isEmpty {
+                                    SchoologyRichTextText(badge.body).foregroundStyle(.secondary)
+                                }
+                            }
+                            .padding(14)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(.background, in: RoundedRectangle(cornerRadius: 12))
+                            .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(.quaternary))
+                        }
+                    }
+                    .padding(14)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func profileInfoRow(_ title: String, value: String, symbol: String) -> some View {
+        if !value.isEmpty {
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                Label(title, systemImage: symbol)
+                    .foregroundStyle(.secondary)
+                    .frame(minWidth: 112, alignment: .leading)
+                Text(value).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(.vertical, 10)
+            if title != "School" { Divider() }
+        }
+    }
+
+    private func load() async {
+        loading = true
+        error = nil
+        updatesError = nil
+        badgesError = nil
+        do {
+            person = try await session.loadPersonProfile(userID: userID)
             loading = false
+            loadingUpdates = true
+            loadingBadges = true
+            async let updatesRequest: [SchoologyActivity]? = try? await session.loadPersonUpdates(userID: userID)
+            async let badgesRequest: [SchoologyProfileItem]? = try? await session.loadPersonBadges(userID: userID)
+            updates = (await updatesRequest) ?? []
+            badges = (await badgesRequest) ?? []
+            loadingUpdates = false
+            loadingBadges = false
+        } catch {
+            self.error = error.localizedDescription
+            loading = false
+            loadingUpdates = false
+            loadingBadges = false
+        }
+    }
+
+    private func loadTab(_ selected: SchoologyPersonProfileTab) async {
+        guard person != nil else { return }
+        if selected == .updates, updates.isEmpty, !loadingUpdates {
+            loadingUpdates = true
+            do { updates = try await session.loadPersonUpdates(userID: userID); updatesError = nil }
+            catch { updatesError = error.localizedDescription }
+            loadingUpdates = false
+        } else if selected == .badges, badges.isEmpty, !loadingBadges {
+            loadingBadges = true
+            do { badges = try await session.loadPersonBadges(userID: userID); badgesError = nil }
+            catch { badgesError = error.localizedDescription }
+            loadingBadges = false
         }
     }
 }

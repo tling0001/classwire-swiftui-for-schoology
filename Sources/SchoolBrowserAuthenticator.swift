@@ -33,11 +33,29 @@ final class SchoolBrowserAuthenticator: NSObject, ASWebAuthenticationPresentatio
 
         return try await withCheckedThrowingContinuation { continuation in
             pendingContinuation = continuation
-            let session = ASWebAuthenticationSession(
+            let completionHandler = Self.makeCompletionHandler(for: self)
+            let session: ASWebAuthenticationSession
+            #if os(macOS)
+            if #available(macOS 14.4, *) {
+                session = ASWebAuthenticationSession(
+                    url: url,
+                    callback: .customScheme("schoology"),
+                    completionHandler: completionHandler
+                )
+            } else {
+                session = ASWebAuthenticationSession(
+                    url: url,
+                    callbackURLScheme: "schoology",
+                    completionHandler: completionHandler
+                )
+            }
+            #else
+            session = ASWebAuthenticationSession(
                 url: url,
                 callback: .customScheme("schoology"),
-                completionHandler: Self.makeCompletionHandler(for: self)
+                completionHandler: completionHandler
             )
+            #endif
             session.presentationContextProvider = self
             session.prefersEphemeralWebBrowserSession = false
             activeSession = session

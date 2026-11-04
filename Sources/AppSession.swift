@@ -487,9 +487,10 @@ final class AppSession {
     }
 
 
-    func downloadAttachment(_ attachment: SchoologyAttachment) async throws -> URL {
+    func downloadAttachment(_ attachment: SchoologyAttachment, forViewing: Bool = false) async throws -> URL {
         guard let auth else { throw SchoologyAPIError.notSignedIn }
-        let (data, mimeType) = try await api.attachmentData(attachment.url, auth: auth)
+        let sourceURL = forViewing ? (attachment.viewURL ?? attachment.url) : attachment.url
+        let (data, mimeType) = try await api.attachmentData(sourceURL, auth: auth)
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("SchoologyAttachments", isDirectory: true)
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
@@ -497,8 +498,11 @@ final class AppSession {
         var filename = URL(fileURLWithPath: attachment.title).lastPathComponent
             .replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: ":", with: "_")
         if filename.isEmpty || filename == "." { filename = "Attachment" }
-        if URL(fileURLWithPath: filename).pathExtension.isEmpty {
-            let ext = attachment.url.pathExtension
+        if forViewing, attachment.viewURL != nil {
+            let base = URL(fileURLWithPath: filename).deletingPathExtension().lastPathComponent
+            filename = base + ".pdf"
+        } else if URL(fileURLWithPath: filename).pathExtension.isEmpty {
+            let ext = sourceURL.pathExtension
             if !ext.isEmpty { filename += "." + ext }
             else if mimeType.lowercased().contains("pdf") { filename += ".pdf" }
         }
@@ -776,6 +780,29 @@ final class AppSession {
             SchoologyProfileItem(id: userID, title: "Schoology user", body: "", subtitle: "", url: nil, isAdmin: false, kind: "person", collectionID: nil)
     }
 
+    func loadPersonUpdates(userID: String) async throws -> [SchoologyActivity] {
+        guard let auth else { throw SchoologyAPIError.notSignedIn }
+        let data = try await api.get("users/\(userID)/updates", auth: auth, params: [
+            "start": "0", "limit": "20", "with_attachments": "TRUE", "richtext": "1"
+        ])
+        var updates = await hydratedActivityAuthors(SchoologyActivity.decodeList(Self.object(data)), auth: auth)
+        for index in updates.indices {
+            if updates[index].authorName.isEmpty {
+                updates[index].authorName = user?.id == userID ? (user?.nameDisplay ?? "You") : "Schoology user"
+            }
+            if updates[index].avatarURL == nil, user?.id == userID { updates[index].avatarURL = user?.pictureURL }
+            if updates[index].commentRealm == nil { updates[index].commentRealm = "users" }
+            if updates[index].commentRealmID == nil { updates[index].commentRealmID = userID }
+        }
+        return updates
+    }
+
+    func loadPersonBadges(userID: String) async throws -> [SchoologyProfileItem] {
+        guard let auth else { throw SchoologyAPIError.notSignedIn }
+        let data = try await api.get("users/\(userID)/badges", auth: auth)
+        return SchoologyProfileItem.decodeList(Self.object(data), keys: ["badge", "badges", "items"])
+    }
+
 
     func loadAssignmentContext(sectionID: String, assignmentID: String) async throws -> SchoologyAssignmentContext {
         guard let auth else { throw SchoologyAPIError.notSignedIn }
@@ -1029,8 +1056,10 @@ final class AppSession {
             let users = await loadMessageUsers(ids, auth: auth)
             for index in hydrated.indices {
                 let id = folder == .sent ? hydrated[index].recipientID : hydrated[index].authorID
-                hydrated[index].personName = users[id ?? ""]?.nameDisplay ?? (id == auth.userID ? "You" : "Schoology")
-                hydrated[index].personPictureURL = users[id ?? ""]?.pictureURL ?? hydrated[index].personPictureURL
+                hydrated[index].personName = users[id ?? ""]?.nameDisplay ?? (id == auth.userID ? (user?.nameDisplay ?? "You") : "Schoology")
+                hydrated[index].personPictureURL = users[id ?? ""]?.pictureURL
+                    ?? (id == auth.userID ? user?.pictureURL : nil)
+                    ?? hydrated[index].personPictureURL
             }
             return folder == .unread ? hydrated.filter(\.isUnread) : hydrated
         } catch {
@@ -1059,6 +1088,7 @@ final class AppSession {
                 guard let id = result[index].authorID else { continue }
                 if id == auth.userID {
                     result[index].personName = "You"
+                    result[index].personPictureURL = user?.pictureURL
                 } else if let user = users[id] {
                     result[index].personName = user.nameDisplay
                     result[index].personPictureURL = user.pictureURL

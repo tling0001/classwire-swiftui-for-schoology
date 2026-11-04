@@ -372,7 +372,11 @@ struct SchoologyCourseMaterialDestinationView: View {
                 SchoologyProfileItemDetailSheet(item: item)
             }
         } else if let url = item.url, isFileAttachment {
-            SchoologyAttachmentPreviewButton(attachment: SchoologyAttachment(title: item.title, url: url))
+            SchoologyAttachmentPreviewButton(attachment: SchoologyAttachment(
+                title: item.fileName.isEmpty ? item.title : item.fileName,
+                url: url,
+                viewURL: item.fileViewURL
+            ))
                 .padding()
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         } else if let url = item.url {

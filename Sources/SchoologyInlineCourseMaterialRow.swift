@@ -43,8 +43,17 @@ struct SchoologyInlineCourseMaterialRow: View {
                     }
                 }
             } label: {
-                Label(item.title, systemImage: "folder")
-                    .contentShape(Rectangle())
+                VStack(alignment: .leading, spacing: 4) {
+                    Label(item.title, systemImage: "folder")
+                    if !item.body.isEmpty {
+                        Text(item.body)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .padding(.vertical, 3)
+                .contentShape(Rectangle())
             }
             .onChange(of: isExpanded) { _, expanded in
                 guard expanded, children == nil, !isLoading else { return }

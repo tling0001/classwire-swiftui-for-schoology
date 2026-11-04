@@ -98,15 +98,17 @@ private struct SchoologySidebar: View {
     @Binding var selection: SchoologySidebarSelection
 
     var body: some View {
-        #if os(macOS)
-        List(selection: $selection) {
-            sidebarSections
+        Group {
+            #if os(macOS)
+            List(selection: $selection) {
+                sidebarSections
+            }
+            #else
+            List {
+                sidebarSections
+            }
+            #endif
         }
-        #else
-        List {
-            sidebarSections
-        }
-        #endif
         .navigationTitle("Schoology")
         .listStyle(.sidebar)
         #if os(iOS)

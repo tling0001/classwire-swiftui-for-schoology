@@ -91,7 +91,7 @@ private struct SchoologyAttachmentActionRow: View {
         errorMessage = nil
         defer { isLoading = false }
         do {
-            let url = try await session.downloadAttachment(attachment)
+            let url = try await session.downloadAttachment(attachment, forViewing: forViewing)
             if forViewing { previewURL = url } else { downloadedURL = url }
         } catch { errorMessage = error.localizedDescription }
     }

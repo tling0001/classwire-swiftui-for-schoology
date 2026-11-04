@@ -1,4 +1,29 @@
-# Release Notes
+## [2026.10.0-port.38]
+
+### Person profiles
+- Redesign person profiles to match Schoology's Updates, Info, and Badges sections, with adaptive compact and wide layouts.
+- Load profile updates through the shared post cards so likes, comments, and recent-comment previews work consistently.
+- Show the person's photo, school, preferred name, role, email, username, and available name details.
+
+### Posts and comments
+- Show the two most recent comments beneath shared post cards, using the same nested comment rows and a View more comments action.
+- Remove the redundant New comment toolbar action from the comments sheet.
+
+### Messages and course materials
+- Use the signed-in user's actual profile photo for messages authored by You.
+- Give the message composer a padded, true multiline editor that inserts line breaks with Return.
+- Display course-material folder descriptions beneath folder names.
+- Route course-material files through the shared View or Download actions and use Schoology's converted PDF for viewing when supplied.
+
+### macOS
+- Add macOS Sonoma 14 as the minimum supported macOS version.
+- Use the legacy assignment tabs and AuthenticationServices callback initializer on macOS 14.0–14.3, with the modern APIs on newer releases.
+- Retain native segmented/material fallbacks on older systems and Liquid Glass on supported releases.
+- Apply the same adaptive navigation picker style to Settings' Theme control.
+- Fix the sidebar view-builder compile error that blocked the previous iOS and macOS Actions archives.
+
+### Build
+- Increment the iOS and macOS bundle build number to 38.
 
 ## [2026.10.0-port.37]
 

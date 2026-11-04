@@ -55,13 +55,6 @@ struct SchoologyCommentsView: View {
             ToolbarItem(placement: .cancellationAction) {
                 Button("Close", systemImage: "xmark") { dismiss() }
             }
-            ToolbarItem(placement: .primaryAction) {
-                Button("New comment", systemImage: "square.and.pencil") {
-                    replyingToID = nil
-                    replyingToName = ""
-                    composerFocused = true
-                }
-            }
         }
         .task(id: updateID) { await load() }
         .refreshable { await load() }
