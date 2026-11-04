@@ -1,3 +1,27 @@
+## [2026.10.0-port.21]
+
+### Assignments and submissions
+- Derive assignment teacher, discussion, and submission permissions from official Schoology assignment, section, enrollment, and grade-item responses.
+- Show Info on every assignment, Comments only when discussion is allowed, and Submissions only when dropbox/submission is enabled.
+- Use a dedicated submissions pane on wide layouts only when submissions are enabled; use native SwiftUI tabs for compact assignment navigation, following Apple's guidance to use tab views for primary content switching.
+- Add student submission history, teacher roster submission status, and native text-submission posting through the official Tauri JSON endpoint and query parameters.
+- Route LTI submissions into the authenticated embedded Schoology WebView.
+
+### Messages
+- Remove the duplicate Messages refresh action and add a Compose Message toolbar action.
+- Add recipient lookup and native message composition using the official `messages/recipients` and `messages` endpoints.
+- Give the conversation thread a full-height, eagerly measured scrolling stack and pull-to-refresh.
+
+### Course Apps
+- Allow JavaScript popup/window.open requests and route target=_blank navigation into the same authenticated WebView.
+
+### Grades
+- Limit numeric grade, percentage, and points display to two fractional digits.
+- Indent assignment rows as well as grading categories so each nested gradebook level is visually distinct.
+
+### Build
+- Increment the iOS and macOS bundle build number to 21.
+
 ## [2026.10.0-port.20]
 
 ### Grades

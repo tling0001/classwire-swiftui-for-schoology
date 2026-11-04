@@ -742,6 +742,135 @@ final class AppSession {
             SchoologyProfileItem(id: userID, title: "Schoology user", body: "", subtitle: "", url: nil, isAdmin: false, kind: "person", collectionID: nil)
     }
 
+
+    func loadAssignmentContext(sectionID: String, assignmentID: String) async throws -> SchoologyAssignmentContext {
+        guard let auth else { throw SchoologyAPIError.notSignedIn }
+        async let assignmentRequest = api.get("sections/\(sectionID)/assignments/\(assignmentID)", auth: auth, params: ["richtext": "1", "with_attachments": "TRUE"])
+        async let sectionRequest = try? await api.get("sections/\(sectionID)", auth: auth)
+        async let enrollmentRequest = try? await api.get("sections/\(sectionID)/enrollments", auth: auth, params: ["uid": auth.userID, "enrollment_status": "1"])
+        let (assignmentData, sectionData, enrollmentData) = try await (assignmentRequest, sectionRequest, enrollmentRequest)
+        let assignmentRoot = Self.object(assignmentData)
+        let rawAssignment = (assignmentRoot["assignment"] as? [String: Any]) ?? assignmentRoot
+        let sectionRoot = sectionData.map(Self.object) ?? [:]
+        let section = (sectionRoot["section"] as? [String: Any]) ?? sectionRoot
+        let enrollmentRoot = enrollmentData.map(Self.object) ?? [:]
+        let enrollment = SchoologyValue.list(enrollmentRoot, keys: ["enrollment", "enrollments", "items"]).first ?? [:]
+        let gradeItemData = try? await api.get("sections/\(sectionID)/grade_items/\(assignmentID)", auth: auth)
+        let gradeItemRoot = gradeItemData.map(Self.object) ?? [:]
+        let gradeItem = (gradeItemRoot["assignment"] as? [String: Any]) ?? (gradeItemRoot["grade_item"] as? [String: Any]) ?? (gradeItemRoot["gradeItem"] as? [String: Any]) ?? gradeItemRoot
+        let gradeItemID = SchoologyValue.string(gradeItem["id"] ?? gradeItem["grade_item_id"] ?? gradeItem["gradeItemId"] ?? rawAssignment["grade_item_id"], fallback: assignmentID)
+        let canSubmit = [rawAssignment["allow_dropbox"], rawAssignment["allowDropbox"], rawAssignment["allow_submission"], rawAssignment["allowSubmission"], gradeItem["allow_dropbox"], gradeItem["allowDropbox"], gradeItem["allow_submission"], gradeItem["allowSubmission"]].contains { SchoologyValue.bool($0) }
+        let allowComments = [rawAssignment["allow_discussion"], rawAssignment["allowDiscussion"], gradeItem["allow_discussion"], gradeItem["allowDiscussion"]].contains { SchoologyValue.bool($0) }
+        let isTeacher = SchoologyValue.bool(enrollment["admin"] ?? section["admin"] ?? rawAssignment["admin"])
+        let enrollmentID = SchoologyValue.optionalString(enrollment["id"] ?? enrollment["enrollment_id"])
+        var gradeParams = ["assignment_id": gradeItemID]
+        if let enrollmentID { gradeParams["enrollment_id"] = enrollmentID }
+        let gradeData = try? await api.get("sections/\(sectionID)/grades", auth: auth, params: gradeParams)
+        let gradeRoot = gradeData.map(Self.object) ?? [:]
+        let grade = SchoologyValue.list(gradeRoot, keys: ["grade", "grades", "items"]).first ?? [:]
+        let rawComment = grade["comment"] ?? grade["teacher_comment"] ?? grade["teacherComment"]
+        let teacherComment = SchoologyValue.plainText(SchoologyValue.string((rawComment as? [String: Any])?["comment"] ?? (rawComment as? [String: Any])?["body"] ?? rawComment))
+        let type = SchoologyValue.string(rawAssignment["assignment_type"] ?? rawAssignment["assignmentType"] ?? rawAssignment["type"]).lowercased()
+        let ltiURL = type == "lti_submission" ? SchoologyValue.url(rawAssignment["web_url"] ?? rawAssignment["webUrl"] ?? rawAssignment["launch_url"] ?? rawAssignment["launchUrl"]) : nil
+        let attachmentRows = SchoologyValue.list(rawAssignment["attachments"] ?? rawAssignment["attachment"], keys: ["files", "file", "attachments", "items", "links", "link"])
+        let attachments = attachmentRows.compactMap { item -> SchoologyAttachment? in
+            guard let url = SchoologyValue.url(item["file_download_url"] ?? item["fileDownloadURL"] ?? item["download_path"] ?? item["downloadPath"] ?? item["url"] ?? item["linkURL"] ?? item["href"]) else { return nil }
+            return SchoologyAttachment(title: SchoologyValue.string(item["filename"] ?? item["fileName"] ?? item["title"], fallback: url.lastPathComponent), url: url)
+        }
+        let profile = SchoologyProfileItem.decodeList(["assignment": rawAssignment], keys: ["assignment"]).first ??
+            SchoologyProfileItem(id: assignmentID, title: "Assignment", body: "", subtitle: "", url: nil, isAdmin: false, kind: "assignment", collectionID: nil)
+        return SchoologyAssignmentContext(assignment: profile, canSubmit: canSubmit, allowComments: allowComments, isTeacher: isTeacher,
+            gradeItemID: gradeItemID, enrollmentID: enrollmentID, ltiURL: ltiURL,
+            currentGrade: SchoologyValue.string(grade["grade"] ?? grade["calculated_grade"], fallback: "—"),
+            maxPoints: SchoologyValue.string(rawAssignment["max_points"] ?? rawAssignment["maxPoints"] ?? gradeItem["max_points"] ?? gradeItem["maxPoints"]),
+            teacherComment: teacherComment, attachments: attachments)
+    }
+
+    func loadAssignmentSubmissions(sectionID: String, context: SchoologyAssignmentContext) async throws -> SchoologyAssignmentSubmissionSummary {
+        guard let auth else { throw SchoologyAPIError.notSignedIn }
+        func commentText(_ record: [String: Any]) -> String {
+            let value = record["comment"] ?? record["teacher_comment"] ?? record["teacherComment"]
+            return SchoologyValue.plainText(SchoologyValue.string((value as? [String: Any])?["comment"] ?? (value as? [String: Any])?["body"] ?? value))
+        }
+        func revisions(from payload: [String: Any]) -> [SchoologyAssignmentRevision] {
+            let nested = payload["data"] as? [String: Any]
+            let raw = payload["revision"] ?? payload["revisions"] ?? nested?["revision"] ?? nested?["revisions"]
+            return SchoologyValue.list(raw, keys: ["revision", "revisions", "items"]).map { row in
+                let attachments = SchoologyValue.list(row["attachments"] ?? row["attachment"], keys: ["files", "file", "attachments", "items"]).compactMap { file -> SchoologyAttachment? in
+                    guard let url = SchoologyValue.url(file["file_download_url"] ?? file["fileDownloadURL"] ?? file["download_path"] ?? file["downloadPath"] ?? file["url"]) else { return nil }
+                    return SchoologyAttachment(title: SchoologyValue.string(file["filename"] ?? file["fileName"] ?? file["title"], fallback: url.lastPathComponent), url: url)
+                }
+                return SchoologyAssignmentRevision(id: SchoologyValue.string(row["revision_id"] ?? row["revisionId"] ?? row["id"], fallback: "0"),
+                    created: SchoologyValue.string(row["created"] ?? row["timestamp"]),
+                    body: SchoologyValue.plainText(SchoologyValue.string(row["body"] ?? row["message"])),
+                    status: SchoologyValue.bool(row["draft"]) ? "Draft" : (SchoologyValue.bool(row["late"]) ? "Late" : "On time"),
+                    attachments: attachments)
+            }.sorted { (Int($0.id) ?? 0) > (Int($1.id) ?? 0) }
+        }
+        if context.isTeacher {
+            async let enrollmentsRequest = api.get("sections/\(sectionID)/enrollments", auth: auth, params: ["enrollment_status": "1", "limit": "200"])
+            async let gradesRequest = api.get("sections/\(sectionID)/grades", auth: auth, params: ["assignment_id": context.gradeItemID, "limit": "200"])
+            async let submissionsRequest = try? await api.get("sections/\(sectionID)/submissions/\(context.gradeItemID)", auth: auth, params: ["with_attachments": "TRUE", "all_revisions": "TRUE", "limit": "200"])
+            let (enrollmentData, gradeData, submissionData) = try await (enrollmentsRequest, gradesRequest, submissionsRequest)
+            let enrollments = SchoologyValue.list(Self.object(enrollmentData), keys: ["enrollment", "enrollments", "items"]).filter { !SchoologyValue.bool($0["admin"]) && SchoologyValue.string($0["status"], fallback: "1") == "1" }
+            let grades = SchoologyValue.list(Self.object(gradeData), keys: ["grade", "grades", "items"])
+            let gradeByEnrollment = Dictionary(grades.compactMap { row -> (String, [String: Any])? in
+                let id = SchoologyValue.string(row["enrollment_id"] ?? row["enrollmentId"])
+                return id.isEmpty ? nil : (id, row)
+            }, uniquingKeysWith: { first, _ in first })
+            let root = submissionData.map(Self.object) ?? [:]
+            let nested = root["data"] as? [String: Any]
+            let revisions = SchoologyValue.list(root["revision"] ?? root["revisions"] ?? nested?["revision"] ?? nested?["revisions"], keys: ["revision", "revisions", "items"])
+            let students = enrollments.map { row -> SchoologyAssignmentStudent in
+                let uid = SchoologyValue.string(row["uid"] ?? row["user_id"] ?? row["userId"])
+                let eid = SchoologyValue.string(row["id"] ?? row["enrollment_id"])
+                let grade = gradeByEnrollment[eid] ?? [:]
+                let revision = revisions.first { SchoologyValue.string($0["uid"] ?? $0["user_id"] ?? $0["userId"]) == uid }
+                let status = revision.map { SchoologyValue.bool($0["draft"]) ? "Draft" : (SchoologyValue.bool($0["late"]) ? "Late" : "Submitted") } ?? "Not submitted"
+                let display = SchoologyValue.string(row["name_display"] ?? row["display_name"] ?? row["name"])
+                let fallback = [SchoologyValue.string(row["name_first"]), SchoologyValue.string(row["name_last"])].filter { !$0.isEmpty }.joined(separator: " ")
+                return SchoologyAssignmentStudent(id: uid.isEmpty ? eid : uid, enrollmentID: eid, name: display.isEmpty ? (fallback.isEmpty ? "Student" : fallback) : display,
+                    status: status, grade: SchoologyValue.string(grade["grade"] ?? grade["calculated_grade"], fallback: "—"))
+            }.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+            return SchoologyAssignmentSubmissionSummary(grade: "—", teacherComment: "", revisions: [], students: students)
+        }
+        var gradeParams = ["assignment_id": context.gradeItemID]
+        if let enrollmentID = context.enrollmentID { gradeParams["enrollment_id"] = enrollmentID }
+        async let gradeRequest = api.get("sections/\(sectionID)/grades", auth: auth, params: gradeParams)
+        async let submissionRequest = try? await api.get("sections/\(sectionID)/submissions/\(context.gradeItemID)/\(auth.userID)", auth: auth, params: ["with_attachments": "TRUE", "all_revisions": "TRUE", "start": "0", "limit": "200"])
+        let (gradeData, submissionData) = try await (gradeRequest, submissionRequest)
+        let grade = SchoologyValue.list(Self.object(gradeData), keys: ["grade", "grades", "items"]).first ?? [:]
+        let root = submissionData.map(Self.object) ?? [:]
+        return SchoologyAssignmentSubmissionSummary(grade: SchoologyValue.string(grade["grade"] ?? grade["calculated_grade"], fallback: "—"),
+            teacherComment: commentText(grade), revisions: revisions(from: root), students: [])
+    }
+
+    func submitAssignmentText(sectionID: String, gradeItemID: String, text: String, draft: Bool) async throws {
+        guard let auth else { throw SchoologyAPIError.notSignedIn }
+        let value = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty else { throw SchoologyAPIError.invalidResponse }
+        _ = try await api.postJSON("sections/\(sectionID)/submissions/\(gradeItemID)/create", auth: auth,
+            params: ["realm": "sections", "realm_id": sectionID, "grade_item_id": gradeItemID, "action": "create"],
+            body: ["body": value, "draft": draft ? 1 : 0])
+    }
+
+    func searchMessageRecipients(_ query: String) async throws -> [SchoologyMessageRecipient] {
+        guard let auth else { throw SchoologyAPIError.notSignedIn }
+        let data = try await api.get("messages/recipients", auth: auth, params: ["name": query, "limit": "10"])
+        return SchoologyMessageRecipient.decodeList(data)
+    }
+
+    func sendMessage(recipientIDs: [String], subject: String, message: String) async throws {
+        guard let auth else { throw SchoologyAPIError.notSignedIn }
+        let ids = Array(Set(recipientIDs.filter { Int($0) != nil })).sorted()
+        guard !ids.isEmpty, !subject.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              !message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { throw SchoologyAPIError.invalidResponse }
+        _ = try await api.postJSON("messages", auth: auth, body: [
+            "recipient_ids": ids.joined(separator: ","), "subject": subject.trimmingCharacters(in: .whitespacesAndNewlines),
+            "message": message.trimmingCharacters(in: .whitespacesAndNewlines)
+        ])
+    }
+
     func loadAssignment(sectionID: String, assignmentID: String) async throws -> SchoologyProfileItem {
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         let data = try await api.get("sections/\(sectionID)/assignments/\(assignmentID)", auth: auth, params: ["richtext": "1", "with_attachments": "TRUE"])

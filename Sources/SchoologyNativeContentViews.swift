@@ -139,78 +139,6 @@ struct SchoologyEventDetailView: View {
     }
 }
 
-struct SchoologyAssignmentDetailView: View {
-    @Environment(AppSession.self) private var session
-    let sectionID: String
-    let assignmentID: String
-    let title: String
-    @State private var assignment: SchoologyProfileItem?
-    @State private var comments: [SchoologyProfileItem] = []
-    @State private var draft = ""
-    @State private var loading = true
-    @State private var error: String?
-
-    var body: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 14) {
-                if loading { ProgressView("Loading assignment…").frame(maxWidth: .infinity) }
-                else if let error { ContentUnavailableView("Unable to load assignment", systemImage: "exclamationmark.triangle", description: Text(error)) }
-                if let assignment {
-                    VStack(alignment: .leading, spacing: 14) {
-                        Text(assignment.title).font(.title2.weight(.semibold))
-                        if !assignment.subtitle.isEmpty { Label(assignment.subtitle, systemImage: "calendar").font(.caption).foregroundStyle(.secondary) }
-                        Text(assignment.body.isEmpty ? "No assignment description." : assignment.body).textSelection(.enabled)
-                        if let url = assignment.url {
-                            NavigationLink { SchoologyEmbeddedWebView(url: url, title: assignment.title) } label: {
-                                Label("Open assignment in Schoology", systemImage: "arrow.up.right.square")
-                            }
-                        }
-                    }.padding(16).frame(maxWidth: .infinity, alignment: .leading)
-                        .background(.background, in: RoundedRectangle(cornerRadius: 14))
-                }
-                Text("Comments").font(.headline)
-                ForEach(comments) { comment in
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(comment.title).font(.subheadline.weight(.semibold))
-                        Text(comment.body).textSelection(.enabled)
-                        if !comment.subtitle.isEmpty { Text(comment.subtitle).font(.caption).foregroundStyle(.secondary) }
-                    }.padding(12).frame(maxWidth: .infinity, alignment: .leading)
-                        .background(.background, in: RoundedRectangle(cornerRadius: 12))
-                }
-                HStack(alignment: .bottom) {
-                    TextField("Add a comment…", text: $draft, axis: .vertical).lineLimit(2...5)
-                    Button("Post", systemImage: "paperplane.fill") { Task { await postComment() } }
-                        .disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                }.padding(12).background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
-            }.padding().frame(maxWidth: 900).frame(maxWidth: .infinity)
-        }
-        .navigationTitle(title)
-        .task(id: assignmentID) { await load() }
-        .refreshable { await load() }
-    }
-
-    private func load() async {
-        loading = true; error = nil
-        do {
-            async let detail = session.loadAssignment(sectionID: sectionID, assignmentID: assignmentID)
-            async let replies = session.loadAssignmentComments(sectionID: sectionID, assignmentID: assignmentID)
-            assignment = try await detail
-            comments = try await replies
-        } catch { self.error = error.localizedDescription }
-        loading = false
-    }
-
-    private func postComment() async {
-        let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty else { return }
-        do {
-            try await session.postComment(realm: "sections", realmID: sectionID, entity: "assignments", entityID: assignmentID, body: text)
-            draft = ""
-            comments = try await session.loadAssignmentComments(sectionID: sectionID, assignmentID: assignmentID)
-        } catch { self.error = error.localizedDescription }
-    }
-}
-
 struct SchoologyAlbumDetailView: View {
     @Environment(AppSession.self) private var session
     let groupID: String
@@ -367,39 +295,61 @@ import UIKit
 struct SchoologyCookieWebView: UIViewRepresentable {
     let url: URL
     let cookies: [SchoologyWebCookie]
+    func makeCoordinator() -> Coordinator { Coordinator() }
     func makeUIView(context: Context) -> WKWebView {
-        let view = WKWebView(frame: .zero)
+        let configuration = WKWebViewConfiguration()
+        configuration.preferences.javaScriptCanOpenWindowsAutomatically = true
+        let view = WKWebView(frame: .zero, configuration: configuration)
+        view.navigationDelegate = context.coordinator
+        view.uiDelegate = context.coordinator
+        view.allowsBackForwardNavigationGestures = true
         let store = view.configuration.websiteDataStore.httpCookieStore
         Task { @MainActor in
             for item in cookies {
-                if let cookie = HTTPCookie(properties: [.domain: item.domain, .path: item.path, .name: item.name, .value: item.value, .secure: "TRUE"]) {
-                    await store.setCookie(cookie)
-                }
+                if let cookie = HTTPCookie(properties: [.domain: item.domain, .path: item.path, .name: item.name, .value: item.value, .secure: "TRUE"]) { await store.setCookie(cookie) }
             }
             view.load(URLRequest(url: url))
         }
         return view
     }
     func updateUIView(_ view: WKWebView, context: Context) {}
+    final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
+        func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration, for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
+            guard navigationAction.targetFrame == nil else { return nil }
+            webView.load(navigationAction.request)
+            return nil
+        }
+    }
 }
 #elseif os(macOS)
 import AppKit
 struct SchoologyCookieWebView: NSViewRepresentable {
     let url: URL
     let cookies: [SchoologyWebCookie]
+    func makeCoordinator() -> Coordinator { Coordinator() }
     func makeNSView(context: Context) -> WKWebView {
-        let view = WKWebView(frame: .zero)
+        let configuration = WKWebViewConfiguration()
+        configuration.preferences.javaScriptCanOpenWindowsAutomatically = true
+        let view = WKWebView(frame: .zero, configuration: configuration)
+        view.navigationDelegate = context.coordinator
+        view.uiDelegate = context.coordinator
+        view.allowsBackForwardNavigationGestures = true
         let store = view.configuration.websiteDataStore.httpCookieStore
         Task { @MainActor in
             for item in cookies {
-                if let cookie = HTTPCookie(properties: [.domain: item.domain, .path: item.path, .name: item.name, .value: item.value, .secure: "TRUE"]) {
-                    await store.setCookie(cookie)
-                }
+                if let cookie = HTTPCookie(properties: [.domain: item.domain, .path: item.path, .name: item.name, .value: item.value, .secure: "TRUE"]) { await store.setCookie(cookie) }
             }
             view.load(URLRequest(url: url))
         }
         return view
     }
     func updateNSView(_ view: WKWebView, context: Context) {}
+    final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
+        func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration, for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
+            guard navigationAction.targetFrame == nil else { return nil }
+            webView.load(navigationAction.request)
+            return nil
+        }
+    }
 }
 #endif

@@ -8,7 +8,7 @@ struct SchoologyGradebookView: View {
                 HStack(alignment: .firstTextBaseline) {
                     Text("Overall Grade").font(.headline)
                     Spacer()
-                    Text(gradebook.overallGrade).font(.headline.monospacedDigit())
+                    Text(SchoologyGradeValueFormatter.display(gradebook.overallGrade)).font(.headline.monospacedDigit())
                 }
                 if !gradebook.overallComment.isEmpty {
                     Label(gradebook.overallComment, systemImage: "text.bubble")
@@ -32,6 +32,7 @@ struct SchoologyGradebookView: View {
                                     VStack(alignment: .leading, spacing: 0) {
                                         ForEach(category.assignments) { assignment in
                                             SchoologyGradeAssignmentRow(assignment: assignment)
+                                                .padding(.leading, 8)
                                             if assignment.id != category.assignments.last?.id {
                                                 Divider()
                                             }
@@ -43,7 +44,7 @@ struct SchoologyGradebookView: View {
                                     Text(category.title).font(.subheadline.weight(.semibold))
                                     Spacer(minLength: 8)
                                     if !category.weight.isEmpty {
-                                        Text(category.weight + (category.weight.contains("%") ? "" : "%"))
+                                        Text(SchoologyGradeValueFormatter.display(category.weight) + (category.weight.contains("%") ? "" : "%"))
                                             .font(.subheadline.monospacedDigit())
                                             .foregroundStyle(.secondary)
                                     }

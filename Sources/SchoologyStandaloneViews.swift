@@ -213,7 +213,7 @@ struct SchoologyGradesView: View {
                                         }
                                     }
                                     Spacer()
-                                    Text(course.overallGrade).font(.headline.monospacedDigit()).foregroundStyle(.primary)
+                                    Text(SchoologyGradeValueFormatter.display(course.overallGrade)).font(.headline.monospacedDigit()).foregroundStyle(.primary)
                                     Image(systemName: expandedCourses.contains(course.id) ? "chevron.up" : "chevron.down")
                                         .font(.caption.weight(.semibold))
                                         .foregroundStyle(.secondary)
@@ -222,7 +222,7 @@ struct SchoologyGradesView: View {
                                 .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
-                            .accessibilityLabel("\(course.title), overall grade \(course.overallGrade)")
+                            .accessibilityLabel("\(course.title), overall grade \(SchoologyGradeValueFormatter.display(course.overallGrade))")
                             .accessibilityHint(expandedCourses.contains(course.id) ? "Collapse course grades" : "Show grading periods, categories, and assignments")
 
                             if expandedCourses.contains(course.id) {

@@ -7,6 +7,7 @@ struct MessagesView: View {
     @State private var selectedMessage: SchoologyMessage?
     @State private var isLoading = false
     @State private var loadError: String?
+    @State private var showingComposer = false
 
     var body: some View {
         GeometryReader { geometry in
@@ -71,10 +72,13 @@ struct MessagesView: View {
         .navigationTitle("Messages")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                Button("Refresh", systemImage: "arrow.clockwise") {
-                    Task { await loadFolder(force: true) }
-                }
-                .disabled(isLoading)
+                Button("Compose Message", systemImage: "square.and.pencil") { showingComposer = true }
+            }
+        }
+        .sheet(isPresented: $showingComposer) {
+            SchoologyMessageComposerView {
+                folder = .sent
+                Task { await loadFolder(force: true) }
             }
         }
     }
@@ -145,7 +149,7 @@ private struct MessageThreadView: View {
                 ContentUnavailableView("Unable to load message", systemImage: "exclamationmark.triangle", description: Text(error))
             } else {
                 ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 14) {
+                    VStack(alignment: .leading, spacing: 14) {
                         ForEach(thread) { item in
                             VStack(alignment: .leading, spacing: 10) {
                                 HStack(spacing: 10) {
@@ -185,6 +189,12 @@ private struct MessageThreadView: View {
                     .padding()
                     .frame(maxWidth: 900)
                     .frame(maxWidth: .infinity)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .refreshable {
+                    let loaded = await session.loadMessageThread(message, folder: folder)
+                    thread = loaded
+                    error = loaded.isEmpty ? (session.errorMessage ?? "No conversation content was returned.") : nil
                 }
             }
         }

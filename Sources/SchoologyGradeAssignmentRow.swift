@@ -5,8 +5,8 @@ struct SchoologyGradeAssignmentRow: View {
 
     private var score: String {
         assignment.maxPoints.isEmpty || assignment.grade == "—"
-            ? assignment.grade
-            : "\(assignment.grade) / \(assignment.maxPoints)"
+            ? SchoologyGradeValueFormatter.display(assignment.grade)
+            : "\(SchoologyGradeValueFormatter.display(assignment.grade)) / \(SchoologyGradeValueFormatter.display(assignment.maxPoints))"
     }
 
     var body: some View {

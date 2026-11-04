@@ -266,7 +266,7 @@ actor SchoologyAPI {
 
     func launchResourceApp(appID: String, auth: SchoologyAuth) async throws -> URL {
         guard Int(appID) != nil else { throw SchoologyAPIError.invalidResponse }
-        let data = try await getV2("resources/applications/\\(appID)/launch", auth: auth)
+        let data = try await getV2("resources/applications/\(appID)/launch", auth: auth)
         let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] ?? [:]
         let payload = (json["data"] as? [String: Any]) ?? (json["response"] as? [String: Any]) ?? json
         guard let rawURL = payload["url"] as? String, let destination = URL(string: rawURL),
@@ -287,6 +287,15 @@ actor SchoologyAPI {
         let body = formEncode(params)
         let extra = params.map { ($0.key, oauthEncode($0.value)) }
         return try await send(url: url, method: "POST", body: body, auth: auth, signed: true, extra: extra)
+    }
+
+    func postJSON(_ path: String, auth: SchoologyAuth, params: [String: String] = [:], body: [String: Any]) async throws -> Data {
+        var components = URLComponents(string: "https://\(apiHost)/v1/\(path)")!
+        components.queryItems = params.sorted { $0.key < $1.key }.map { URLQueryItem(name: $0.key, value: $0.value) }
+        guard let url = components.url, JSONSerialization.isValidJSONObject(body),
+              let data = try? JSONSerialization.data(withJSONObject: body, options: [.sortedKeys]),
+              let payload = String(data: data, encoding: .utf8) else { throw SchoologyAPIError.invalidResponse }
+        return try await send(url: url, method: "POST", body: payload, auth: auth, signed: true, extra: [], contentType: "application/json")
     }
 
     func postMultiOptions(_ paths: [String], auth: SchoologyAuth) async throws -> Data {
@@ -371,7 +380,8 @@ actor SchoologyAPI {
         auth: SchoologyAuth?,
         signed: Bool,
         extra: [(String, String)],
-        clientIdentity: Bool = true
+        clientIdentity: Bool = true,
+        contentType: String = "application/x-www-form-urlencoded"
     ) async throws -> Data {
         // Schoology can redirect API requests. Match the Tauri host's behavior:
         // disable automatic redirect replay and create a fresh OAuth signature for
@@ -401,7 +411,7 @@ actor SchoologyAPI {
             }
             if let currentBody {
                 request.httpBody = currentBody.data(using: .utf8)
-                request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+                request.setValue(contentType, forHTTPHeaderField: "Content-Type")
             }
             if signed {
                 request.setValue(
