@@ -1,3 +1,17 @@
+## [2026.10.0-port.20]
+
+### Grades
+- Restore the official grading-period → grading-category → assignment hierarchy in standalone Grades and course Grades.
+- Keep gradebook rows, category weights, scores, due dates, and teacher comments grouped in native SwiftUI disclosure controls.
+- Preserve the final grade and teacher comment while avoiding arbitrary selection of another student's grade record.
+
+### Performance
+- Replace serial group-update author profile lookups with the existing bounded-concurrency profile loader.
+- Hydrate missing author names and avatars in parallel while preserving any author data already embedded in the activity response.
+
+### Build
+- Increment the iOS and macOS bundle build number to 20.
+
 ## [2026.10.0-port.19]
 
 ### Standalone Schoology pages

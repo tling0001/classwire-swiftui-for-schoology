@@ -270,83 +270,171 @@ final class AppSession {
         return peopleByID.values.sorted { $0.lastName.localizedCaseInsensitiveCompare($1.lastName) == .orderedAscending }
     }
 
-    func loadCourseGrades(courseID: String) async throws -> [SchoologyProfileItem] {
+    func loadCourseGradebook(courseID: String) async throws -> SchoologyGradebook {
         guard let auth else { throw SchoologyAPIError.notSignedIn }
+        async let sectionRequest = api.get("sections/\(courseID)", auth: auth)
         async let periodsRequest = api.get("sections/\(courseID)/grading_periods", auth: auth)
         async let categoriesRequest = api.get("sections/\(courseID)/grading_categories", auth: auth)
         async let itemsRequest = api.get("sections/\(courseID)/grade_items", auth: auth, params: ["limit": "2000"])
         async let userGradesRequest = api.get("users/\(auth.userID)/grades", auth: auth, params: ["section_id": courseID])
-        let (periodsData, categoriesData, itemsData, userGradesData) = try await (periodsRequest, categoriesRequest, itemsRequest, userGradesRequest)
+        let (sectionData, periodsData, categoriesData, itemsData, userGradesData) =
+            try await (sectionRequest, periodsRequest, categoriesRequest, itemsRequest, userGradesRequest)
 
+        let section = Self.object(sectionData)
         let gradeItems = SchoologyValue.list(Self.object(itemsData), keys: ["assignment", "assignments", "items"])
         let userSections = SchoologyValue.list(Self.object(userGradesData), keys: ["section", "sections", "items"])
-        let currentGrades = userSections.first {
+        let current = userSections.first {
             SchoologyValue.string($0["section_id"] ?? $0["sectionId"] ?? $0["id"]) == courseID
-        } ?? userSections.first
+        } ?? (userSections.count == 1 ? userSections.first : nil)
 
         var gradeByAssignmentID: [String: [String: Any]] = [:]
-        let periods = SchoologyValue.list(currentGrades?["period"] ?? currentGrades?["periods"], keys: ["period", "periods", "items"])
-        for period in periods {
-            let rows = SchoologyValue.list(period["assignment"] ?? period["assignments"], keys: ["assignment", "assignments", "items"])
-            for row in rows {
-                let id = SchoologyValue.string(row["assignment_id"] ?? row["assignmentId"] ?? row["id"])
-                if !id.isEmpty { gradeByAssignmentID[id] = row }
+        for period in SchoologyValue.list(current?["period"] ?? current?["periods"], keys: ["period", "periods", "items"]) {
+            for grade in SchoologyValue.list(period["assignment"] ?? period["assignments"], keys: ["assignment", "assignments", "items"]) {
+                let id = SchoologyValue.string(grade["assignment_id"] ?? grade["assignmentId"] ?? grade["id"])
+                if !id.isEmpty { gradeByAssignmentID[id] = grade }
             }
         }
-        let directRows = SchoologyValue.list(currentGrades?["assignment"] ?? currentGrades?["assignments"], keys: ["assignment", "assignments", "items"])
-        for row in directRows {
-            let id = SchoologyValue.string(row["assignment_id"] ?? row["assignmentId"] ?? row["id"])
-            if !id.isEmpty { gradeByAssignmentID[id] = row }
-        }
 
-        var categoryNames: [String: String] = [:]
-        for row in SchoologyValue.list(Self.object(categoriesData), keys: ["grading_category", "grading_categories", "category", "categories", "items"]) {
-            let id = SchoologyValue.string(row["id"]), name = SchoologyValue.string(row["title"] ?? row["name"])
-            if !id.isEmpty && !name.isEmpty { categoryNames[id] = name }
-        }
-        var periodNames: [String: String] = [:]
-        for row in SchoologyValue.list(Self.object(periodsData), keys: ["grading_period", "grading_periods", "period", "periods", "items"]) {
-            let id = SchoologyValue.string(row["id"]), name = SchoologyValue.string(row["title"] ?? row["name"])
-            if !id.isEmpty && !name.isEmpty { periodNames[id] = name }
-        }
+        let rawCategories = SchoologyValue.list(Self.object(categoriesData), keys: ["grading_category", "grading_categories", "category", "categories", "items"])
+        let rawPeriods = SchoologyValue.list(Self.object(periodsData), keys: ["grading_period", "grading_periods", "grade_period", "gradePeriod", "period", "periods", "items"])
+        let categoryMap = Dictionary(rawCategories.compactMap { row -> (String, [String: Any])? in
+            let id = SchoologyValue.string(row["id"])
+            return id.isEmpty ? nil : (id, row)
+        }, uniquingKeysWith: { first, _ in first })
+        let periodMap = Dictionary(rawPeriods.compactMap { row -> (String, [String: Any])? in
+            let id = SchoologyValue.string(row["id"])
+            return id.isEmpty ? nil : (id, row)
+        }, uniquingKeysWith: { first, _ in first })
 
-        var result: [SchoologyProfileItem] = []
-        if let currentGrades {
-            let rawFinal = currentGrades["final_grade"] ?? currentGrades["finalGrade"] ?? currentGrades["final_grades"] ?? currentGrades["finalGrades"]
-            let finalRecord = (rawFinal as? [[String: Any]])?.first ?? (rawFinal as? [String: Any])
-            let finalPeriods = SchoologyValue.list(finalRecord?["period"] ?? finalRecord?["periods"], keys: ["period", "periods", "items"])
-            let finalPeriod = finalPeriods.first { SchoologyValue.string($0["period_id"] ?? $0["periodId"]) == "final" } ?? finalPeriods.first
-            let overallValue = finalPeriod?["override_str"] ?? finalPeriod?["overrideStr"] ?? finalPeriod?["grade"] ??
-                finalRecord?["override_str"] ?? finalRecord?["overrideStr"] ?? finalRecord?["grade"] ??
-                finalRecord?["calculated_grade"] ?? finalRecord?["calculatedGrade"]
-            if let overallValue, !(overallValue is NSNull), !SchoologyValue.string(overallValue).isEmpty {
-                result.append(SchoologyProfileItem(id: "overall-grade", title: "Overall Grade", body: SchoologyValue.string(overallValue),
-                    subtitle: "Final grade", url: nil, isAdmin: false, kind: "overall_grade", collectionID: nil))
-            }
-        }
+        let rawFinal = current?["final_grade"] ?? current?["finalGrade"] ?? current?["final_grades"] ?? current?["finalGrades"]
+        let finalRecord = (rawFinal as? [[String: Any]])?.first ?? (rawFinal as? [String: Any])
+        let finalPeriods = SchoologyValue.list(finalRecord?["period"] ?? finalRecord?["periods"] ?? finalRecord?["final_period"] ?? finalRecord?["finalPeriod"], keys: ["period", "periods", "items"])
+        let finalPeriod = finalPeriods.first { SchoologyValue.string($0["period_id"] ?? $0["periodId"]) == "final" } ?? finalPeriods.first
+        let overallRaw = finalPeriod?["override_str"] ?? finalPeriod?["overrideStr"] ??
+            finalPeriod?["override_string"] ?? finalPeriod?["overrideString"] ??
+            finalRecord?["override_str"] ?? finalRecord?["overrideStr"] ??
+            finalRecord?["override_string"] ?? finalRecord?["overrideString"] ??
+            finalPeriod?["grade"] ?? finalRecord?["grade"] ??
+            finalRecord?["calculated_grade"] ?? finalRecord?["calculatedGrade"]
+        let overall = overallRaw == nil || overallRaw is NSNull ? "—" : SchoologyValue.string(overallRaw, fallback: "—")
+        let overallCommentRaw = finalRecord?["comment"] ?? finalPeriod?["comment"]
+        let overallComment = SchoologyValue.plainText(SchoologyValue.string(
+            (overallCommentRaw as? [String: Any])?["comment"] ?? (overallCommentRaw as? [String: Any])?["body"] ?? overallCommentRaw
+        ))
+
+        var grouped: [String: [String: [SchoologyGradeAssignment]]] = [:]
         for item in gradeItems {
             let id = SchoologyValue.string(item["id"] ?? item["assignment_id"] ?? item["assignmentId"])
             guard !id.isEmpty else { continue }
-            let grade = gradeByAssignmentID[id]
-            let rawGrade = grade?["override_str"] ?? grade?["overrideStr"] ?? grade?["grade_str"] ??
-                grade?["gradeStr"] ?? grade?["grade"] ?? grade?["grade_value"] ?? grade?["gradeValue"]
-            let gradeText: String
-            if let rawGrade, !(rawGrade is NSNull), !SchoologyValue.string(rawGrade).isEmpty {
-                if let nested = rawGrade as? [String: Any] {
-                    gradeText = SchoologyValue.string(nested["grade"] ?? nested["value"] ?? nested["label"], fallback: "Graded")
-                } else { gradeText = SchoologyValue.string(rawGrade) }
-            } else { gradeText = "Not graded" }
-            let categoryID = SchoologyValue.string(item["grading_category_id"] ?? item["gradingCategoryId"] ?? grade?["grading_category_id"])
-            let periodID = SchoologyValue.string(item["grading_period_id"] ?? item["gradingPeriodId"] ?? grade?["grading_period_id"])
-            let due = SchoologyValue.string(item["due"] ?? item["due_date"] ?? item["dueDate"])
-            let metadata = [categoryNames[categoryID], periodNames[periodID], due.isEmpty ? nil : "Due " + due].compactMap { $0 }.filter { !$0.isEmpty }
-            result.append(SchoologyProfileItem(id: id, title: SchoologyValue.string(item["title"] ?? item["name"], fallback: "Assignment"),
-                body: gradeText, subtitle: metadata.joined(separator: " • "),
-                url: SchoologyValue.url(item["web_url"] ?? item["webUrl"] ?? item["url"]), isAdmin: false, kind: "assignment", collectionID: nil))
+            let grade = gradeByAssignmentID[id] ?? [:]
+            let periodID = SchoologyValue.string(item["grading_period_id"] ?? item["grading_period"] ?? item["period_id"] ?? item["periodId"], fallback: "0")
+            let categoryID = SchoologyValue.string(item["grading_category_id"] ?? item["grading_category"] ?? item["category_id"] ?? item["categoryId"], fallback: "0")
+            let rawScore = grade["grade"] ?? grade["calculated_grade"] ?? grade["score"] ?? grade["override_numeric"] ?? grade["overrideNumeric"]
+            let score = rawScore == nil || rawScore is NSNull ? "—" : SchoologyValue.string(rawScore, fallback: "—")
+            let maxPoints = SchoologyValue.string(item["max_points"] ?? item["maxPoints"] ?? grade["max_points"] ?? grade["maxPoints"])
+            let rawComment = grade["comment"] ?? grade["teacher_comment"] ?? grade["teacherComment"]
+            let comment = SchoologyValue.plainText(SchoologyValue.string(
+                (rawComment as? [String: Any])?["comment"] ?? (rawComment as? [String: Any])?["body"] ?? rawComment
+            ))
+            let assignment = SchoologyGradeAssignment(
+                id: id,
+                title: SchoologyValue.string(item["title"] ?? item["assignment_title"] ?? item["assignmentTitle"], fallback: "Assignment"),
+                grade: score,
+                maxPoints: maxPoints,
+                due: SchoologyValue.string(item["due"] ?? item["due_date"] ?? item["dueDate"]),
+                comment: comment,
+                itemType: SchoologyValue.string(item["type"] ?? item["template_type"] ?? item["type_name"] ?? item["typeName"], fallback: "assignment")
+            )
+            grouped[periodID, default: [:]][categoryID, default: []].append(assignment)
         }
-        return result
+
+        var gradePeriods: [SchoologyGradePeriod] = []
+        let orderedPeriods = rawPeriods.sorted {
+            let lhs = SchoologyValue.integer($0["sort_order"] ?? $0["sortOrder"])
+            let rhs = SchoologyValue.integer($1["sort_order"] ?? $1["sortOrder"])
+            return lhs == rhs
+                ? SchoologyValue.string($0["title"]).localizedCaseInsensitiveCompare(SchoologyValue.string($1["title"])) == .orderedAscending
+                : lhs < rhs
+        }
+        let periodIDs = Set(grouped.keys)
+        for period in orderedPeriods {
+            let periodID = SchoologyValue.string(period["id"])
+            guard periodIDs.contains(periodID) else { continue }
+            let categoryGroups = grouped[periodID] ?? [:]
+            let categoryIDs = Set(categoryGroups.keys)
+            var categories: [SchoologyGradeCategory] = []
+            for category in rawCategories {
+                let categoryID = SchoologyValue.string(category["id"])
+                guard categoryIDs.contains(categoryID) else { continue }
+                categories.append(SchoologyGradeCategory(
+                    id: categoryID,
+                    title: SchoologyValue.string(category["title"] ?? category["name"], fallback: "Category"),
+                    weight: SchoologyValue.string(category["weight"] ?? category["percent"] ?? category["percentage"] ?? category["weight_percent"] ?? category["weightPercentage"]),
+                    assignments: (categoryGroups[categoryID] ?? []).sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+                ))
+            }
+            if let ungrouped = categoryGroups["0"] {
+                categories.append(SchoologyGradeCategory(
+                    id: "\(periodID)-ungrouped",
+                    title: "Ungraded",
+                    weight: "",
+                    assignments: ungrouped.sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+                ))
+            }
+            for categoryID in categoryIDs where categoryID != "0" && categoryMap[categoryID] == nil {
+                categories.append(SchoologyGradeCategory(
+                    id: categoryID,
+                    title: "Category",
+                    weight: "",
+                    assignments: (categoryGroups[categoryID] ?? []).sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+                ))
+            }
+            gradePeriods.append(SchoologyGradePeriod(
+                id: periodID,
+                title: SchoologyValue.string(period["title"] ?? period["name"], fallback: "Grading Period"),
+                categories: categories
+            ))
+        }
+        for periodID in grouped.keys.sorted() where !periodMap.keys.contains(periodID) {
+            let categoryGroups = grouped[periodID] ?? [:]
+            let categories = categoryGroups.keys.sorted().map { categoryID in
+                SchoologyGradeCategory(
+                    id: "\(periodID)-\(categoryID)",
+                    title: categoryID == "0" ? "Ungraded" : SchoologyValue.string(categoryMap[categoryID]?["title"] ?? categoryMap[categoryID]?["name"], fallback: "Category"),
+                    weight: SchoologyValue.string(categoryMap[categoryID]?["weight"] ?? categoryMap[categoryID]?["percent"]),
+                    assignments: (categoryGroups[categoryID] ?? []).sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+                )
+            }
+            gradePeriods.append(SchoologyGradePeriod(id: periodID, title: periodID == "0" ? "Other" : "Grading Period", categories: categories))
+        }
+
+        let sectionPayload = (section["section"] as? [String: Any]) ?? section
+        let defaultScale = SchoologyValue.string((sectionPayload["options"] as? [String: Any])?["default_grading_scale_id"])
+        return SchoologyGradebook(
+            courseID: courseID,
+            overallGrade: overall,
+            overallComment: overallComment,
+            gradingScaleID: defaultScale,
+            periods: gradePeriods
+        )
     }
 
+    func loadCourseGrades(courseID: String) async throws -> [SchoologyProfileItem] {
+        let gradebook = try await loadCourseGradebook(courseID: courseID)
+        return gradebook.periods.flatMap { period in
+            period.categories.flatMap { category in
+                category.assignments.map { assignment in
+                    SchoologyProfileItem(
+                        id: assignment.id,
+                        title: assignment.title,
+                        body: assignment.grade,
+                        subtitle: [period.title, category.title, assignment.due.isEmpty ? nil : "Due " + assignment.due].compactMap { $0 }.joined(separator: " • "),
+                        url: nil, isAdmin: false, kind: assignment.itemType, collectionID: nil
+                    )
+                }
+            }
+        }
+    }
 
     func loadResources(force: Bool = false) async {
         guard let auth, !isLoadingResources else { return }
@@ -484,15 +572,17 @@ final class AppSession {
     }
 
     private func hydratedActivityAuthors(_ items: [SchoologyActivity], auth: SchoologyAuth) async -> [SchoologyActivity] {
+        let missingIDs = Set(items.filter { $0.authorName.isEmpty || $0.avatarURL == nil }.compactMap(\.authorID))
+        let users = await loadMessageUsers(missingIDs, auth: auth)
         var hydrated = items
-        for index in hydrated.indices.prefix(50) {
-            guard hydrated[index].authorName.isEmpty,
-                  let authorID = hydrated[index].authorID,
-                  let data = try? await api.get("users/\(authorID)", auth: auth) else { continue }
-            let json = Self.object(data)
-            let user = (json["user"] as? [String: Any]) ?? json
-            hydrated[index].authorName = SchoologyValue.string(user["name_display"] ?? user["display_name"] ?? user["name"], fallback: "Schoology")
-            hydrated[index].avatarURL = SchoologyValue.url(user["picture_url"] ?? user["pictureUrl"] ?? user["picture"] ?? user["photo_url"])
+        for index in hydrated.indices {
+            guard let authorID = hydrated[index].authorID else { continue }
+            if authorID == auth.userID {
+                if hydrated[index].authorName.isEmpty { hydrated[index].authorName = "You" }
+            } else if let user = users[authorID] {
+                if hydrated[index].authorName.isEmpty { hydrated[index].authorName = user.nameDisplay }
+                if hydrated[index].avatarURL == nil { hydrated[index].avatarURL = user.pictureURL }
+            }
         }
         return hydrated
     }

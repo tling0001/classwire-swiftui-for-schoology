@@ -175,7 +175,7 @@ struct SchoologyGradesView: View {
     @Environment(AppSession.self) private var session
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var expandedCourses: Set<String> = []
-    @State private var gradeItems: [String: [SchoologyProfileItem]] = [:]
+    @State private var gradebooks: [String: SchoologyGradebook] = [:]
     @State private var loadingCourses: Set<String> = []
     @State private var courseErrors: [String: String] = [:]
 
@@ -191,48 +191,48 @@ struct SchoologyGradesView: View {
                 List {
                     ForEach(session.userGradeCourses) { course in
                         Section {
-                            Button { toggle(course) } label: {
+                            Button {
+                                toggle(course)
+                            } label: {
                                 HStack(spacing: 12) {
                                     if let image = course.imageURL {
-                                        AuthenticatedSchoologyImage(url: image).frame(width: 48, height: 48).clipShape(RoundedRectangle(cornerRadius: 8))
+                                        AuthenticatedSchoologyImage(url: image)
+                                            .frame(width: 48, height: 48)
+                                            .clipShape(RoundedRectangle(cornerRadius: 8))
                                     } else {
-                                        Image(systemName: "book.closed.fill").font(.title2).foregroundStyle(SchoologyStyle.blue)
-                                            .frame(width: 48, height: 48).background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
+                                        Image(systemName: "book.closed.fill")
+                                            .font(.title2)
+                                            .foregroundStyle(SchoologyStyle.blue)
+                                            .frame(width: 48, height: 48)
+                                            .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
                                     }
                                     VStack(alignment: .leading, spacing: 3) {
                                         Text(course.title).font(.headline).foregroundStyle(.primary)
                                         if course.courseTitle != course.title {
-                                            Text(course.courseTitle).font(.caption).foregroundStyle(.secondary)
+                                            Text(course.courseTitle).font(.subheadline).foregroundStyle(.secondary)
                                         }
                                     }
                                     Spacer()
                                     Text(course.overallGrade).font(.headline.monospacedDigit()).foregroundStyle(.primary)
                                     Image(systemName: expandedCourses.contains(course.id) ? "chevron.up" : "chevron.down")
-                                        .font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-                                }.contentShape(Rectangle()).padding(.vertical, 4)
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundStyle(.secondary)
+                                }
+                                .frame(minHeight: 56)
+                                .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
                             .accessibilityLabel("\(course.title), overall grade \(course.overallGrade)")
-                            .accessibilityHint(expandedCourses.contains(course.id) ? "Collapse course grades" : "Show graded assignments")
+                            .accessibilityHint(expandedCourses.contains(course.id) ? "Collapse course grades" : "Show grading periods, categories, and assignments")
+
                             if expandedCourses.contains(course.id) {
                                 if loadingCourses.contains(course.id) {
-                                    ProgressView("Loading course grades…")
+                                    ProgressView("Loading course grades…").frame(maxWidth: .infinity).padding()
                                 } else if let error = courseErrors[course.id] {
                                     ContentUnavailableView("Unable to load course grades", systemImage: "exclamationmark.triangle", description: Text(error))
-                                } else if let rows = gradeItems[course.id], rows.isEmpty {
-                                    Text("No graded items").foregroundStyle(.secondary)
-                                } else {
-                                    ForEach(gradeItems[course.id] ?? []) { item in
-                                        HStack(alignment: .top, spacing: 12) {
-                                            Image(systemName: "doc.text").foregroundStyle(.secondary).frame(width: 22)
-                                            VStack(alignment: .leading, spacing: 3) {
-                                                Text(item.title).foregroundStyle(.primary)
-                                                if !item.subtitle.isEmpty { Text(item.subtitle).font(.caption).foregroundStyle(.secondary) }
-                                            }
-                                            Spacer()
-                                            Text(item.body).font(.subheadline.monospacedDigit()).foregroundStyle(.secondary)
-                                        }.padding(.vertical, 3)
-                                    }
+                                } else if let gradebook = gradebooks[course.id] {
+                                    SchoologyGradebookView(gradebook: gradebook)
+                                        .listRowInsets(EdgeInsets())
                                 }
                             }
                         }
@@ -251,14 +251,14 @@ struct SchoologyGradesView: View {
             if shouldExpand { expandedCourses.insert(course.id) }
             else { expandedCourses.remove(course.id) }
         }
-        guard shouldExpand, gradeItems[course.id] == nil, !loadingCourses.contains(course.id) else { return }
+        guard shouldExpand, gradebooks[course.id] == nil, !loadingCourses.contains(course.id) else { return }
         Task { await loadGrades(for: course) }
     }
 
     private func loadGrades(for course: SchoologyUserGradeCourse) async {
         loadingCourses.insert(course.id)
         courseErrors[course.id] = nil
-        do { gradeItems[course.id] = try await session.loadCourseGrades(courseID: course.id) }
+        do { gradebooks[course.id] = try await session.loadCourseGradebook(courseID: course.id) }
         catch { courseErrors[course.id] = error.localizedDescription }
         loadingCourses.remove(course.id)
     }

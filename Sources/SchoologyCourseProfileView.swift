@@ -19,7 +19,7 @@ struct SchoologyCourseProfileView: View {
     @State private var courseApps: [SchoologyCourseApp] = []
     @State private var courseAppsLoading = false
     @State private var courseAppsError: String?
-    @State private var grades: [SchoologyProfileItem] = []
+    @State private var gradebook: SchoologyGradebook?
     @State private var members: [SchoologyProfileItem] = []
     @State private var upcoming: [SchoologyUpcomingEvent] = []
     @State private var upcomingLoading = true
@@ -218,14 +218,15 @@ struct SchoologyCourseProfileView: View {
         case .updates:
             ScrollView { RecentActivityView(activities: updates).padding() }
         case .grades:
-            List(grades) { item in
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(item.title)
-                    if !item.subtitle.isEmpty { Text(item.subtitle).font(.caption).foregroundStyle(.secondary) }
-                    if !item.body.isEmpty { Text(item.body).font(.subheadline).foregroundStyle(.secondary) }
+            Group {
+                if let gradebook {
+                    ScrollView {
+                        SchoologyGradebookView(gradebook: gradebook)
+                    }
+                } else if !loading {
+                    ContentUnavailableView("No grades available", systemImage: "chart.bar")
                 }
             }
-            .overlay { if grades.isEmpty && !loading { ContentUnavailableView("No grades available", systemImage: "chart.bar") } }
         case .members:
             SchoologyPeopleDirectoryView(items: members, membersMode: true, placeholder: "Search course members")
         case .courseApps:
@@ -268,7 +269,7 @@ struct SchoologyCourseProfileView: View {
         switch tab {
         case .materials: return materials.isEmpty
         case .updates: return updates.isEmpty
-        case .grades: return grades.isEmpty
+        case .grades: return gradebook == nil
         case .members: return members.isEmpty
         case .upcoming: return upcoming.isEmpty
         case .courseApps: return courseApps.isEmpty
@@ -288,7 +289,7 @@ struct SchoologyCourseProfileView: View {
             switch tab {
             case .materials: materials = try await session.loadCourseMaterials(courseID: course.id)
             case .updates: updates = try await session.loadCourseUpdates(courseID: course.id)
-            case .grades: grades = try await session.loadCourseGrades(courseID: course.id)
+            case .grades: gradebook = try await session.loadCourseGradebook(courseID: course.id)
             case .members: members = try await session.loadCourseMembers(courseID: course.id)
             case .upcoming: upcoming = await session.loadUpcomingEvents(for: course)
             case .courseApps: break
