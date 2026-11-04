@@ -359,8 +359,8 @@ enum SchoologyValue {
             }
         }
         return result
-            .replacingOccurrences(of: "<br\s*/?>", with: "\n", options: .regularExpression)
-            .replacingOccurrences(of: "</(?:p|div|li|h[1-6])\s*>", with: "\n", options: .regularExpression)
+            .replacingOccurrences(of: #"<br\s*/?>"#, with: "\n", options: .regularExpression)
+            .replacingOccurrences(of: #"</(?:p|div|li|h[1-6])\s*>"#, with: "\n", options: .regularExpression)
             .replacingOccurrences(of: "<[^>]+>", with: " ", options: .regularExpression)
             .replacingOccurrences(of: "&nbsp;|&#160;", with: " ", options: .regularExpression)
             .replacingOccurrences(of: "&amp;", with: "&")
