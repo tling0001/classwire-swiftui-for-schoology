@@ -1,4 +1,9 @@
 import SwiftUI
+#if canImport(UIKit)
+import UIKit
+#elseif canImport(AppKit)
+import AppKit
+#endif
 
 @main
 struct SchoologyApp: App {
@@ -57,7 +62,23 @@ enum AppDestination: String, CaseIterable, Identifiable {
 }
 
 enum SchoologyStyle {
-    static let blue = Color(red: 0.0, green: 0.39, blue: 0.67)
+    static let blue: Color = {
+        #if canImport(UIKit)
+        Color(uiColor: UIColor { traits in
+            traits.userInterfaceStyle == .dark
+                ? UIColor(red: 0.38, green: 0.69, blue: 1.0, alpha: 1)
+                : UIColor(red: 0.0, green: 0.39, blue: 0.67, alpha: 1)
+        })
+        #elseif canImport(AppKit)
+        Color(nsColor: NSColor(name: NSColor.Name("SchoologyBrandBlue")) { appearance in
+            appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+                ? NSColor(calibratedRed: 0.38, green: 0.69, blue: 1.0, alpha: 1)
+                : NSColor(calibratedRed: 0.0, green: 0.39, blue: 0.67, alpha: 1)
+        })
+        #else
+        Color(red: 0.0, green: 0.39, blue: 0.67)
+        #endif
+    }()
     static let deepBlue = Color(red: 0.0, green: 0.13, blue: 0.22)
 }
 

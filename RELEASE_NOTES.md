@@ -1,5 +1,21 @@
 # Release Notes
 
+## [2026.10.0-port.32]
+
+### Navigation and appearance
+- Remove the redundant All Courses and All Groups destinations; expanding the sidebar now reveals each course and group directly.
+- Use an appearance-aware Schoology blue that remains legible in dark mode across buttons, links, and notification icons.
+
+### Posts, comments, and dialogs
+- Use the signed-in user's profile image when rendering their own recent-activity posts and comments.
+- Recognize additional embedded author, creator, name, and profile-image fields when decoding comments.
+- Give macOS attachment and likes sheets useful minimum dimensions so actions are not clipped; use a full-height presentation on iOS.
+
+### Assignment submissions
+- Allow selecting and submitting multiple files in one pass.
+- Show per-file upload progress and continue processing remaining files if one fails.
+
+
 ## [2026.10.0-port.31]
 
 ### Build and navigation

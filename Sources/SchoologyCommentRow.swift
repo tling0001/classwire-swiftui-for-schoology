@@ -22,7 +22,7 @@ struct SchoologyCommentRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 9) {
             HStack(spacing: 9) {
-                if let avatarURL = comment.avatarURL {
+                if let avatarURL = comment.avatarURL ?? (comment.authorID == session.auth?.userID ? session.user?.pictureURL : nil) {
                     AuthenticatedSchoologyImage(url: avatarURL)
                         .frame(width: 34, height: 34)
                         .clipShape(Circle())
@@ -36,7 +36,7 @@ struct SchoologyCommentRow: View {
                     NavigationLink {
                         SchoologyPersonProfileView(userID: authorID)
                     } label: {
-                        Text(comment.authorName.isEmpty ? "Schoology" : comment.authorName)
+                        Text(comment.authorName.isEmpty ? (comment.authorID == session.auth?.userID ? (session.user?.nameDisplay ?? "You") : "Schoology") : comment.authorName)
                             .font(.subheadline.weight(.semibold))
                     }
                     .buttonStyle(.plain)
@@ -101,7 +101,12 @@ struct SchoologyCommentRow: View {
             NavigationStack {
                 SchoologyLikesView(target: target)
             }
-            .presentationDetents([.medium, .large])
+            #if os(macOS)
+            .frame(minWidth: 400, idealWidth: 480, minHeight: 540, idealHeight: 640)
+            #else
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
+            #endif
         }
     }
 

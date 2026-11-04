@@ -164,12 +164,13 @@ struct RecentActivityView: View {
 }
 
 private struct SchoologyActivityCard: View {
+    @Environment(AppSession.self) private var session
     let activity: SchoologyActivity
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 10) {
-                if let avatar = activity.avatarURL {
+                if let avatar = activity.avatarURL ?? (activity.authorID == session.auth?.userID ? session.user?.pictureURL : nil) {
                     AuthenticatedSchoologyImage(url: avatar)
                         .frame(width: 42, height: 42)
                         .clipShape(Circle())

@@ -21,14 +21,21 @@ struct SchoologyComment: Identifiable, Sendable {
             let person = (item["user"] as? [String: Any]) ??
                 (item["author"] as? [String: Any]) ??
                 (item["profile"] as? [String: Any]) ??
-                (item["creator"] as? [String: Any]) ?? [:]
+                (item["creator"] as? [String: Any]) ??
+                (item["created_by"] as? [String: Any]) ??
+                (item["createdBy"] as? [String: Any]) ??
+                (item["user_profile"] as? [String: Any]) ??
+                (item["userProfile"] as? [String: Any]) ?? [:]
             let authorID = SchoologyValue.optionalString(
-                person["id"] ?? person["uid"] ?? person["user_id"] ??
-                item["user_id"] ?? item["userId"] ?? item["author_id"] ?? item["authorId"]
+                person["id"] ?? person["uid"] ?? person["user_id"] ?? person["userId"] ??
+                item["user_id"] ?? item["userId"] ?? item["uid"] ?? item["author_id"] ?? item["authorId"] ??
+                item["creator_id"] ?? item["creatorId"]
             )
             let first = SchoologyValue.string(person["name_first"] ?? person["first_name"])
             let last = SchoologyValue.string(person["name_last"] ?? person["last_name"])
-            let rawAuthorName = SchoologyValue.string(person["name_display"] ?? person["display_name"] ?? person["name"])
+            let rawAuthorName = SchoologyValue.string(person["name_display"] ?? person["display_name"] ?? person["name"] ??
+                item["name_display"] ?? item["display_name"] ?? item["author_name"] ??
+                item["user_name"] ?? item["username"])
             let authorName = rawAuthorName.isEmpty
                 ? [first, last].filter { !$0.isEmpty }.joined(separator: " ")
                 : rawAuthorName
@@ -56,7 +63,12 @@ struct SchoologyComment: Identifiable, Sendable {
                 parentID: parentID,
                 authorID: authorID,
                 authorName: authorName,
-                avatarURL: SchoologyValue.url(person["picture_url"] ?? person["pictureUrl"] ?? person["picture"] ?? person["photo_url"]),
+                avatarURL: SchoologyValue.url(
+                    person["picture_url"] ?? person["pictureUrl"] ?? person["picture"] ??
+                    person["photo_url"] ?? person["photo"] ?? person["avatar_url"] ??
+                    item["picture_url"] ?? item["pictureUrl"] ?? item["user_photo"] ??
+                    item["photo_url"] ?? item["avatar_url"]
+                ),
                 body: SchoologyValue.plainText(SchoologyValue.string(item["body"] ?? item["comment"] ?? item["message"])),
                 created: SchoologyValue.string(item["created"] ?? item["timestamp"] ?? item["last_updated"] ?? item["lastUpdated"]),
                 likes: SchoologyValue.integer(item["likes"] ?? item["like_count"] ?? item["likeCount"]),

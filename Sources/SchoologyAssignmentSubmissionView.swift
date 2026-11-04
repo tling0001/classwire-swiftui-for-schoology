@@ -12,6 +12,9 @@ struct SchoologyAssignmentSubmissionView: View {
     @Binding var showingResourcePicker: Bool
     @State private var selectedStudent: SchoologyAssignmentStudent?
     @State private var isUploading = false
+    @State private var uploadCompletedCount = 0
+    @State private var uploadTotalCount = 0
+    @State private var uploadStatus = ""
     @State private var uploadError: String?
     @State private var refreshID = UUID()
     var body: some View {
@@ -25,11 +28,17 @@ struct SchoologyAssignmentSubmissionView: View {
                     VStack(alignment: .leading, spacing: 14) {
                         Text(context.isTeacher ? "Student Submissions" : "Your Submissions").font(.headline)
                         if isUploading {
-                            HStack(spacing: 12) {
-                                ProgressView()
-                                Text("Uploading and submitting file…")
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
+                            VStack(alignment: .leading, spacing: 8) {
+                                HStack {
+                                    ProgressView()
+                                    Text(uploadStatus.isEmpty ? "Uploading and submitting files…" : uploadStatus)
+                                        .font(.subheadline)
+                                        .foregroundStyle(.secondary)
+                                }
+                                ProgressView(value: Double(uploadCompletedCount), total: Double(max(uploadTotalCount, 1)))
+                                Text("\(uploadCompletedCount) of \(uploadTotalCount) files completed")
+                                    .font(.caption)
+                                    .foregroundStyle(.tertiary)
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(14)
@@ -104,11 +113,11 @@ struct SchoologyAssignmentSubmissionView: View {
             }
         }
         .task(id: refreshID) { await load() }
-        .fileImporter(isPresented: $showingFileImporter, allowedContentTypes: [.item], allowsMultipleSelection: false) { result in
+        .fileImporter(isPresented: $showingFileImporter, allowedContentTypes: [.item], allowsMultipleSelection: true) { result in
             switch result {
             case .success(let urls):
-                guard let url = urls.first else { return }
-                Task { await uploadSubmission(from: url) }
+                guard !urls.isEmpty else { return }
+                Task { await uploadSubmissions(from: urls) }
             case .failure(let error):
                 uploadError = error.localizedDescription
             }
@@ -154,26 +163,33 @@ struct SchoologyAssignmentSubmissionView: View {
         loading = false
     }
 
-    private func uploadSubmission(from url: URL) async {
-        guard !isUploading else { return }
+    private func uploadSubmissions(from urls: [URL]) async {
+        guard !isUploading, !urls.isEmpty else { return }
         isUploading = true
-        defer { isUploading = false }
-        let didAccess = url.startAccessingSecurityScopedResource()
-        defer { if didAccess { url.stopAccessingSecurityScopedResource() } }
-        do {
-            let data = try Data(contentsOf: url)
-            guard !data.isEmpty else { throw CocoaError(.fileReadCorruptFile) }
-            let mime = UTType(filenameExtension: url.pathExtension)?.preferredMIMEType ?? "application/octet-stream"
-            try await session.submitAssignmentFile(
-                data: data,
-                filename: url.lastPathComponent,
-                mime: mime,
-                sectionID: sectionID,
-                assignmentID: context.assignment.id
-            )
-            await load()
-        } catch {
-            uploadError = error.localizedDescription
+        uploadCompletedCount = 0
+        uploadTotalCount = urls.count
+        uploadStatus = "Preparing files…"
+        defer {
+            isUploading = false
+            uploadStatus = ""
         }
+        var failures: [String] = []
+        for (index, url) in urls.enumerated() {
+            uploadStatus = "Uploading \(url.lastPathComponent)…"
+            let didAccess = url.startAccessingSecurityScopedResource()
+            do {
+                defer { if didAccess { url.stopAccessingSecurityScopedResource() } }
+                let data = try Data(contentsOf: url)
+                guard !data.isEmpty else { throw CocoaError(.fileReadCorruptFile) }
+                let mime = UTType(filenameExtension: url.pathExtension)?.preferredMIMEType ?? "application/octet-stream"
+                try await session.submitAssignmentFile(data: data, filename: url.lastPathComponent, mime: mime,
+                    sectionID: sectionID, assignmentID: context.assignment.id)
+            } catch {
+                failures.append("\(url.lastPathComponent): \(error.localizedDescription)")
+            }
+            uploadCompletedCount = index + 1
+        }
+        await load()
+        if !failures.isEmpty { uploadError = failures.joined(separator: "\n") }
     }
 }

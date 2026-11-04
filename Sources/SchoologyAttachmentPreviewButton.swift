@@ -38,8 +38,12 @@ struct SchoologyAttachmentsView: View {
                 .navigationTitle("Attachments")
                 .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
         }
-        .presentationDetents(attachments.count > 5 ? [.medium, .large] : [.medium])
+        #if os(macOS)
+        .frame(minWidth: 440, idealWidth: 520, minHeight: 440, idealHeight: 600)
+        #else
+        .presentationDetents([.large])
         .presentationDragIndicator(.visible)
+        #endif
     }
 }
 

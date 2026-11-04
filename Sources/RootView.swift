@@ -61,7 +61,6 @@ private struct SchoologySidebar: View {
         Section("Learning") {
             destinationRow(.home)
             DisclosureGroup {
-                NavigationLink { CourseListView() } label: { Label("All Courses", systemImage: "books.vertical") }
                 ForEach(session.courses) { course in
                     NavigationLink { SchoologyCourseProfileView(course: course) } label: {
                         Label(course.title, systemImage: "book.closed").lineLimit(1)
@@ -69,7 +68,6 @@ private struct SchoologySidebar: View {
                 }
             } label: { Label("Courses", systemImage: "book.closed") }
             DisclosureGroup {
-                NavigationLink { GroupListView() } label: { Label("All Groups", systemImage: "person.3") }
                 ForEach(session.groups) { group in
                     NavigationLink { GroupProfileView(group: group) } label: {
                         Label(group.title, systemImage: "person.3").lineLimit(1)
