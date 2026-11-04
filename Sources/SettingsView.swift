@@ -102,7 +102,6 @@ struct SettingsView: View {
 
             Section("About") {
                 LabeledContent("Version", value: AppVersion.current)
-                LabeledContent("Bundle identifier", value: "com.schoologytauri.app")
             }
         }
         .formStyle(.grouped)

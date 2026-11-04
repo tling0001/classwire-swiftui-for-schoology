@@ -28,11 +28,11 @@ struct SchoologyAssignmentDetailView: View {
                     if geometry.size.width >= 801 && context.canSubmit {
                         HStack(spacing: 0) {
                             TabView(selection: $selectedTab) {
-                                Tab("Info", systemImage: "info.circle", value: .info) {
+                                Tab("Info", systemImage: "info.circle", value: SchoologyAssignmentTab.info) {
                                     infoPane(context: context)
                                 }
                                 if context.allowComments {
-                                    Tab("Comments", systemImage: "bubble.left", value: .comments) {
+                                    Tab("Comments", systemImage: "bubble.left", value: SchoologyAssignmentTab.comments) {
                                         commentsPane
                                     }
                                 }
@@ -47,16 +47,16 @@ struct SchoologyAssignmentDetailView: View {
                         }
                     } else {
                         TabView(selection: $selectedTab) {
-                            Tab("Info", systemImage: "info.circle", value: .info) {
+                            Tab("Info", systemImage: "info.circle", value: SchoologyAssignmentTab.info) {
                                 infoPane(context: context)
                             }
                             if context.allowComments {
-                                Tab("Comments", systemImage: "bubble.left", value: .comments) {
+                                Tab("Comments", systemImage: "bubble.left", value: SchoologyAssignmentTab.comments) {
                                     commentsPane
                                 }
                             }
                             if context.canSubmit {
-                                Tab(context.isTeacher ? "Submissions" : "Submit", systemImage: "doc.text", value: .submissions) {
+                                Tab(context.isTeacher ? "Submissions" : "Submit", systemImage: "doc.text", value: SchoologyAssignmentTab.submissions) {
                                     SchoologyAssignmentSubmissionView(sectionID: sectionID, context: context)
                                 }
                             }

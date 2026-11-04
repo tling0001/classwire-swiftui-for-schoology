@@ -150,7 +150,7 @@ private struct MessageThreadView: View {
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 14) {
-                        ForEach(thread) { item in
+                        ForEach(thread, id: \.threadIdentity) { item in
                             VStack(alignment: .leading, spacing: 10) {
                                 HStack(spacing: 10) {
                                     if let avatar = item.personPictureURL {

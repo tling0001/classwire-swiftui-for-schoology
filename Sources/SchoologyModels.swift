@@ -369,6 +369,17 @@ struct SchoologyMessage: Identifiable, Hashable, Sendable {
     var personPictureURL: URL?
     var attachments: [SchoologyAttachment]
 
+    /// Schoology may repeat the containing thread ID for every individual message.
+    /// Include author, timestamp, and a deterministic body digest for unique SwiftUI identity.
+    var threadIdentity: String {
+        var digest: UInt64 = 14_695_981_039_346_656_037
+        for byte in body.utf8 {
+            digest ^= UInt64(byte)
+            digest &*= 1_099_511_628_211
+        }
+        return "\(id)|\(authorID ?? "")|\(created)|\(String(digest, radix: 16))"
+    }
+
     static func decodeList(_ value: Any?) -> [SchoologyMessage] {
         let payload = (value as? [String: Any]).map { $0["data"] ?? $0["response"] ?? $0 } ?? value
         func threadRows(_ value: Any?) -> [[String: Any]] {

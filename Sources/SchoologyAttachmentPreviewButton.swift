@@ -34,7 +34,7 @@ struct SchoologyAttachmentsView: View {
     var body: some View {
         NavigationStack {
             List(attachments) { attachment in SchoologyAttachmentActionRow(attachment: attachment) }
-                .listStyle(.insetGrouped)
+                .schoologyInsetGroupedListStyle()
                 .navigationTitle("Attachments")
                 .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
         }

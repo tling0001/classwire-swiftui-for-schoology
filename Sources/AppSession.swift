@@ -1027,7 +1027,7 @@ final class AppSession {
             let data = try await api.get("messages/\(sourceFolder)/\(message.id)", auth: auth, params: ["with_attachments": "TRUE"])
             let json = Self.object(data)
             let payload = (json["data"] as? [String: Any]) ?? (json["response"] as? [String: Any]) ?? json
-            let rows = SchoologyMessage.decodeList(payload)
+            let rows = SchoologyMessage.decodeList(json)
             var result = rows
             var users = embeddedMessageUsers(payload)
             let missingIDs = Set(rows.filter { $0.personName.isEmpty }.compactMap(\.authorID))

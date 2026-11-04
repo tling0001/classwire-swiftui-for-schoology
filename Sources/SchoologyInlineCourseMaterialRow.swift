@@ -4,6 +4,7 @@ import SwiftUI
 /// a course never replaces the Materials list with a folder-only screen.
 struct SchoologyInlineCourseMaterialRow: View {
     @Environment(AppSession.self) private var session
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let courseID: String
     let item: SchoologyProfileItem
 
@@ -22,19 +23,23 @@ struct SchoologyInlineCourseMaterialRow: View {
                     }
                     .padding(.vertical, 6)
                     .accessibilityElement(children: .combine)
+                    .transition(.opacity)
                 } else if let loadError {
                     Label(loadError, systemImage: "exclamationmark.triangle")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .padding(.vertical, 6)
+                        .transition(.opacity.combined(with: .move(edge: .top)))
                 } else if let children, children.isEmpty {
                     Text("This folder is empty")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .padding(.vertical, 6)
+                        .transition(.opacity.combined(with: .move(edge: .top)))
                 } else if let children {
                     ForEach(children) { child in
                         SchoologyInlineCourseMaterialRow(courseID: courseID, item: child)
+                            .transition(.opacity.combined(with: .move(edge: .top)))
                     }
                 }
             } label: {
@@ -68,11 +73,17 @@ struct SchoologyInlineCourseMaterialRow: View {
         guard !isLoading, children == nil else { return }
         isLoading = true
         loadError = nil
-        defer { isLoading = false }
         do {
-            children = try await session.loadCourseMaterials(courseID: courseID, folderID: item.id)
+            let loaded = try await session.loadCourseMaterials(courseID: courseID, folderID: item.id)
+            withAnimation(reduceMotion ? nil : .snappy(duration: 0.24)) {
+                children = loaded
+                isLoading = false
+            }
         } catch {
-            loadError = error.localizedDescription
+            withAnimation(reduceMotion ? nil : .snappy(duration: 0.24)) {
+                loadError = error.localizedDescription
+                isLoading = false
+            }
         }
     }
 }

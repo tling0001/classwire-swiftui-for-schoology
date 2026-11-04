@@ -324,7 +324,7 @@ private struct CourseDashboardCard: View {
     }
 }
 
-private struct UpcomingEventList: View {
+struct UpcomingEventList: View {
     @Environment(AppSession.self) private var session
     let events: [SchoologyUpcomingEvent]
     var isLoading = false
@@ -485,7 +485,7 @@ private struct CourseDashboardDetailView: View {
     }
 }
 
-private struct UpcomingEventDetailView: View {
+struct UpcomingEventDetailView: View {
     @Environment(AppSession.self) private var session
     let event: SchoologyUpcomingEvent
 

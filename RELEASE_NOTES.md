@@ -1,5 +1,20 @@
 # Release Notes
 
+## [2026.10.0-port.30]
+
+### Build reliability
+- Fix assignment tab value inference and use the shared cross-platform inset-grouped list style for attachment sheets.
+
+### Calendar and messages
+- Reuse the homepage Upcoming event list and destinations in Calendar's Upcoming tab.
+- Give each message in a conversation a stable, per-message identity even when Schoology repeats the containing thread ID.
+
+### Resources and navigation
+- Expand standalone resource folders recursively inline instead of navigating to separate folder pages.
+- Animate folder contents when asynchronous loading completes, while respecting Reduce Motion.
+- Remove the bundle identifier from Settings.
+
+
 ## [2026.10.0-port.29]
 
 ### Shared attachments
