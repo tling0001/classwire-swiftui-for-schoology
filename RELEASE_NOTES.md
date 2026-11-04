@@ -1,5 +1,19 @@
 # Release Notes
 
+## [2026.10.0-port.34]
+
+### OAuth request signing
+- Match Android and Classic Tauri's positive random 64-bit hexadecimal OAuth nonce format.
+- Retain recent nonce values so a collision cannot replay a nonce during the current app session.
+
+### Likes and profile navigation
+- Selecting a person from a post's likes directory opens their profile in the main app navigation stack after dismissing the likes sheet.
+- Selecting a person from a comment's likes directory dismisses both likes and comments presentations before opening the profile normally.
+
+### Build
+- Increment the iOS and macOS build number to 34.
+
+
 ## [2026.10.0-port.33]
 
 ### Switching to Schoology Classic

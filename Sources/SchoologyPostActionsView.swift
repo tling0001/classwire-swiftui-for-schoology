@@ -75,7 +75,9 @@ struct SchoologyPostActionsView: View {
                         onCommentPosted: { commentsCount += 1 }
                     )
                 case .likes:
-                    SchoologyLikesView(target: .update(activity.id))
+                    SchoologyLikesView(target: .update(activity.id)) { userID in
+                        session.showPersonProfile(userID: userID)
+                    }
                 }
             }
             #if os(macOS)

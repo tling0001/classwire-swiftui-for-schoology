@@ -4,6 +4,7 @@ struct RootView: View {
     @Environment(AppSession.self) private var session
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var preferredCompactColumn: NavigationSplitViewColumn = .sidebar
+    @State private var detailPath: [String] = []
 
     var body: some View {
         Group {
@@ -14,8 +15,11 @@ struct RootView: View {
                     .navigationSplitViewColumnWidth(min: 250, ideal: 285, max: 360)
                     #endif
                 } detail: {
-                    NavigationStack {
+                    NavigationStack(path: $detailPath) {
                         DestinationView(destination: session.destination)
+                            .navigationDestination(for: String.self) { userID in
+                                SchoologyPersonProfileView(userID: userID)
+                            }
                     }
                     // Each sidebar destination owns a fresh detail stack. Deeper
                     // course, group, assignment, and profile links then push instead
@@ -23,6 +27,14 @@ struct RootView: View {
                     .id(session.destination)
                 }
                 .navigationSplitViewStyle(.balanced)
+                .onChange(of: session.pendingPersonProfileID) { _, userID in
+                    guard let userID else { return }
+                    detailPath.append(userID)
+                    session.pendingPersonProfileID = nil
+                }
+                .onChange(of: session.destination) { _, _ in
+                    detailPath.removeAll()
+                }
             } else {
                 SignInView()
             }

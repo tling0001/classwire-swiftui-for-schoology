@@ -5,16 +5,23 @@ struct SchoologyCommentRow: View {
     let comment: SchoologyComment
     let updateID: String
     let onReply: (String) -> Void
+    let onOpenProfile: (String) -> Void
     @State private var isLiked: Bool
     @State private var likeCount: Int
     @State private var isUpdatingLike = false
     @State private var errorMessage: String?
     @State private var presentedLikes: SchoologyLikeTarget?
 
-    init(comment: SchoologyComment, updateID: String, onReply: @escaping (String) -> Void) {
+    init(
+        comment: SchoologyComment,
+        updateID: String,
+        onReply: @escaping (String) -> Void,
+        onOpenProfile: @escaping (String) -> Void
+    ) {
         self.comment = comment
         self.updateID = updateID
         self.onReply = onReply
+        self.onOpenProfile = onOpenProfile
         _isLiked = State(initialValue: comment.isLiked)
         _likeCount = State(initialValue: comment.likes)
     }
@@ -99,7 +106,7 @@ struct SchoologyCommentRow: View {
         .padding(.leading, comment.parentID == nil ? 0 : 18)
         .sheet(item: $presentedLikes) { target in
             NavigationStack {
-                SchoologyLikesView(target: target)
+                SchoologyLikesView(target: target, onSelect: onOpenProfile)
             }
             #if os(macOS)
             .frame(minWidth: 400, idealWidth: 480, minHeight: 540, idealHeight: 640)

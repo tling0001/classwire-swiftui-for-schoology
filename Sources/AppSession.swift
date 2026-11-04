@@ -9,6 +9,7 @@ final class AppSession {
     var user: SchoologyUser?
     var peopleDirectoryEnabled = false
     var destination: AppDestination = .home
+    var pendingPersonProfileID: String?
     var homeSection: HomeSection = .recent
     var isLoading = false
     var isRefreshing = false
@@ -60,6 +61,11 @@ final class AppSession {
     }
 
     var isSignedIn: Bool { auth != nil }
+
+    func showPersonProfile(userID: String) {
+        guard !userID.isEmpty else { return }
+        pendingPersonProfileID = userID
+    }
 
     func restore(_ credentials: SchoologyAuth) async {
         isLoading = true

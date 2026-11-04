@@ -36,7 +36,8 @@ actor SchoologyAPI {
     private let mobileCookie = "s_mobile=03447c0175ac0c7299a5508fde9569fc"
     private let userAgent = "okhttp/4.8.0"
     private var timeOffset: Int64 = 0
-    private var nonceCounter: UInt64 = 0
+    private var recentOAuthNonces = Set<String>()
+    private var oauthNonceOrder: [String] = []
     private var useCanadianServer = false
     func setCanadianServer(_ enabled: Bool) { useCanadianServer = enabled }
 
@@ -434,10 +435,21 @@ actor SchoologyAPI {
     }
 
     private func nextOAuthNonce() -> String {
-        // Match the official Tauri signer: 128 random bits plus a process-local sequence.
-        nonceCounter &+= 1
-        let random = UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased()
-        return random + String(format: "%016llx", nonceCounter)
+        // Match Android's OAuthRequestSigner and the Tauri port: a positive
+        // random 64-bit integer rendered as lowercase hexadecimal.
+        // Retain recent values so a collision cannot replay a nonce in-session.
+        var nonce: String
+        repeat {
+            nonce = String(UInt64.random(in: 0...UInt64(Int64.max)), radix: 16)
+        } while recentOAuthNonces.contains(nonce)
+
+        recentOAuthNonces.insert(nonce)
+        oauthNonceOrder.append(nonce)
+        if oauthNonceOrder.count > 4096 {
+            let expired = oauthNonceOrder.removeFirst()
+            recentOAuthNonces.remove(expired)
+        }
+        return nonce
     }
 
     private func plaintextAuthorization(auth: SchoologyAuth) -> String {

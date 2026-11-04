@@ -31,7 +31,15 @@ struct SchoologyCommentsView: View {
                         .padding(.top, 28)
                 } else {
                     ForEach(comments) { comment in
-                        SchoologyCommentRow(comment: comment, updateID: updateID, onReply: beginReply)
+                        SchoologyCommentRow(
+                            comment: comment,
+                            updateID: updateID,
+                            onReply: beginReply,
+                            onOpenProfile: { userID in
+                                dismiss()
+                                session.showPersonProfile(userID: userID)
+                            }
+                        )
                     }
                 }
             }

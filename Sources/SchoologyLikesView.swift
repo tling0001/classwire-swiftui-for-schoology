@@ -2,7 +2,9 @@ import SwiftUI
 
 struct SchoologyLikesView: View {
     @Environment(AppSession.self) private var session
+    @Environment(\.dismiss) private var dismiss
     let target: SchoologyLikeTarget
+    let onSelect: (String) -> Void
     @State private var users: [SchoologyProfileItem] = []
     @State private var isLoading = true
     @State private var errorMessage: String?
@@ -18,8 +20,9 @@ struct SchoologyLikesView: View {
                 ContentUnavailableView("No likes yet", systemImage: "hand.thumbsup")
             } else {
                 List(users) { user in
-                    NavigationLink {
-                        SchoologyPersonProfileView(userID: user.id)
+                    Button {
+                        onSelect(user.id)
+                        dismiss()
                     } label: {
                         HStack(spacing: 12) {
                             if let pictureURL = user.pictureURL {
