@@ -17,15 +17,12 @@ struct SchoologyCourseProfileView: View {
     @State private var materials: [SchoologyProfileItem] = []
     @State private var updates: [SchoologyActivity] = []
     @State private var courseApps: [SchoologyCourseApp] = []
-    @State private var courseAppsLoading = false
-    @State private var courseAppsError: String?
+    @State private var loadedTabs: Set<SchoologyCourseTab> = []
+    @State private var loadingTabs: Set<SchoologyCourseTab> = []
+    @State private var tabErrors: [SchoologyCourseTab: String] = [:]
     @State private var gradebook: SchoologyGradebook?
     @State private var members: [SchoologyProfileItem] = []
     @State private var upcoming: [SchoologyUpcomingEvent] = []
-    @State private var upcomingLoading = true
-    @State private var upcomingLoaded = false
-    @State private var loading = false
-    @State private var error: String?
     @State private var schoolName = ""
 
     var body: some View {
@@ -39,12 +36,12 @@ struct SchoologyCourseProfileView: View {
         .navigationTitle(course.title)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                Button("Refresh", systemImage: "arrow.clockwise") { Task { await load() } }.disabled(loading)
+                Button("Refresh", systemImage: "arrow.clockwise") { Task { await loadTab(tab, force: true) } }.disabled(loadingTabs.contains(tab))
             }
         }
-        .task(id: tab) { await load() }
-        .task(id: course.id) { await loadCourseApps() }
-        .refreshable { await load() }
+        .task(id: tab) { await loadTab(tab) }
+        .task(id: course.id) { schoolName = await session.loadSchoolName(for: course) }
+        .refreshable { await loadTab(tab, force: true) }
     }
 
     private var compactLayout: some View {
@@ -69,18 +66,8 @@ struct SchoologyCourseProfileView: View {
                     if !course.courseCode.isEmpty { Text(course.courseCode).font(.caption).foregroundStyle(.secondary) }
                     if !schoolName.isEmpty { Text(schoolName).font(.caption).foregroundStyle(SchoologyStyle.blue) }
                     Divider().padding(.vertical, 3)
-                    ForEach([SchoologyCourseTab.materials, .updates, .grades, .members]) { item in
+                    ForEach([SchoologyCourseTab.materials, .updates, .grades, .members, .courseApps]) { item in
                         courseTabButton(item)
-                    }
-                    if courseAppsLoading || !courseApps.isEmpty || courseAppsError != nil {
-                        Divider().padding(.vertical, 3)
-                        Text("Course Apps").font(.caption.weight(.semibold)).foregroundStyle(.secondary).padding(.horizontal, 10)
-                        if courseAppsLoading && courseApps.isEmpty { ProgressView().controlSize(.small).padding(10) }
-                        if let courseAppsError, courseApps.isEmpty { Text(courseAppsError).font(.caption).foregroundStyle(.secondary).padding(10) }
-                        ForEach(courseApps) { app in
-                            NavigationLink { SchoologyCourseAppLaunchView(courseID: course.id, app: app) } label: { courseAppLabel(app) }
-                                .buttonStyle(.plain)
-                        }
                     }
                 }
                 .padding(12)
@@ -94,7 +81,7 @@ struct SchoologyCourseProfileView: View {
                 HStack {
                     Text(tab.rawValue).font(.headline)
                     Spacer()
-                    if loading { ProgressView().controlSize(.small) }
+                    if loadingTabs.contains(tab) { ProgressView().controlSize(.small) }
                 }
                 .padding(.horizontal, 16).padding(.vertical, 12)
                 Divider()
@@ -108,9 +95,9 @@ struct SchoologyCourseProfileView: View {
                 Divider()
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 8) {
-                        if upcomingLoading && upcoming.isEmpty {
+                        if loadingTabs.contains(.upcoming) && upcoming.isEmpty {
                             ProgressView("Loading upcoming…").frame(maxWidth: .infinity).padding(.top, 24)
-                        } else if upcoming.isEmpty && upcomingLoaded {
+                        } else if upcoming.isEmpty && loadedTabs.contains(.upcoming) {
                             ContentUnavailableView("Nothing upcoming", systemImage: "calendar").padding(.top, 24)
                         }
                         ForEach(upcoming) { event in courseUpcomingRow(event) }
@@ -120,15 +107,16 @@ struct SchoologyCourseProfileView: View {
             }
             .frame(width: max(250, width * 0.2743))
             .background(.thinMaterial)
+            .task { await loadTab(.upcoming) }
         }
     }
 
     private var currentContent: some View {
         Group {
-            if loading && currentIsEmpty {
+            if loadingTabs.contains(tab) && currentIsEmpty {
                 ProgressView("Loading \(tab.rawValue.lowercased())…")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if let error, currentIsEmpty {
+            } else if let error = tabErrors[tab], currentIsEmpty {
                 ContentUnavailableView("Unable to load \(tab.rawValue.lowercased())",
                     systemImage: "exclamationmark.triangle", description: Text(error))
             } else {
@@ -173,14 +161,6 @@ struct SchoologyCourseProfileView: View {
         }.frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, 7).contentShape(Rectangle())
     }
 
-    private func loadCourseApps() async {
-        courseAppsLoading = true
-        courseAppsError = nil
-        defer { courseAppsLoading = false }
-        do { courseApps = try await session.loadCourseApps(courseID: course.id) }
-        catch { courseAppsError = error.localizedDescription }
-    }
-
     private func courseUpcomingRow(_ event: SchoologyUpcomingEvent) -> some View {
         NavigationLink {
             if event.type == "assignment", let assignmentID = event.assignmentID {
@@ -214,7 +194,7 @@ struct SchoologyCourseProfileView: View {
                     Label(item.title, systemImage: item.kind == "folder" ? "folder" : item.kind.contains("discussion") ? "text.bubble" : item.kind.contains("assignment") ? "doc.text" : "doc")
                 }
             }
-            .overlay { if materials.isEmpty && !loading { ContentUnavailableView("No materials", systemImage: "folder") } }
+            .overlay { if materials.isEmpty && loadedTabs.contains(.materials) { ContentUnavailableView("No materials", systemImage: "folder") } }
         case .updates:
             ScrollView { RecentActivityView(activities: updates).padding() }
         case .grades:
@@ -223,7 +203,7 @@ struct SchoologyCourseProfileView: View {
                     ScrollView {
                         SchoologyGradebookView(gradebook: gradebook)
                     }
-                } else if !loading {
+                } else if loadedTabs.contains(.grades) {
                     ContentUnavailableView("No grades available", systemImage: "chart.bar")
                 }
             }
@@ -231,9 +211,7 @@ struct SchoologyCourseProfileView: View {
             SchoologyPeopleDirectoryView(items: members, membersMode: true, placeholder: "Search course members")
         case .courseApps:
             Group {
-                if courseAppsLoading && courseApps.isEmpty {
-                    ProgressView("Loading course apps…").frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if let courseAppsError, courseApps.isEmpty {
+                if let courseAppsError = tabErrors[.courseApps], courseApps.isEmpty {
                     ContentUnavailableView("Unable to load course apps", systemImage: "exclamationmark.triangle", description: Text(courseAppsError))
                 } else if courseApps.isEmpty {
                     ContentUnavailableView("No course apps", systemImage: "square.grid.2x2")
@@ -261,7 +239,7 @@ struct SchoologyCourseProfileView: View {
                     }
                 }
             }
-            .overlay { if upcoming.isEmpty && !loading { ContentUnavailableView("Nothing upcoming", systemImage: "calendar") } }
+            .overlay { if upcoming.isEmpty && loadedTabs.contains(.upcoming) { ContentUnavailableView("Nothing upcoming", systemImage: "calendar") } }
         }
     }
 
@@ -276,26 +254,25 @@ struct SchoologyCourseProfileView: View {
         }
     }
 
-    private func load() async {
-        guard !loading else { return }
-        loading = true
-        error = nil
+    private func loadTab(_ selected: SchoologyCourseTab, force: Bool = false) async {
+        guard force || !loadedTabs.contains(selected) else { return }
+        guard !loadingTabs.contains(selected) else { return }
+        loadingTabs.insert(selected)
+        tabErrors[selected] = nil
+        defer { loadingTabs.remove(selected) }
         do {
-            upcomingLoading = !upcomingLoaded
-            upcoming = await session.loadUpcomingEvents(for: course)
-            upcomingLoaded = true
-            upcomingLoading = false
-            schoolName = await session.loadSchoolName(for: course)
-            switch tab {
+            switch selected {
             case .materials: materials = try await session.loadCourseMaterials(courseID: course.id)
             case .updates: updates = try await session.loadCourseUpdates(courseID: course.id)
             case .grades: gradebook = try await session.loadCourseGradebook(courseID: course.id)
             case .members: members = try await session.loadCourseMembers(courseID: course.id)
             case .upcoming: upcoming = await session.loadUpcomingEvents(for: course)
-            case .courseApps: break
+            case .courseApps: courseApps = try await session.loadCourseApps(courseID: course.id)
             }
-        } catch { self.error = error.localizedDescription }
-        loading = false
+            loadedTabs.insert(selected)
+        } catch {
+            tabErrors[selected] = error.localizedDescription
+        }
     }
 }
 

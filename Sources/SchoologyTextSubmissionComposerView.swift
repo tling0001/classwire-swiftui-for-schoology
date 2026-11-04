@@ -1,7 +1,7 @@
 import SwiftUI
 struct SchoologyTextSubmissionComposerView: View {
     @Environment(AppSession.self) private var session
-    @Environment(\\.dismiss) private var dismiss
+    @Environment(\.dismiss) private var dismiss
     let sectionID: String
     let context: SchoologyAssignmentContext
     let onSubmitted: () -> Void

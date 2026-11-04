@@ -26,6 +26,9 @@ struct GroupProfileView: View {
     @State private var isLoading = true
     @State private var error: String?
     @State private var schoolName = ""
+    @State private var loadedTabs: Set<ProfileTab> = []
+    @State private var loadingTabs: Set<ProfileTab> = []
+    @State private var tabErrors: [ProfileTab: String] = [:]
     @State private var presentedAction: GroupProfileAction?
     @State private var selectedDetail: SchoologyProfileItem?
 
@@ -37,12 +40,13 @@ struct GroupProfileView: View {
         }
         .navigationTitle(profile?.group.title ?? group.title)
         .toolbar { ToolbarItem(placement: .primaryAction) {
-            Button("Refresh", systemImage: "arrow.clockwise") { Task { await load() } }.disabled(isLoading)
+            Button("Refresh", systemImage: "arrow.clockwise") { Task { await loadTab(tab, force: true) } }.disabled(isLoading || loadingTabs.contains(tab))
         }}
         .task { await load() }
+        .onChange(of: tab) { _, selected in Task { await loadTab(selected) } }
         .sheet(item: $presentedAction) { action in
             GroupProfileActionSheet(groupID: group.id, action: action) {
-                Task { await load() }
+                Task { await loadTab(tab, force: true) }
             }
         }
         .sheet(item: $selectedDetail) { item in
@@ -71,10 +75,17 @@ struct GroupProfileView: View {
                     Divider()
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Upcoming").font(.headline)
-                        ScrollView { LazyVStack(alignment: .leading, spacing: 8) {
-                            ForEach(profile.upcoming) { event in eventCard(event) }
-                        }}
-                    }.padding(14).frame(width: max(250, proxy.size.width * 0.2743)).background(.thinMaterial)
+                        if loadingTabs.contains(.upcoming) && profile.upcoming.isEmpty {
+                            ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+                        } else {
+                            ScrollView { LazyVStack(alignment: .leading, spacing: 8) {
+                                ForEach(profile.upcoming) { event in eventCard(event) }
+                            }}
+                        }
+                    }
+                    .padding(14).frame(width: max(250, proxy.size.width * 0.2743))
+                    .background(.thinMaterial)
+                    .task(id: isLoading) { if !isLoading { await loadTab(.upcoming) } }
                 }
             } else {
                 VStack(spacing: 0) {
@@ -105,7 +116,13 @@ struct GroupProfileView: View {
 
     private func groupContent(_ profile: SchoologyGroupProfile) -> some View {
         VStack(spacing: 0) {
-            if hasGroupActions(profile.permissions) {
+            if loadingTabs.contains(tab) && tabIsEmpty(profile) {
+                ProgressView("Loading \(tab.rawValue.lowercased())…")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if let tabError = tabErrors[tab], tabIsEmpty(profile) {
+                ContentUnavailableView("Unable to load \(tab.rawValue.lowercased())",
+                    systemImage: "exclamationmark.triangle", description: Text(tabError))
+            } else if hasGroupActions(profile.permissions) {
                 Menu {
                     if profile.permissions.canPostUpdates { Button("Post update", systemImage: "square.and.pencil") { presentedAction = .update } }
                     if profile.permissions.canCreateDiscussion { Button("Create discussion", systemImage: "bubble.left") { presentedAction = .discussion } }
@@ -190,16 +207,54 @@ struct GroupProfileView: View {
     }
 
     private func load() async {
-        isLoading = true; error = nil
+        guard profile == nil else { await loadTab(tab); return }
+        isLoading = true
+        error = nil
         do {
             profile = try await session.loadGroupProfile(group)
-            if let id = profile?.group.schoolID, let auth = session.auth {
-                let _ = auth
-                let schoolProfile = try? await session.loadSchoolProfile(id)
-                schoolName = schoolProfile?.school.title ?? ""
+            schoolName = await session.loadSchoolName(for: group)
+            isLoading = false
+            await loadTab(tab)
+        } catch {
+            self.error = error.localizedDescription
+            isLoading = false
+        }
+    }
+
+    private func tabIsEmpty(_ profile: SchoologyGroupProfile) -> Bool {
+        switch tab {
+        case .updates: profile.updates.isEmpty
+        case .members: profile.members.isEmpty
+        case .upcoming: profile.upcoming.isEmpty
+        case .discussions: profile.discussions.isEmpty
+        case .albums: profile.albums.isEmpty
+        case .resources: profile.resources.isEmpty
+        case .info: false
+        }
+    }
+
+    private func loadTab(_ selected: ProfileTab, force: Bool = false) async {
+        guard var cached = profile else { return }
+        guard force || !loadedTabs.contains(selected) else { return }
+        guard !loadingTabs.contains(selected) else { return }
+        loadingTabs.insert(selected)
+        tabErrors[selected] = nil
+        defer { loadingTabs.remove(selected) }
+        do {
+            switch selected {
+            case .updates: cached.updates = try await session.loadGroupUpdates(groupID: group.id)
+            case .members: cached.members = try await session.loadGroupMembers(groupID: group.id)
+            case .upcoming: cached.upcoming = try await session.loadGroupUpcoming(groupID: group.id)
+            case .discussions: cached.discussions = try await session.loadGroupDiscussions(groupID: group.id)
+            case .albums: cached.albums = try await session.loadGroupAlbums(groupID: group.id)
+            case .resources: cached.resources = try await session.loadGroupResources(groupID: group.id)
+            case .info: break
             }
-        } catch let loadError { error = loadError.localizedDescription }
-        isLoading = false
+            profile = cached
+            loadedTabs.insert(selected)
+        } catch {
+            tabErrors[selected] = error.localizedDescription
+        }
     }
 }
 

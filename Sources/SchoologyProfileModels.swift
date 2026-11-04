@@ -76,12 +76,12 @@ struct SchoologyGroupPermissions: Sendable {
 struct SchoologyGroupProfile: Sendable {
     let group: SchoologyGroup
     let permissions: SchoologyGroupPermissions
-    let members: [SchoologyProfileItem]
-    let updates: [SchoologyActivity]
-    let upcoming: [SchoologyUpcomingEvent]
-    let discussions: [SchoologyProfileItem]
-    let albums: [SchoologyProfileItem]
-    let resources: [SchoologyProfileItem]
+    var members: [SchoologyProfileItem]
+    var updates: [SchoologyActivity]
+    var upcoming: [SchoologyUpcomingEvent]
+    var discussions: [SchoologyProfileItem]
+    var albums: [SchoologyProfileItem]
+    var resources: [SchoologyProfileItem]
 }
 struct SchoologyProfileSchool: Sendable { let id: String; let title: String; let pictureURL: URL?; let address: String; let phone: String }
 struct SchoologySchoolProfile: Sendable { let school: SchoologyProfileSchool; let updates: [SchoologyActivity]; let upcoming: [SchoologyUpcomingEvent]; let resources: [SchoologyProfileItem] }

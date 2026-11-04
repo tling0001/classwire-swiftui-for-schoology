@@ -1,3 +1,18 @@
+## [2026.10.0-port.22]
+
+### Build and app icon
+- Fix the Swift key-path syntax that prevented both iOS and macOS archives from compiling.
+- Generate the app icon from the exact Schoology ring and S vector paths in Tauri port.28.
+- Provide matching light, dark, and tinted iOS/iPadOS and macOS icon appearances.
+
+### Course and group loading
+- Load group metadata and permissions first, then fetch each group tab only when selected.
+- Cache successful group-tab responses and refresh only the selected tab on demand.
+- Load course tabs lazily and cache successful responses, including Course Apps; keep the wide-layout Upcoming panel independently lazy.
+
+### Build
+- Increment the iOS and macOS bundle build number to 22.
+
 ## [2026.10.0-port.21]
 
 ### Assignments and submissions
