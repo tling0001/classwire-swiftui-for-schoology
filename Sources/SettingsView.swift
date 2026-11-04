@@ -98,9 +98,6 @@ struct SettingsView: View {
                 if let user = session.user {
                     LabeledContent("Signed in as", value: user.nameDisplay)
                 }
-                Button("Sign out", role: .destructive) {
-                    session.signOut()
-                }
             }
 
             Section("About") {

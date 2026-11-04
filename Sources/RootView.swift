@@ -72,8 +72,20 @@ private struct SchoologySidebar: View {
 
         Section("More") {
             destinationRow(.profile)
-            ForEach([AppDestination.resources, .grades, .people, .settings]) { item in
+            ForEach([AppDestination.resources, .grades]) { item in
                 destinationRow(item)
+            }
+            if session.peopleDirectoryEnabled {
+                destinationRow(.people)
+            }
+            destinationRow(.settings)
+        }
+
+        Section {
+            Button(role: .destructive) {
+                session.signOut()
+            } label: {
+                Label("Sign Out", systemImage: "rectangle.portrait.and.arrow.right")
             }
         }
     }

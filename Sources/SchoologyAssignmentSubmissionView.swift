@@ -97,7 +97,7 @@ struct SchoologyAssignmentSubmissionView: View {
         .task(id: refreshID) { await load() }
         .toolbar {
             if !context.isTeacher {
-                ToolbarItem(placement: .primaryAction) {
+                ToolbarItem(placement: .topBarTrailing) {
                     Menu("Create submission", systemImage: "plus") {
                         Button("Create Text Submission", systemImage: "square.and.pencil") {
                             showingTextComposer = true

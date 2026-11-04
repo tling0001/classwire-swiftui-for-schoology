@@ -290,9 +290,6 @@ struct SignedInProfileView: View {
                 LabeledContent("Name", value: session.user?.nameDisplay ?? "—")
                 LabeledContent("User ID", value: session.user?.id ?? "—")
             }
-            Section {
-                Button("Sign Out", role: .destructive) { session.signOut() }
-            }
         }
         .navigationTitle("Profile")
     }

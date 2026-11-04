@@ -36,8 +36,7 @@ actor SchoologyAPI {
     private let mobileCookie = "s_mobile=03447c0175ac0c7299a5508fde9569fc"
     private let userAgent = "okhttp/4.8.0"
     private var timeOffset: Int64 = 0
-    private var nonceGenerator = SystemRandomNumberGenerator()
-    private var recentOAuthNonces: [String] = []
+    private var nonceCounter: UInt64 = 0
     private var useCanadianServer = false
     func setCanadianServer(_ enabled: Bool) { useCanadianServer = enabled }
 
@@ -383,13 +382,10 @@ actor SchoologyAPI {
     }
 
     private func nextOAuthNonce() -> String {
-        var nonce: String
-        repeat {
-            nonce = String(UInt64.random(in: 0...UInt64(Int64.max), using: &nonceGenerator), radix: 16)
-        } while recentOAuthNonces.contains(nonce)
-        recentOAuthNonces.append(nonce)
-        if recentOAuthNonces.count > 512 { recentOAuthNonces.removeFirst(recentOAuthNonces.count - 512) }
-        return nonce
+        // Match the official Tauri signer: 128 random bits plus a process-local sequence.
+        nonceCounter &+= 1
+        let random = UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased()
+        return random + String(format: "%016llx", nonceCounter)
     }
 
     private func plaintextAuthorization(auth: SchoologyAuth) -> String {

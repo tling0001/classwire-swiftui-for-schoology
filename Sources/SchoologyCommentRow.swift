@@ -46,7 +46,7 @@ struct SchoologyCommentRow: View {
                 }
                 Spacer()
                 if let date = comment.createdDate {
-                    Text(date, style: .relative)
+                    Text(SchoologyValue.postDateLabel(date))
                         .font(.caption)
                         .foregroundStyle(.tertiary)
                 }

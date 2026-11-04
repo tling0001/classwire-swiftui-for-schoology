@@ -57,8 +57,13 @@ struct SchoologyMessageComposerView: View {
                     try await Task.sleep(nanoseconds: 250_000_000)
                     try Task.checkCancellation()
                     recipients = try await session.searchMessageRecipients(query)
-                } catch is CancellationError { return }
-                catch { self.error = error.localizedDescription }
+                } catch is CancellationError {
+                    return
+                } catch let error as URLError where error.code == .cancelled {
+                    return
+                } catch {
+                    self.error = error.localizedDescription
+                }
             }
         }
     }

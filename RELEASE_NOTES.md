@@ -1,3 +1,9 @@
+## 2026.10.0-port.25
+- Match official Tauri JSON request bodies for post and comment likes, and strengthen OAuth nonce uniqueness with a random-plus-sequence value.
+- Ignore cancelled recipient-search requests instead of displaying a red error in the message composer.
+- Show Schoology-style date and time labels on comments, keeping relative labels for posts from the last 24 hours.
+- Hide the People directory unless the account's Schoology visibility permissions allow it, and move Sign Out to the bottom of the app sidebar.
+
 ## [2026.10.0-port.24]
 
 ### Authentication and post likes

@@ -325,6 +325,14 @@ enum SchoologyValue {
         return nil
     }
 
+    static func postDateLabel(_ date: Date) -> String {
+        let age = Date.now.timeIntervalSince(date)
+        if age >= 0 && age < 24 * 60 * 60 {
+            return date.formatted(.relative(presentation: .named))
+        }
+        return date.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day().year().hour().minute())
+    }
+
     static func plainText(_ value: String) -> String {
         value
             .replacingOccurrences(of: "<br\\s*/?>", with: "\n", options: .regularExpression)
@@ -376,7 +384,10 @@ struct SchoologyMessage: Identifiable, Hashable, Sendable {
         }
         let rows = threadRows(payload)
         return rows.compactMap { item in
-            guard let rawID = item["message_id"] ?? item["messageId"] ?? item["id"] else { return nil }
+            guard // Android's Message model defines `id` as the individual message ID.
+            // message_id can identify the containing conversation and is not unique
+            // across every message in a thread.
+            let rawID = item["id"] ?? item["message_id"] ?? item["messageId"] else { return nil }
             let attachmentRoot = item["attachments"] ?? item["attachment"] ?? [:]
             let attachmentItems = SchoologyValue.list(attachmentRoot, keys: ["files", "file", "links", "link", "embeds", "embed", "items"])
             let attachments = attachmentItems.compactMap { attachment -> SchoologyAttachment? in

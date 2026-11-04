@@ -7,6 +7,7 @@ import SwiftUI
 final class AppSession {
     var auth: SchoologyAuth?
     var user: SchoologyUser?
+    var peopleDirectoryEnabled = false
     var destination: AppDestination = .home
     var homeSection: HomeSection = .recent
     var isLoading = false
@@ -68,6 +69,7 @@ final class AppSession {
             let profile = try await api.currentUser(auth: credentials)
             auth = credentials
             user = profile
+            await refreshPeopleDirectoryAvailability(auth: credentials)
             await refresh()
         } catch {
             KeychainStore.clear()
@@ -138,6 +140,7 @@ final class AppSession {
         KeychainStore.save(verifiedCredentials)
         auth = verifiedCredentials
         user = profile
+        await refreshPeopleDirectoryAvailability(auth: verifiedCredentials)
         destination = .home
         homeSection = .recent
         await refresh()
@@ -660,8 +663,8 @@ final class AppSession {
 
     func setUpdateLike(updateID: String, liked: Bool) async throws -> Bool {
         guard let auth else { throw SchoologyAPIError.notSignedIn }
-        let data = try await api.post("like/\(updateID)", auth: auth, params: [
-            "like_action": liked ? "true" : "false"
+        let data = try await api.postJSON("like/\(updateID)", auth: auth, body: [
+            "like_action": liked
         ])
         let response = Self.object(data)
         if let value = response["user_like_action"] ?? response["userLikeAction"] ?? response["liked"] {
@@ -678,8 +681,8 @@ final class AppSession {
 
     func setCommentLike(updateID: String, commentID: String, liked: Bool) async throws -> Bool {
         guard let auth else { throw SchoologyAPIError.notSignedIn }
-        let data = try await api.post("like/\(updateID)/comment/\(commentID)", auth: auth, params: [
-            "like_action": liked ? "true" : "false"
+        let data = try await api.postJSON("like/\(updateID)/comment/\(commentID)", auth: auth, body: [
+            "like_action": liked
         ])
         let response = Self.object(data)
         if let value = response["user_like_action"] ?? response["userLikeAction"] ?? response["liked"] {
@@ -1182,10 +1185,36 @@ final class AppSession {
         return SchoologyProfileItem.decodeList(Self.object(data),keys:["discussion","discussions"])
     }
 
+    private func refreshPeopleDirectoryAvailability(auth: SchoologyAuth) async {
+        async let userData = try? api.get("users/\(auth.userID)", auth: auth)
+        async let mobileData = try? api.get("mobile/me", auth: auth)
+        let (userResponse, mobileResponse) = await (userData, mobileData)
+        let userRoot = Self.object(userResponse ?? Data())
+        let user = (userRoot["user"] as? [String: Any]) ?? userRoot
+        let mobileRoot = Self.object(mobileResponse ?? Data())
+        let mobile = (mobileRoot["user"] as? [String: Any]) ?? (mobileRoot["mobile_me"] as? [String: Any]) ?? mobileRoot
+        func truthy(_ value: Any?) -> Bool { SchoologyValue.bool(value) }
+        let enterprise = [
+            user["is_enterprise_user"], user["isEnterpriseUser"], user["enterprise"],
+            user["is_enterprise"], user["isEnterprise"], user["enterprise_enabled"],
+            mobile["is_enterprise_user"], mobile["isEnterpriseUser"], mobile["enterprise"],
+            mobile["is_enterprise"], mobile["isEnterprise"], mobile["enterprise_enabled"]
+        ].contains(where: truthy) || [
+            user["ent_stat"], user["entStat"], user["ENT_STAT"],
+            mobile["ent_stat"], mobile["entStat"], mobile["ENT_STAT"]
+        ].contains { SchoologyValue.string($0) == "573" }
+        let directoryPublic = [
+            user["is_directory_public"], user["directory_public"],
+            user["isDirectoryPublic"], user["directoryPublic"]
+        ].contains(where: truthy)
+        peopleDirectoryEnabled = enterprise && directoryPublic
+    }
+
     func signOut() {
         KeychainStore.clear()
         auth = nil
         user = nil
+        peopleDirectoryEnabled = false
         courses = []
         groups = []
         notifications = []
