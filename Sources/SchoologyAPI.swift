@@ -180,7 +180,7 @@ actor SchoologyAPI {
 
     func webSessionCookies(auth: SchoologyAuth) async throws -> [SchoologyWebCookie] {
         var components = URLComponents(string: "https://\(apiHost)/v1/sessionstart")!
-        components.queryItems = [URLQueryItem(name: "domain", value: webHost)]
+        components.queryItems = [URLQueryItem(name: "for_domain", value: webHost)]
         guard let url = components.url else { throw SchoologyAPIError.invalidResponse }
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
@@ -210,6 +210,10 @@ actor SchoologyAPI {
                 cookies.append(SchoologyWebCookie(name: cookie.name, value: cookie.value, domain: cookie.domain, path: cookie.path))
             }
         }
+        if !cookies.contains(where: { $0.name == "s_mobile" }) {
+            let mobileValue = mobileCookie.split(separator: "=", maxSplits: 1).last.map(String.init) ?? ""
+            cookies.append(SchoologyWebCookie(name: "s_mobile", value: mobileValue, domain: cookieDomain, path: "/"))
+        }
         let suffix = useCanadianServer ? "schoologyca.com" : "schoology.com"
         let safe = cookies.filter {
             let domain = $0.domain.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "."))
@@ -217,7 +221,7 @@ actor SchoologyAPI {
                 (domain == suffix || domain.hasSuffix(".\(suffix)")) &&
                 !$0.name.contains(";") && !$0.value.contains(";")
         }
-        guard safe.contains(where: { $0.name.caseInsensitiveCompare("SESS") == .orderedSame }) else {
+        guard safe.contains(where: { $0.name.uppercased().hasPrefix("SESS") }) else {
             throw SchoologyAPIError.invalidToken
         }
         return safe

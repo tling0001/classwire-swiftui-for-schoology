@@ -1,5 +1,24 @@
 # Release Notes
 
+## [2026.10.0-port.29]
+
+### Shared attachments
+- Replace direct attachment previews with a compact shared Attachments sheet.
+- Offer explicit View and Download actions for assignment, submission, comment, message, and post attachments.
+- Add an assignment-level View Attachments action.
+
+### Assignment submissions
+- Move the student submission plus menu to the assignment navigation toolbar so it remains visible on iPhone.
+
+### Shared WebView session
+- Match the official Android/Tauri session bootstrap parameter name (`for_domain`).
+- Install the required `s_mobile` cookie alongside server-issued session cookies.
+
+### Build
+- Increment iOS and macOS build number to 29.
+
+# Release Notes
+
 ## [2026.10.0-port.28]
 
 ### Course Materials

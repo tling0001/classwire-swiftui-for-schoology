@@ -7,9 +7,9 @@ struct SchoologyAssignmentSubmissionView: View {
     @State private var summary: SchoologyAssignmentSubmissionSummary?
     @State private var loading = true
     @State private var error: String?
-    @State private var showingTextComposer = false
-    @State private var showingFileImporter = false
-    @State private var showingResourcePicker = false
+    @Binding var showingTextComposer: Bool
+    @Binding var showingFileImporter: Bool
+    @Binding var showingResourcePicker: Bool
     @State private var selectedStudent: SchoologyAssignmentStudent?
     @State private var isUploading = false
     @State private var uploadError: String?
@@ -104,23 +104,6 @@ struct SchoologyAssignmentSubmissionView: View {
             }
         }
         .task(id: refreshID) { await load() }
-        .toolbar {
-            if !context.isTeacher {
-                ToolbarItem(placement: .primaryAction) {
-                    Menu("Create submission", systemImage: "plus") {
-                        Button("Create Text Submission", systemImage: "square.and.pencil") {
-                            showingTextComposer = true
-                        }
-                        Button("Upload Submission", systemImage: "arrow.up.doc") {
-                            showingFileImporter = true
-                        }
-                        Button("Submit Schoology Resource", systemImage: "folder") {
-                            showingResourcePicker = true
-                        }
-                    }
-                }
-            }
-        }
         .fileImporter(isPresented: $showingFileImporter, allowedContentTypes: [.item], allowsMultipleSelection: false) { result in
             switch result {
             case .success(let urls):

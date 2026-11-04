@@ -209,14 +209,10 @@ private struct SchoologyActivityCard: View {
             if !activity.attachments.isEmpty {
                 VStack(alignment: .leading, spacing: 8) {
                     ForEach(activity.attachments) { attachment in
-                        Link(destination: attachment.url) {
-                            Label(attachment.title, systemImage: "paperclip")
-                                .font(.subheadline)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(10)
-                                .background(.quaternary, in: RoundedRectangle(cornerRadius: 10))
-                        }
-                        .buttonStyle(.plain)
+                        SchoologyAttachmentPreviewButton(attachment: attachment)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(10)
+                            .background(.quaternary, in: RoundedRectangle(cornerRadius: 10))
                     }
                 }
             }

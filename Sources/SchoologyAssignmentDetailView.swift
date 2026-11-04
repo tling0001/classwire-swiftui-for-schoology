@@ -11,6 +11,9 @@ struct SchoologyAssignmentDetailView: View {
     @State private var loading = true
     @State private var error: String?
     @State private var isPosting = false
+    @State private var showingSubmissionTextComposer = false
+    @State private var showingSubmissionFileImporter = false
+    @State private var showingSubmissionResourcePicker = false
 
     var body: some View {
         Group {
@@ -36,7 +39,7 @@ struct SchoologyAssignmentDetailView: View {
                             }
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                             Divider()
-                            SchoologyAssignmentSubmissionView(sectionID: sectionID, context: context)
+                            SchoologyAssignmentSubmissionView(sectionID: sectionID, context: context, showingTextComposer: $showingSubmissionTextComposer, showingFileImporter: $showingSubmissionFileImporter, showingResourcePicker: $showingSubmissionResourcePicker)
                                 .frame(minWidth: 300, idealWidth: 390, maxWidth: .infinity, maxHeight: .infinity)
                         }
                         .onAppear {
@@ -67,6 +70,17 @@ struct SchoologyAssignmentDetailView: View {
             }
         }
         .navigationTitle(context?.assignment.title ?? title)
+        .toolbar {
+            if let context, context.canSubmit, !context.isTeacher {
+                ToolbarItem(placement: .primaryAction) {
+                    Menu("Create submission", systemImage: "plus") {
+                        Button("Create Text Submission", systemImage: "square.and.pencil") { showingSubmissionTextComposer = true }
+                        Button("Upload Submission", systemImage: "arrow.up.doc") { showingSubmissionFileImporter = true }
+                        Button("Submit Schoology Resource", systemImage: "folder") { showingSubmissionResourcePicker = true }
+                    }
+                }
+            }
+        }
         .task(id: assignmentID) { await load() }
         .refreshable { await load() }
     }
@@ -94,14 +108,10 @@ struct SchoologyAssignmentDetailView: View {
                 .padding(16).frame(maxWidth: .infinity, alignment: .leading)
                 .background(.background, in: RoundedRectangle(cornerRadius: 14))
                 if !context.attachments.isEmpty {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Attachments").font(.headline)
-                        ForEach(context.attachments) { attachment in
-                            SchoologyAttachmentPreviewButton(attachment: attachment)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                    }
-                    .padding(14).background(.background, in: RoundedRectangle(cornerRadius: 12))
+                    SchoologyAttachmentsButton(attachments: context.attachments)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(14)
+                        .background(.background, in: RoundedRectangle(cornerRadius: 12))
                 }
             }
             .padding().frame(maxWidth: 900).frame(maxWidth: .infinity)
