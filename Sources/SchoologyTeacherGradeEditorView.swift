@@ -58,7 +58,7 @@ struct SchoologyTeacherGradeEditorView: View {
             grade = value.grade
             comment = value.comment
             commentVisible = value.commentVisible
-        } catch { error = error.localizedDescription }
+        } catch let caughtError { error = caughtError.localizedDescription }
         isLoading = false
     }
 
@@ -71,7 +71,7 @@ struct SchoologyTeacherGradeEditorView: View {
                 grade: grade, comment: comment, commentVisible: commentVisible)
             onSaved()
             dismiss()
-        } catch { error = error.localizedDescription }
+        } catch let caughtError { error = caughtError.localizedDescription }
         isSaving = false
     }
 }

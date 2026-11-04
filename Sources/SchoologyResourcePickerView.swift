@@ -18,7 +18,9 @@ struct SchoologyResourcePickerView: View {
                 if let collection { resourceList(collection) } else { collectionList }
             }
             .navigationTitle(collection?.title ?? "Choose a Resource")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {

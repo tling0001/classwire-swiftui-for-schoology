@@ -308,7 +308,7 @@ actor SchoologyAPI {
         guard let url = components.url, JSONSerialization.isValidJSONObject(body),
               let data = try? JSONSerialization.data(withJSONObject: body, options: [.sortedKeys]),
               let payload = String(data: data, encoding: .utf8) else { throw SchoologyAPIError.invalidResponse }
-        return try await send(url: url, method: "PUT", body: payload, auth: auth, signed: false, extra: [], contentType: "application/json")
+        return try await send(url: url, method: "PUT", body: payload, auth: auth, signed: true, extra: [], contentType: "application/json")
     }
 
 
@@ -358,6 +358,43 @@ actor SchoologyAPI {
             return mime.hasPrefix("image/") ? data : nil
         }
         return nil
+    }
+
+
+    func attachmentData(_ url: URL, auth: SchoologyAuth) async throws -> (Data, String) {
+        guard url.scheme?.lowercased() == "https", url.host != nil else { throw SchoologyAPIError.invalidResponse }
+        let session = URLSession(configuration: .ephemeral)
+        let redirectDelegate = NoRedirectDelegate()
+        defer { session.invalidateAndCancel() }
+        var currentURL = url
+        for redirectCount in 0...5 {
+            var request = URLRequest(url: currentURL)
+            request.httpMethod = "GET"
+            request.timeoutInterval = 45
+            request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
+            request.setValue("*/*", forHTTPHeaderField: "Accept")
+            request.setValue("https://\\(webHost)/", forHTTPHeaderField: "Referer")
+            if currentURL.host?.caseInsensitiveCompare(apiHost) == .orderedSame {
+                request.setValue("Android", forHTTPHeaderField: "X-Schoology-Client")
+                request.setValue("2026.10.0", forHTTPHeaderField: "X-Schoology-App-Version")
+                request.setValue(mobileCookie, forHTTPHeaderField: "Cookie")
+                request.setValue(try authorization(method: "GET", url: currentURL, auth: auth, extra: []), forHTTPHeaderField: "Authorization")
+            }
+            let (data, response) = try await session.data(for: request, delegate: redirectDelegate)
+            guard let http = response as? HTTPURLResponse else { throw SchoologyAPIError.invalidResponse }
+            if (300...399).contains(http.statusCode), redirectCount < 5,
+               let location = http.value(forHTTPHeaderField: "Location"),
+               let nextURL = URL(string: location, relativeTo: currentURL)?.absoluteURL,
+               nextURL.scheme?.lowercased() == "https" {
+                currentURL = nextURL
+                continue
+            }
+            guard (200..<300).contains(http.statusCode), !data.isEmpty, data.count <= 50 * 1024 * 1024 else {
+                throw SchoologyAPIError.invalidResponse
+            }
+            return (data, http.value(forHTTPHeaderField: "Content-Type") ?? "application/octet-stream")
+        }
+        throw SchoologyAPIError.invalidResponse
     }
 
     private func requestToken() async throws -> SchoologyAuth {

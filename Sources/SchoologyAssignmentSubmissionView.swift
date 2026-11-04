@@ -90,7 +90,7 @@ struct SchoologyAssignmentSubmissionView: View {
                                         }
                                         if !revision.created.isEmpty { Text(revision.created).font(.caption).foregroundStyle(.secondary) }
                                         if !revision.body.isEmpty { Text(revision.body).textSelection(.enabled) }
-                                        ForEach(revision.attachments) { attachment in Link(destination: attachment.url) { Label(attachment.title, systemImage: "paperclip") } }
+                                        ForEach(revision.attachments) { attachment in SchoologyAttachmentPreviewButton(attachment: attachment) }
                                     }
                                     .padding(13).frame(maxWidth: .infinity, alignment: .leading)
                                     .background(.background, in: RoundedRectangle(cornerRadius: 12))

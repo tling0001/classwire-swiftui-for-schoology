@@ -480,6 +480,27 @@ final class AppSession {
         return SchoologyProfileItem.decodeList(Self.object(data), keys: ["resource", "resources", "resource_list", "items"])
     }
 
+
+    func downloadAttachment(_ attachment: SchoologyAttachment) async throws -> URL {
+        guard let auth else { throw SchoologyAPIError.notSignedIn }
+        let (data, mimeType) = try await api.attachmentData(attachment.url, auth: auth)
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("SchoologyAttachments", isDirectory: true)
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        var filename = URL(fileURLWithPath: attachment.title).lastPathComponent
+            .replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: ":", with: "_")
+        if filename.isEmpty || filename == "." { filename = "Attachment" }
+        if URL(fileURLWithPath: filename).pathExtension.isEmpty {
+            let ext = attachment.url.pathExtension
+            if !ext.isEmpty { filename += "." + ext }
+            else if mimeType.lowercased().contains("pdf") { filename += ".pdf" }
+        }
+        let destination = directory.appendingPathComponent(filename)
+        try data.write(to: destination, options: .atomic)
+        return destination
+    }
+
     func loadUserGradeCourses(force: Bool = false) async {
         guard let auth, !isLoadingUserGrades else { return }
         if hasLoadedUserGrades && !force { return }

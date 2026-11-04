@@ -59,10 +59,7 @@ struct SchoologyCommentRow: View {
 
             if !comment.isDeleted {
                 ForEach(comment.attachments) { attachment in
-                    Link(destination: attachment.url) {
-                        Label(attachment.title, systemImage: "paperclip")
-                            .font(.caption)
-                    }
+                    SchoologyAttachmentPreviewButton(attachment: attachment)
                 }
             }
 

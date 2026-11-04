@@ -1,5 +1,17 @@
 # Release Notes
 
+## [2026.10.0-port.27]
+
+### Attachments
+- Add authenticated downloads and a shared native Quick Look preview for comment attachments, assignment attachments, and submission revision attachments.
+- Support common Schoology attachment formats, including PDFs, images, and Office documents, through the system preview experience.
+
+### Build fixes
+- Fix macOS resource picker title configuration by applying the inline title style only on iOS.
+- Fix teacher grade editor error handling on both platforms.
+- Sign teacher grade update requests with Schoology OAuth.
+- Increment the iOS and macOS bundle build number to 27.
+
 ## [2026.10.0-port.26]
 
 ### Assignments
