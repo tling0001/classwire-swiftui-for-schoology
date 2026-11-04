@@ -603,9 +603,12 @@ final class AppSession {
             guard let authorID = hydrated[index].authorID else { continue }
             if authorID == auth.userID {
                 if hydrated[index].authorName.isEmpty { hydrated[index].authorName = "You" }
-            } else if let user = users[authorID] {
-                if hydrated[index].authorName.isEmpty { hydrated[index].authorName = user.nameDisplay }
-                if hydrated[index].avatarURL == nil { hydrated[index].avatarURL = user.pictureURL }
+                // The current user is intentionally excluded from the batched
+                // users/{id} lookup; hydrate their avatar from the signed-in profile.
+                if hydrated[index].avatarURL == nil { hydrated[index].avatarURL = user?.pictureURL }
+            } else if let profile = users[authorID] {
+                if hydrated[index].authorName.isEmpty { hydrated[index].authorName = profile.nameDisplay }
+                if hydrated[index].avatarURL == nil { hydrated[index].avatarURL = profile.pictureURL }
             }
         }
         return hydrated
@@ -660,9 +663,10 @@ final class AppSession {
             guard let authorID = comments[index].authorID else { continue }
             if authorID == auth.userID {
                 if comments[index].authorName.isEmpty { comments[index].authorName = "You" }
-            } else if let user = users[authorID] {
-                if comments[index].authorName.isEmpty { comments[index].authorName = user.nameDisplay }
-                if comments[index].avatarURL == nil { comments[index].avatarURL = user.pictureURL }
+                if comments[index].avatarURL == nil { comments[index].avatarURL = user?.pictureURL }
+            } else if let profile = users[authorID] {
+                if comments[index].authorName.isEmpty { comments[index].authorName = profile.nameDisplay }
+                if comments[index].avatarURL == nil { comments[index].avatarURL = profile.pictureURL }
             }
         }
         return SchoologyComment.ordered(comments)
