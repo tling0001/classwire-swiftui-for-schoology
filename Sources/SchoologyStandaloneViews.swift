@@ -107,24 +107,18 @@ private struct SchoologyResourceCollectionView: View {
     @State private var error: String?
 
     var body: some View {
-        Group {
-            if loading && items.isEmpty {
-                ProgressView("Loading resources…").frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if let error, items.isEmpty {
-                ContentUnavailableView("Unable to load resources", systemImage: "exclamationmark.triangle", description: Text(error))
-            } else if items.isEmpty {
-                ContentUnavailableView("No resources", systemImage: "folder", description: Text("This collection is empty."))
-            } else {
-                List(items) { item in
-                    SchoologyInlineResourceItemRow(collectionID: collection.id, item: item)
-                }
-                .schoologyInsetGroupedListStyle()
-                .overlay(alignment: .top) { if loading { ProgressView().padding(.top, 8) } }
-            }
+        SchoologyResourcesContentView(
+            items: items,
+            source: .collection(collectionID: collection.id),
+            isLoading: loading,
+            error: error,
+            emptyTitle: "No resources",
+            emptyDescription: "This collection is empty."
+        ) {
+            await load()
         }
         .navigationTitle(collection.title)
         .task { await load() }
-        .refreshable { await load() }
     }
 
     private func load() async {
@@ -133,92 +127,6 @@ private struct SchoologyResourceCollectionView: View {
         do { items = try await session.loadResourceItems(collectionID: collection.id, folderID: collection.folderID) }
         catch { self.error = error.localizedDescription }
         loading = false
-    }
-}
-
-private struct SchoologyInlineResourceItemRow: View {
-    @Environment(AppSession.self) private var session
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    let collectionID: String
-    let item: SchoologyProfileItem
-    @State private var isExpanded = false
-    @State private var children: [SchoologyProfileItem]?
-    @State private var isLoading = false
-    @State private var loadError: String?
-
-    var body: some View {
-        if item.kind.lowercased() == "folder" {
-            DisclosureGroup(isExpanded: $isExpanded) {
-                if isLoading {
-                    HStack(spacing: 8) {
-                        ProgressView().controlSize(.small)
-                        Text("Loading folder…").font(.caption).foregroundStyle(.secondary)
-                    }
-                    .padding(.vertical, 6)
-                    .accessibilityElement(children: .combine)
-                    .transition(.opacity)
-                } else if let loadError {
-                    Label(loadError, systemImage: "exclamationmark.triangle")
-                        .font(.caption).foregroundStyle(.secondary).padding(.vertical, 6)
-                        .transition(.opacity.combined(with: .move(edge: .top)))
-                } else if let children, children.isEmpty {
-                    Text("This folder is empty").font(.caption).foregroundStyle(.secondary)
-                        .padding(.vertical, 6)
-                        .transition(.opacity.combined(with: .move(edge: .top)))
-                } else if let children {
-                    ForEach(children) { child in
-                        SchoologyInlineResourceItemRow(collectionID: collectionID, item: child)
-                            .transition(.opacity.combined(with: .move(edge: .top)))
-                    }
-                }
-            } label: {
-                Label(item.title, systemImage: "folder").contentShape(Rectangle())
-            }
-            .onChange(of: isExpanded) { _, expanded in
-                guard expanded, children == nil, !isLoading else { return }
-                Task { await loadChildren() }
-            }
-        } else if let url = item.url {
-            NavigationLink {
-                SchoologyEmbeddedWebView(url: url, title: item.title)
-            } label: {
-                Label(item.title, systemImage: resourceSymbol)
-            }
-        } else {
-            NavigationLink {
-                SchoologyProfileItemDetailSheet(item: item)
-            } label: {
-                Label(item.title, systemImage: resourceSymbol)
-            }
-        }
-    }
-
-    private var resourceSymbol: String {
-        let kind = item.kind.lowercased()
-        if kind.contains("link") || item.url?.host != nil { return "link" }
-        if kind.contains("page") { return "doc.text" }
-        if kind.contains("assessment") || kind.contains("quiz") { return "checklist" }
-        if kind.contains("discussion") { return "text.bubble" }
-        return "doc"
-    }
-
-    @MainActor
-    private func loadChildren() async {
-        guard !isLoading, children == nil else { return }
-        isLoading = true
-        loadError = nil
-        do {
-            let loaded = try await session.loadResourceItems(collectionID: collectionID, folderID: item.id)
-            withAnimation(reduceMotion ? nil : .snappy(duration: 0.24)) {
-                children = loaded
-                isLoading = false
-            }
-        } catch {
-            withAnimation(reduceMotion ? nil : .snappy(duration: 0.24)) {
-                loadError = error.localizedDescription
-                isLoading = false
-            }
-        }
     }
 }
 

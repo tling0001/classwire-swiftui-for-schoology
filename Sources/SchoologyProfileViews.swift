@@ -116,43 +116,64 @@ struct GroupProfileView: View {
 
     private func groupContent(_ profile: SchoologyGroupProfile) -> some View {
         VStack(spacing: 0) {
-            if loadingTabs.contains(tab) && tabIsEmpty(profile) {
+            if tab == .resources {
+                if hasGroupActions(profile.permissions) {
+                    groupActionsMenu(profile.permissions)
+                }
+                SchoologyResourcesContentView(
+                    items: profile.resources,
+                    source: .group(groupID: group.id),
+                    isLoading: loadingTabs.contains(.resources),
+                    error: tabErrors[.resources],
+                    emptyTitle: "No resources",
+                    emptyDescription: "Resources shared with this group will appear here."
+                ) {
+                    await loadTab(.resources, force: true)
+                }
+            } else if loadingTabs.contains(tab) && tabIsEmpty(profile) {
                 ProgressView("Loading \(tab.rawValue.lowercased())…")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if let tabError = tabErrors[tab], tabIsEmpty(profile) {
                 ContentUnavailableView("Unable to load \(tab.rawValue.lowercased())",
                     systemImage: "exclamationmark.triangle", description: Text(tabError))
-            } else if hasGroupActions(profile.permissions) {
-                Menu {
-                    if profile.permissions.canPostUpdates { Button("Post update", systemImage: "square.and.pencil") { presentedAction = .update } }
-                    if profile.permissions.canCreateDiscussion { Button("Create discussion", systemImage: "bubble.left") { presentedAction = .discussion } }
-                    if profile.permissions.canCreateEvent { Button("Create event", systemImage: "calendar.badge.plus") { presentedAction = .event } }
-                    if profile.permissions.canCreateAlbum { Button("Create album", systemImage: "photo.badge.plus") { presentedAction = .album } }
-                    if profile.permissions.canAddResources { Button("Add resource", systemImage: "folder.badge.plus") { presentedAction = .resource } }
-                } label: {
-                    Label("Create", systemImage: "plus.circle.fill").font(.subheadline.weight(.semibold))
-                        .frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 14).padding(.vertical, 10)
-                }
-                .accessibilityHint("Shows actions allowed by this group's permissions")
-            }
-            if tab == .members {
-                SchoologyPeopleDirectoryView(items: profile.members, membersMode: true, placeholder: "Search group members")
             } else {
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 12) {
-                        switch tab {
-                        case .updates: RecentActivityView(activities: profile.updates)
-                        case .members: EmptyView()
-                        case .upcoming: ForEach(profile.upcoming) { event in eventCard(event) }
-                        case .discussions: profileRows(profile.discussions, empty: "No discussions")
-                        case .albums: profileRows(profile.albums, empty: "No albums")
-                        case .resources: profileRows(profile.resources, empty: "No resources")
-                        case .info: EmptyView()
-                        }
-                    }.padding()
+                if hasGroupActions(profile.permissions) {
+                    groupActionsMenu(profile.permissions)
+                }
+                if tab == .members {
+                    SchoologyPeopleDirectoryView(items: profile.members, membersMode: true, placeholder: "Search group members")
+                } else {
+                    ScrollView {
+                        LazyVStack(alignment: .leading, spacing: 12) {
+                            switch tab {
+                            case .updates: RecentActivityView(activities: profile.updates)
+                            case .members: EmptyView()
+                            case .upcoming: ForEach(profile.upcoming) { event in eventCard(event) }
+                            case .discussions: profileRows(profile.discussions, empty: "No discussions")
+                            case .albums: profileRows(profile.albums, empty: "No albums")
+                            case .resources: EmptyView()
+                            case .info: EmptyView()
+                            }
+                        }.padding()
+                    }
                 }
             }
         }
+    }
+
+    @ViewBuilder
+    private func groupActionsMenu(_ permissions: SchoologyGroupPermissions) -> some View {
+        Menu {
+            if permissions.canPostUpdates { Button("Post update", systemImage: "square.and.pencil") { presentedAction = .update } }
+            if permissions.canCreateDiscussion { Button("Create discussion", systemImage: "bubble.left") { presentedAction = .discussion } }
+            if permissions.canCreateEvent { Button("Create event", systemImage: "calendar.badge.plus") { presentedAction = .event } }
+            if permissions.canCreateAlbum { Button("Create album", systemImage: "photo.badge.plus") { presentedAction = .album } }
+            if permissions.canAddResources { Button("Add resource", systemImage: "folder.badge.plus") { presentedAction = .resource } }
+        } label: {
+            Label("Create", systemImage: "plus.circle.fill").font(.subheadline.weight(.semibold))
+                .frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 14).padding(.vertical, 10)
+        }
+        .accessibilityHint("Shows actions allowed by this group's permissions")
     }
 
     private func hasGroupActions(_ permissions: SchoologyGroupPermissions) -> Bool {
@@ -168,7 +189,7 @@ struct GroupProfileView: View {
                     switch tab {
                     case .discussions: SchoologyDiscussionDetailView(realm: "groups", realmID: group.id, itemID: item.id, title: item.title)
                     case .albums: SchoologyAlbumDetailView(groupID: group.id, albumID: item.id, title: item.title)
-                    case .resources: SchoologyResourceFolderView(groupID: group.id, item: item)
+                    case .resources: SchoologyProfileItemDetailSheet(item: item)
                     default: SchoologyProfileItemDetailSheet(item: item)
                     }
                 } label: {

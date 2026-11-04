@@ -179,51 +179,6 @@ struct SchoologyAlbumDetailView: View {
     }
 }
 
-struct SchoologyResourceFolderView: View {
-    @Environment(AppSession.self) private var session
-    let groupID: String
-    let item: SchoologyProfileItem
-    @State private var resources: [SchoologyProfileItem] = []
-    @State private var loading = true
-    @State private var error: String?
-
-    var body: some View {
-        Group {
-            if item.kind == "folder" {
-                List(resources) { resource in
-                    NavigationLink {
-                        if resource.kind == "folder" {
-                            SchoologyResourceFolderView(groupID: groupID, item: resource)
-                        } else if let url = resource.url {
-                            SchoologyEmbeddedWebView(url: url, title: resource.title)
-                        } else {
-                            SchoologyProfileItemDetailSheet(item: resource)
-                        }
-                    } label: {
-                        Label(resource.title, systemImage: resource.kind == "folder" ? "folder" : "doc")
-                    }
-                }
-                .overlay {
-                    if loading { ProgressView("Loading resources…") }
-                    else if let error { ContentUnavailableView("Unable to load resources", systemImage: "exclamationmark.triangle", description: Text(error)) }
-                    else if resources.isEmpty { ContentUnavailableView("Empty folder", systemImage: "folder") }
-                }
-                .task(id: item.id) {
-                    loading = true; error = nil
-                    do { resources = try await session.loadGroupResources(groupID: groupID, folderID: item.id, collectionID: item.collectionID) }
-                    catch { self.error = error.localizedDescription }
-                    loading = false
-                }
-                .navigationTitle(item.title)
-            } else if let url = item.url {
-                SchoologyEmbeddedWebView(url: url, title: item.title)
-            } else {
-                SchoologyProfileItemDetailSheet(item: item)
-            }
-        }
-    }
-}
-
 struct SchoologyPersonProfileView: View {
     @Environment(AppSession.self) private var session
     let userID: String

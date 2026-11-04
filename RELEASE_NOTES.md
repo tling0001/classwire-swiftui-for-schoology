@@ -1,5 +1,12 @@
 # Release Notes
 
+## [2026.10.0-port.35]
+
+### Changed
+- Share one recursive Resources browser between standalone Resources and group Resources, using the standalone list presentation in both places.
+- Expand group resource folders inline and retain group-specific resource loading, refresh, and permission-gated Add Resource actions.
+- Bump the project version to 2026.10.0-port.35.
+
 ## [2026.10.0-port.34]
 
 ### OAuth request signing
