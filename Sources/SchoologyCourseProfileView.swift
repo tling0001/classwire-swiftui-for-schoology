@@ -187,11 +187,9 @@ struct SchoologyCourseProfileView: View {
     @ViewBuilder private var content: some View {
         switch tab {
         case .materials:
-            List(materials) { item in
-                NavigationLink {
-                    SchoologyCourseMaterialDestinationView(courseID: course.id, item: item)
-                } label: {
-                    Label(item.title, systemImage: item.kind == "folder" ? "folder" : item.kind.contains("discussion") ? "text.bubble" : item.kind.contains("assignment") ? "doc.text" : "doc")
+            List {
+                ForEach(materials) { item in
+                    SchoologyInlineCourseMaterialRow(courseID: course.id, item: item)
                 }
             }
             .overlay { if materials.isEmpty && loadedTabs.contains(.materials) { ContentUnavailableView("No materials", systemImage: "folder") } }

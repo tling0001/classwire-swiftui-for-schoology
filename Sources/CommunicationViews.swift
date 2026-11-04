@@ -175,10 +175,8 @@ private struct MessageThreadView: View {
                                     .frame(maxWidth: .infinity, alignment: .leading)
                                     .textSelection(.enabled)
                                 ForEach(item.attachments) { attachment in
-                                    Link(destination: attachment.url) {
-                                        Label(attachment.title, systemImage: "paperclip")
-                                            .frame(maxWidth: .infinity, alignment: .leading)
-                                    }
+                                    SchoologyAttachmentPreviewButton(attachment: attachment)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
                                 }
                             }
                             .padding(15)

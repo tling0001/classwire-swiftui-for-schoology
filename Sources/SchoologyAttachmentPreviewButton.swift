@@ -1,4 +1,5 @@
 import SwiftUI
+import QuickLook
 
 struct SchoologyAttachmentPreviewButton: View {
     @Environment(AppSession.self) private var session

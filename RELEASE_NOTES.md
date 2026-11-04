@@ -1,5 +1,21 @@
 # Release Notes
 
+## [2026.10.0-port.28]
+
+### Course Materials
+- Expand course Materials folders inline, with nested folders loading only when opened.
+- Keep the Materials list in place while navigating nested folder trees, with clear loading, empty, and retryable error states.
+
+### Attachments
+- Use the shared native Quick Look preview for message-thread attachments as well as existing comment and assignment attachments.
+
+### App icon
+- Complete the Schoology ring's missing lower-right outer arc so the iPhone icon renders as a continuous ring.
+
+### Build
+- Import the Quick Look framework explicitly for the shared preview modifier.
+- Increment the iOS and macOS bundle build number to 28.
+
 ## [2026.10.0-port.27]
 
 ### Attachments
