@@ -10,6 +10,9 @@ struct RootView: View {
             if session.isSignedIn {
                 NavigationSplitView(preferredCompactColumn: $preferredCompactColumn) {
                     SchoologySidebar()
+                    #if os(macOS)
+                    .navigationSplitViewColumnWidth(min: 250, ideal: 285, max: 360)
+                    #endif
                 } detail: {
                     NavigationStack {
                         DestinationView(destination: session.destination)

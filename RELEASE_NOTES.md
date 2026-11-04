@@ -1,5 +1,21 @@
 # Release Notes
 
+## [2026.10.0-port.33]
+
+### Switching to Schoology Classic
+- Add a Settings action to discover the latest stable release from the official Schoology Classic Tauri repository.
+- Select the architecture-matching macOS disk image or the iOS Ad Hoc installation manifest using the same platform asset conventions as Tauri port.28.
+- Confirm before replacing the SwiftUI app; verify the downloaded macOS asset against GitHub's size and SHA-256 metadata before installing.
+- Install Classic in place on macOS and use Apple's Ad Hoc OTA manifest flow on iOS/iPadOS.
+
+### macOS navigation
+- Increase the sidebar's preferred width while preserving native column resizing and a flexible range.
+
+### Comment author resolution
+- Extract author IDs from Schoology's nested user/profile fields and linked user/author/creator URLs.
+- Recognize additional name and avatar fields from comment payloads, and avoid presenting the generic Schoology label as the author.
+
+
 ## [2026.10.0-port.32]
 
 ### Navigation and appearance

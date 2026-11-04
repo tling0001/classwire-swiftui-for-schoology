@@ -21,21 +21,40 @@ struct SchoologyComment: Identifiable, Sendable {
             let person = (item["user"] as? [String: Any]) ??
                 (item["author"] as? [String: Any]) ??
                 (item["profile"] as? [String: Any]) ??
+                (item["profile_info"] as? [String: Any]) ??
+                (item["profileInfo"] as? [String: Any]) ??
                 (item["creator"] as? [String: Any]) ??
                 (item["created_by"] as? [String: Any]) ??
                 (item["createdBy"] as? [String: Any]) ??
                 (item["user_profile"] as? [String: Any]) ??
                 (item["userProfile"] as? [String: Any]) ?? [:]
+            let links = item["links"] as? [String: Any] ?? [:]
+            let userLink = (links["user"] as? [String: Any])?["href"] ??
+                (links["author"] as? [String: Any])?["href"] ??
+                (links["creator"] as? [String: Any])?["href"]
+            let linkedAuthorID = Self.userID(from: userLink)
             let authorID = SchoologyValue.optionalString(
                 person["id"] ?? person["uid"] ?? person["user_id"] ?? person["userId"] ??
-                item["user_id"] ?? item["userId"] ?? item["uid"] ?? item["author_id"] ?? item["authorId"] ??
-                item["creator_id"] ?? item["creatorId"]
+                item["user_id"] ?? item["userId"] ?? item["uid"] ??
+                item["author_user_id"] ?? item["authorUserId"] ??
+                item["creator_user_id"] ?? item["creatorUserId"] ??
+                item["commenter_id"] ?? item["commenterId"] ??
+                item["creater_id"] ?? item["creator_id"] ?? item["creatorId"] ??
+                (item["created_by"] as? String) ?? (item["createdBy"] as? String) ??
+                item["author_id"] ?? item["authorId"] ?? linkedAuthorID
             )
-            let first = SchoologyValue.string(person["name_first"] ?? person["first_name"])
-            let last = SchoologyValue.string(person["name_last"] ?? person["last_name"])
-            let rawAuthorName = SchoologyValue.string(person["name_display"] ?? person["display_name"] ?? person["name"] ??
-                item["name_display"] ?? item["display_name"] ?? item["author_name"] ??
-                item["user_name"] ?? item["username"])
+            let first = SchoologyValue.string(person["name_first"] ?? person["first_name"] ?? item["name_first"] ?? item["first_name"])
+            let last = SchoologyValue.string(person["name_last"] ?? person["last_name"] ?? item["name_last"] ?? item["last_name"])
+            let rawName = SchoologyValue.string(
+                person["name_display"] ?? person["nameDisplay"] ?? person["display_name"] ??
+                person["displayName"] ?? person["author_name"] ?? person["authorName"] ??
+                person["user_name"] ?? person["userName"] ?? person["commenter_name"] ??
+                person["commenterName"] ?? person["creator_name"] ?? person["creatorName"] ??
+                person["name"] ?? item["name_display"] ?? item["nameDisplay"] ??
+                item["display_name"] ?? item["displayName"] ?? item["author_name"] ??
+                item["authorName"] ?? item["user_name"] ?? item["userName"] ?? item["username"]
+            )
+            let rawAuthorName = ["schoology", "schoology user"].contains(rawName.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()) ? "" : rawName
             let authorName = rawAuthorName.isEmpty
                 ? [first, last].filter { !$0.isEmpty }.joined(separator: " ")
                 : rawAuthorName
@@ -65,9 +84,10 @@ struct SchoologyComment: Identifiable, Sendable {
                 authorName: authorName,
                 avatarURL: SchoologyValue.url(
                     person["picture_url"] ?? person["pictureUrl"] ?? person["picture"] ??
-                    person["photo_url"] ?? person["photo"] ?? person["avatar_url"] ??
+                    person["avatar_url"] ?? person["avatarUrl"] ?? person["photo_url"] ??
+                    person["photoUrl"] ?? person["photo"] ?? person["avatar"] ??
                     item["picture_url"] ?? item["pictureUrl"] ?? item["user_photo"] ??
-                    item["photo_url"] ?? item["avatar_url"]
+                    item["avatar_url"] ?? item["avatarUrl"] ?? item["photo_url"] ?? item["photoUrl"]
                 ),
                 body: SchoologyValue.plainText(SchoologyValue.string(item["body"] ?? item["comment"] ?? item["message"])),
                 created: SchoologyValue.string(item["created"] ?? item["timestamp"] ?? item["last_updated"] ?? item["lastUpdated"]),
@@ -77,6 +97,15 @@ struct SchoologyComment: Identifiable, Sendable {
                 attachments: attachments
             )
         }
+    }
+
+    private static func userID(from value: Any?) -> String? {
+        guard let href = value as? String, !href.isEmpty else { return nil }
+        let pattern = #"/(?:users|user)/(\d+)"#
+        guard let regex = try? NSRegularExpression(pattern: pattern),
+              let match = regex.firstMatch(in: href, range: NSRange(href.startIndex..., in: href)),
+              let range = Range(match.range(at: 1), in: href) else { return nil }
+        return String(href[range])
     }
 
     static func ordered(_ comments: [SchoologyComment]) -> [SchoologyComment] {
