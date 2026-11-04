@@ -1,5 +1,17 @@
 # Release Notes
 
+## [2026.10.0-port.36]
+
+### Navigation
+- Use one typed NavigationSplitView selection for top-level destinations and individual course/group profiles.
+- Give each selected sidebar destination its own detail-root identity so switching between courses, groups, Calendar, and other sections cannot reuse stale screen state.
+- Keep pushed detail pages on the active destination's NavigationStack and clear that path when the sidebar destination changes.
+- Apply the same navigation model on iOS and macOS, preserving native collapsed-sidebar behavior on iPhone.
+
+### Build
+- Increment the iOS and macOS build number to 36.
+
+
 ## [2026.10.0-port.35]
 
 ### Changed
