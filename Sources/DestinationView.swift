@@ -490,29 +490,57 @@ private struct CourseDashboardDetailView: View {
 }
 
 private struct UpcomingEventDetailView: View {
+    @Environment(AppSession.self) private var session
     let event: SchoologyUpcomingEvent
 
+    @ViewBuilder
     var body: some View {
-        List {
-            Section("Details") {
-                LabeledContent("Type", value: event.typeLabel)
-                LabeledContent("Title", value: event.title)
-                if let date = event.date {
-                    LabeledContent("Date", value: date.formatted(date: .complete, time: .shortened))
-                }
-                if event.allDay {
-                    LabeledContent("Time", value: "All day")
+        switch event.type.lowercased() {
+        case "assignment":
+            if let sectionID = event.sectionID, let assignmentID = event.assignmentID {
+                SchoologyAssignmentDetailView(sectionID: sectionID, assignmentID: assignmentID, title: event.title)
+            } else {
+                unavailableTarget("This assignment is missing its section or assignment identifier.")
+            }
+        case "discussion":
+            if let sectionID = event.sectionID, let discussionID = event.discussionID {
+                SchoologyDiscussionDetailView(realm: "sections", realmID: sectionID, itemID: discussionID, title: event.title)
+            } else if let url = event.webURL {
+                SchoologyEmbeddedWebView(url: url, title: event.title)
+            } else {
+                unavailableTarget("Schoology did not provide a discussion destination.")
+            }
+        case "event":
+            if let sectionID = event.sectionID {
+                SchoologyEventDetailView(realm: "sections", realmID: sectionID, eventID: event.id, title: event.title)
+            } else if let url = event.webURL {
+                SchoologyEmbeddedWebView(url: url, title: event.title)
+            } else {
+                unavailableTarget("Schoology did not provide an event destination.")
+            }
+        case "assessment", "assessment_v2", "managed_assessment", "quiz":
+            if let url = event.webURL {
+                SchoologyEmbeddedWebView(url: url, title: event.title)
+            } else {
+                let host = session.canadianServer ? "app.schoologyca.com" : "app.schoology.com"
+                if let url = URL(string: "https://\(host)/assignment/\(event.assignmentID ?? event.id)") {
+                    SchoologyEmbeddedWebView(url: url, title: event.title)
+                } else {
+                    unavailableTarget("Schoology did not provide a quiz destination.")
                 }
             }
+        default:
             if let url = event.webURL {
-                Section {
-                    Link(destination: url) {
-                        Label("Open in Schoology", systemImage: "arrow.up.right.square")
-                    }
-                }
+                SchoologyEmbeddedWebView(url: url, title: event.title)
+            } else {
+                unavailableTarget("This upcoming item has no supported destination.")
             }
         }
-        .navigationTitle(event.typeLabel)
+    }
+
+    private func unavailableTarget(_ message: String) -> some View {
+        ContentUnavailableView("Unable to open item", systemImage: "exclamationmark.triangle", description: Text(message))
+            .navigationTitle(event.typeLabel)
     }
 }
 

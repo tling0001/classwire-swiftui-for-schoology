@@ -450,7 +450,8 @@ actor SchoologyAPI {
     }
 
     private func authorization(method: String, url: URL, auth: SchoologyAuth?, extra: [(String, String)]) throws -> String {
-        let nonce = UUID().uuidString.replacingOccurrences(of: "-", with: "")
+        var random = SystemRandomNumberGenerator()
+        let nonce = String(UInt64.random(in: .min ... .max, using: &random), radix: 16)
         let timestamp = Int64(Date.now.timeIntervalSince1970) + timeOffset
         var pairs = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.map { ($0.name, $0.value ?? "") } ?? []
         pairs += [

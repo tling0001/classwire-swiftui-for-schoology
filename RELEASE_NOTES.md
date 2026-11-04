@@ -1,3 +1,19 @@
+## [2026.10.0-port.23]
+
+### Authentication
+- Generate OAuth nonces as fresh random 64-bit hexadecimal values, matching the official Android signer and Tauri port instead of using UUID-formatted values.
+
+### Upcoming navigation
+- Route homepage and other shared Upcoming assignment items into the native assignment detail page when Schoology supplies both section and assignment IDs.
+- Route supported discussions, events, and assessments to their corresponding native or authenticated WebView destinations rather than a generic details placeholder.
+
+### Assignment submissions
+- Move student submission creation into a plus menu in the app bar, with text and upload actions.
+- Keep text submissions connected to the native composer. The upload action clearly reports that file/resource upload is not wired yet.
+
+### Build
+- Increment the iOS and macOS bundle build number to 23.
+
 ## [2026.10.0-port.22]
 
 ### Build and app icon

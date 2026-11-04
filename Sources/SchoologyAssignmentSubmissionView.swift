@@ -7,6 +7,7 @@ struct SchoologyAssignmentSubmissionView: View {
     @State private var loading = true
     @State private var error: String?
     @State private var showingTextComposer = false
+    @State private var showingUploadNotice = false
     @State private var refreshID = UUID()
     var body: some View {
         Group {
@@ -72,8 +73,6 @@ struct SchoologyAssignmentSubmissionView: View {
                                     .background(.background, in: RoundedRectangle(cornerRadius: 12))
                                 }
                             }
-                            Button("Create Text Submission", systemImage: "square.and.pencil") { showingTextComposer = true }
-                                .buttonStyle(.borderedProminent)
                         }
                     }
                     .padding().frame(maxWidth: 850).frame(maxWidth: .infinity, alignment: .topLeading)
@@ -82,6 +81,25 @@ struct SchoologyAssignmentSubmissionView: View {
             }
         }
         .task(id: refreshID) { await load() }
+        .toolbar {
+            if !context.isTeacher {
+                ToolbarItem(placement: .primaryAction) {
+                    Menu("Create submission", systemImage: "plus") {
+                        Button("Create Text Submission", systemImage: "square.and.pencil") {
+                            showingTextComposer = true
+                        }
+                        Button("Upload Submission", systemImage: "arrow.up.doc") {
+                            showingUploadNotice = true
+                        }
+                    }
+                }
+            }
+        }
+        .alert("Upload Submission", isPresented: $showingUploadNotice) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text("File and Schoology resource submission are not connected in this SwiftUI port yet.")
+        }
         .sheet(isPresented: $showingTextComposer) {
             SchoologyTextSubmissionComposerView(sectionID: sectionID, context: context) { refreshID = UUID() }
         }
