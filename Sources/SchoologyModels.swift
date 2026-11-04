@@ -376,7 +376,7 @@ struct SchoologyMessage: Identifiable, Hashable, Sendable {
         }
         let rows = threadRows(payload)
         return rows.compactMap { item in
-            guard let rawID = item["id"] ?? item["message_id"] ?? item["messageId"] else { return nil }
+            guard let rawID = item["message_id"] ?? item["messageId"] ?? item["id"] else { return nil }
             let attachmentRoot = item["attachments"] ?? item["attachment"] ?? [:]
             let attachmentItems = SchoologyValue.list(attachmentRoot, keys: ["files", "file", "links", "link", "embeds", "embed", "items"])
             let attachments = attachmentItems.compactMap { attachment -> SchoologyAttachment? in

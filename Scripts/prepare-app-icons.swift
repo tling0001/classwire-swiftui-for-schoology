@@ -18,8 +18,10 @@ func svg(dark: Bool = false, tinted: Bool = false) -> String {
     return """
     <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 20 20">
       \(background)
-      <path fill="\(ring)" fill-rule="evenodd" d="\(ringPath)" transform="translate(0 -.226)"/>
-      <path fill="\(letter)" fill-rule="evenodd" d="\(letterPath)"/>
+      <g transform="translate(1.35 1.35) scale(0.865)">
+        <path fill="\(ring)" fill-rule="evenodd" d="\(ringPath)" transform="translate(0 -.226)"/>
+        <path fill="\(letter)" fill-rule="evenodd" d="\(letterPath)"/>
+      </g>
     </svg>
     """
 }

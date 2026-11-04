@@ -1,3 +1,26 @@
+## [2026.10.0-port.24]
+
+### Authentication and post likes
+- Refresh the Schoology server timestamp before signed write requests, bypass timestamp-response caching, and retain recently used OAuth nonces to prevent reuse.
+- Match the Android OAuth nonce format and use the official plaintext signer for FileService uploads.
+
+### Messages
+- Prefer each message's message_id/messageId over a conversation-level id for SwiftUI identity, preventing repeated cards when Schoology returns a shared parent id.
+
+### Grades
+- Make linked assignment grade items open the native shared assignment detail page.
+
+### Assignment submissions
+- Add native SwiftUI file importing and upload progress feedback.
+- Upload the selected file to Schoology FileService and create the submission with the official Android/Tauri files payload and assignment endpoint.
+- Keep security-scoped file access scoped to the upload operation.
+
+### App icon
+- Reduce the Schoology mark scale within the square icon canvas so the ring has a clear safe margin.
+
+### Build
+- Increment the iOS and macOS bundle build number to 24.
+
 ## [2026.10.0-port.23]
 
 ### Authentication

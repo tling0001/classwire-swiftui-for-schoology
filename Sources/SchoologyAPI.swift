@@ -36,6 +36,8 @@ actor SchoologyAPI {
     private let mobileCookie = "s_mobile=03447c0175ac0c7299a5508fde9569fc"
     private let userAgent = "okhttp/4.8.0"
     private var timeOffset: Int64 = 0
+    private var nonceGenerator = SystemRandomNumberGenerator()
+    private var recentOAuthNonces: [String] = []
     private var useCanadianServer = false
     func setCanadianServer(_ enabled: Bool) { useCanadianServer = enabled }
 
@@ -283,6 +285,7 @@ actor SchoologyAPI {
     }
 
     func post(_ path: String, auth: SchoologyAuth, params: [String: String]) async throws -> Data {
+        await syncServerTime()
         let url = URL(string: "https://\(apiHost)/v1/\(path)")!
         let body = formEncode(params)
         let extra = params.map { ($0.key, oauthEncode($0.value)) }
@@ -290,6 +293,7 @@ actor SchoologyAPI {
     }
 
     func postJSON(_ path: String, auth: SchoologyAuth, params: [String: String] = [:], body: [String: Any]) async throws -> Data {
+        await syncServerTime()
         var components = URLComponents(string: "https://\(apiHost)/v1/\(path)")!
         components.queryItems = params.sorted { $0.key < $1.key }.map { URLQueryItem(name: $0.key, value: $0.value) }
         guard let url = components.url, JSONSerialization.isValidJSONObject(body),
@@ -367,10 +371,83 @@ actor SchoologyAPI {
 
     private func syncServerTime() async {
         guard let url = URL(string: "https://\(webHost)/oauth/timestamp") else { return }
-        if let (data, _) = try? await URLSession.shared.data(from: url),
+        var request = URLRequest(url: url)
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+        request.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
+        request.timeoutInterval = 15
+        if let (data, response) = try? await URLSession.shared.data(for: request),
+           (response as? HTTPURLResponse).map({ (200..<300).contains($0.statusCode) }) == true,
            let server = Int64(String(decoding: data, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)) {
             timeOffset = server - Int64(Date.now.timeIntervalSince1970)
         }
+    }
+
+    private func nextOAuthNonce() -> String {
+        var nonce: String
+        repeat {
+            nonce = String(UInt64.random(in: 0...UInt64(Int64.max), using: &nonceGenerator), radix: 16)
+        } while recentOAuthNonces.contains(nonce)
+        recentOAuthNonces.append(nonce)
+        if recentOAuthNonces.count > 512 { recentOAuthNonces.removeFirst(recentOAuthNonces.count - 512) }
+        return nonce
+    }
+
+    private func plaintextAuthorization(auth: SchoologyAuth) -> String {
+        let nonce = nextOAuthNonce()
+        let timestamp = Int64(Date.now.timeIntervalSince1970) + timeOffset
+        let fields = [
+            ("oauth_consumer_key", consumerKey),
+            ("oauth_nonce", nonce),
+            ("oauth_signature", "\(consumerSecret)%26\(auth.secret)"),
+            ("oauth_signature_method", "PLAINTEXT"),
+            ("oauth_timestamp", String(timestamp)),
+            ("oauth_token", auth.token)
+        ]
+        return "OAuth " + fields.map { "\($0.0)=\"\($0.1)\"" }.joined(separator: ", ")
+    }
+
+    func submitAssignmentFile(data: Data, filename: String, mime: String, sectionID: String, assignmentID: String, auth: SchoologyAuth) async throws {
+        await syncServerTime()
+        let boundary = UUID().uuidString
+        let safeFilename = filename
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "%22")
+            .replacingOccurrences(of: "\r", with: "%0D")
+            .replacingOccurrences(of: "\n", with: "%0A")
+        var multipart = Data()
+        multipart.append(Data("--\(boundary)\r\n".utf8))
+        multipart.append(Data("Content-Disposition: form-data; name=\"file\"; filename=\"\(safeFilename)\"\r\n".utf8))
+        multipart.append(Data("Content-Type: multipart/form-data\r\n".utf8))
+        multipart.append(Data("Content-Length: \(data.count)\r\n\r\n".utf8))
+        multipart.append(data)
+        multipart.append(Data("\r\n--\(boundary)--\r\n".utf8))
+
+        var components = URLComponents()
+        components.scheme = "https"
+        components.host = apiHost
+        components.path = "/v1/file"
+        components.queryItems = [URLQueryItem(name: "name", value: filename)]
+        guard let uploadURL = components.url else { throw SchoologyAPIError.invalidResponse }
+        var request = URLRequest(url: uploadURL)
+        request.httpMethod = "POST"
+        request.timeoutInterval = 120
+        request.httpBody = multipart
+        request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
+        request.setValue("Android", forHTTPHeaderField: "X-Schoology-Client")
+        request.setValue("2026.10.0", forHTTPHeaderField: "X-Schoology-App-Version")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        request.setValue(String(multipart.count), forHTTPHeaderField: "Content-Length")
+        request.setValue(mobileCookie, forHTTPHeaderField: "Cookie")
+        request.setValue(plaintextAuthorization(auth: auth), forHTTPHeaderField: "Authorization")
+        let (uploadedData, uploadedResponse) = try await URLSession.shared.data(for: request)
+        try validate(uploadedResponse, data: uploadedData)
+        let uploaded = try JSONSerialization.jsonObject(with: uploadedData) as? [String: Any] ?? [:]
+        guard let fileID = uploaded["fileMetadataId"].map({ String(describing: $0) }), !fileID.isEmpty else {
+            throw SchoologyAPIError.invalidResponse
+        }
+        _ = try await postJSON("section/\(sectionID)/assignment/\(assignmentID)/submission", auth: auth,
+            body: ["files": [["id": fileID]]])
     }
 
     private func send(
@@ -450,8 +527,7 @@ actor SchoologyAPI {
     }
 
     private func authorization(method: String, url: URL, auth: SchoologyAuth?, extra: [(String, String)]) throws -> String {
-        var random = SystemRandomNumberGenerator()
-        let nonce = String(UInt64.random(in: .min ... .max, using: &random), radix: 16)
+        let nonce = nextOAuthNonce()
         let timestamp = Int64(Date.now.timeIntervalSince1970) + timeOffset
         var pairs = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.map { ($0.name, $0.value ?? "") } ?? []
         pairs += [

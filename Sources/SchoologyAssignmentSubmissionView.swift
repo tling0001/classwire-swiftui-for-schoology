@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 struct SchoologyAssignmentSubmissionView: View {
     @Environment(AppSession.self) private var session
     let sectionID: String
@@ -7,7 +8,9 @@ struct SchoologyAssignmentSubmissionView: View {
     @State private var loading = true
     @State private var error: String?
     @State private var showingTextComposer = false
-    @State private var showingUploadNotice = false
+    @State private var showingFileImporter = false
+    @State private var isUploading = false
+    @State private var uploadError: String?
     @State private var refreshID = UUID()
     var body: some View {
         Group {
@@ -19,6 +22,17 @@ struct SchoologyAssignmentSubmissionView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 14) {
                         Text(context.isTeacher ? "Student Submissions" : "Your Submissions").font(.headline)
+                        if isUploading {
+                            HStack(spacing: 12) {
+                                ProgressView()
+                                Text("Uploading and submitting file…")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(14)
+                            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12))
+                        }
                         if context.isTeacher {
                             if summary.students.isEmpty { ContentUnavailableView("No students found", systemImage: "person.2") }
                             else {
@@ -89,16 +103,28 @@ struct SchoologyAssignmentSubmissionView: View {
                             showingTextComposer = true
                         }
                         Button("Upload Submission", systemImage: "arrow.up.doc") {
-                            showingUploadNotice = true
+                            showingFileImporter = true
                         }
                     }
                 }
             }
         }
-        .alert("Upload Submission", isPresented: $showingUploadNotice) {
-            Button("OK", role: .cancel) { }
+        .fileImporter(isPresented: $showingFileImporter, allowedContentTypes: [.item], allowsMultipleSelection: false) { result in
+            switch result {
+            case .success(let urls):
+                guard let url = urls.first else { return }
+                Task { await uploadSubmission(from: url) }
+            case .failure(let error):
+                uploadError = error.localizedDescription
+            }
+        }
+        .alert("Unable to Submit File", isPresented: Binding(
+            get: { uploadError != nil },
+            set: { if !$0 { uploadError = nil } }
+        )) {
+            Button("OK", role: .cancel) { uploadError = nil }
         } message: {
-            Text("File and Schoology resource submission are not connected in this SwiftUI port yet.")
+            Text(uploadError ?? "The file could not be submitted.")
         }
         .sheet(isPresented: $showingTextComposer) {
             SchoologyTextSubmissionComposerView(sectionID: sectionID, context: context) { refreshID = UUID() }
@@ -111,5 +137,28 @@ struct SchoologyAssignmentSubmissionView: View {
         do { summary = try await session.loadAssignmentSubmissions(sectionID: sectionID, context: context) }
         catch { self.error = error.localizedDescription }
         loading = false
+    }
+
+    private func uploadSubmission(from url: URL) async {
+        guard !isUploading else { return }
+        isUploading = true
+        defer { isUploading = false }
+        let didAccess = url.startAccessingSecurityScopedResource()
+        defer { if didAccess { url.stopAccessingSecurityScopedResource() } }
+        do {
+            let data = try Data(contentsOf: url)
+            guard !data.isEmpty else { throw CocoaError(.fileReadCorruptFile) }
+            let mime = UTType(filenameExtension: url.pathExtension)?.preferredMIMEType ?? "application/octet-stream"
+            try await session.submitAssignmentFile(
+                data: data,
+                filename: url.lastPathComponent,
+                mime: mime,
+                sectionID: sectionID,
+                assignmentID: context.assignment.id
+            )
+            await load()
+        } catch {
+            uploadError = error.localizedDescription
+        }
     }
 }

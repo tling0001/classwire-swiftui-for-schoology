@@ -854,6 +854,11 @@ final class AppSession {
             body: ["body": value, "draft": draft ? 1 : 0])
     }
 
+    func submitAssignmentFile(data: Data, filename: String, mime: String, sectionID: String, assignmentID: String) async throws {
+        guard let auth else { throw SchoologyAPIError.notSignedIn }
+        try await api.submitAssignmentFile(data: data, filename: filename, mime: mime, sectionID: sectionID, assignmentID: assignmentID, auth: auth)
+    }
+
     func searchMessageRecipients(_ query: String) async throws -> [SchoologyMessageRecipient] {
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         let data = try await api.get("messages/recipients", auth: auth, params: ["name": query, "limit": "10"])
