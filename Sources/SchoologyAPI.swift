@@ -318,10 +318,7 @@ actor SchoologyAPI {
 
 
     func postMultiOptions(_ paths: [String], auth: SchoologyAuth) async throws -> Data {
-        let url = URL(string: "https://\(apiHost)/v1/multioptions")!
-        let body = paths.map { "request=\(oauthEncode($0))" }.joined(separator: "&")
-        let extra = paths.map { ("request", oauthEncode($0)) }
-        return try await send(url: url, method: "POST", body: body, auth: auth, signed: true, extra: extra)
+        try await postJSON("multioptions", auth: auth, body: ["request": paths])
     }
 
     func imageData(_ url: URL, auth: SchoologyAuth) async throws -> Data? {
@@ -464,6 +461,49 @@ actor SchoologyAPI {
             ("oauth_token", auth.token)
         ]
         return "OAuth " + fields.map { "\($0.0)=\"\($0.1)\"" }.joined(separator: ", ")
+    }
+
+    func uploadMessageFile(data: Data, filename: String, mime: String, auth: SchoologyAuth) async throws -> String {
+        await syncServerTime()
+        let boundary = UUID().uuidString
+        let safeFilename = filename
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "%22")
+            .replacingOccurrences(of: "\r", with: "%0D")
+            .replacingOccurrences(of: "\n", with: "%0A")
+        var multipart = Data()
+        multipart.append(Data("--\(boundary)\r\n".utf8))
+        multipart.append(Data("Content-Disposition: form-data; name=\"file\"; filename=\"\(safeFilename)\"\r\n".utf8))
+        multipart.append(Data("Content-Type: multipart/form-data\r\n".utf8))
+        multipart.append(Data("Content-Length: \(data.count)\r\n\r\n".utf8))
+        multipart.append(data)
+        multipart.append(Data("\r\n--\(boundary)--\r\n".utf8))
+
+        var components = URLComponents()
+        components.scheme = "https"
+        components.host = apiHost
+        components.path = "/v1/file"
+        components.queryItems = [URLQueryItem(name: "name", value: filename)]
+        guard let uploadURL = components.url else { throw SchoologyAPIError.invalidResponse }
+        var request = URLRequest(url: uploadURL)
+        request.httpMethod = "POST"
+        request.timeoutInterval = 120
+        request.httpBody = multipart
+        request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
+        request.setValue("Android", forHTTPHeaderField: "X-Schoology-Client")
+        request.setValue("2026.10.0", forHTTPHeaderField: "X-Schoology-App-Version")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        request.setValue(String(multipart.count), forHTTPHeaderField: "Content-Length")
+        request.setValue(mobileCookie, forHTTPHeaderField: "Cookie")
+        request.setValue(plaintextAuthorization(auth: auth), forHTTPHeaderField: "Authorization")
+        let (uploadedData, uploadedResponse) = try await URLSession.shared.data(for: request)
+        try validate(uploadedResponse, data: uploadedData)
+        let uploaded = try JSONSerialization.jsonObject(with: uploadedData) as? [String: Any] ?? [:]
+        guard let rawID = uploaded["fileMetadataId"] else { throw SchoologyAPIError.invalidResponse }
+        let fileID = String(describing: rawID)
+        guard !fileID.isEmpty else { throw SchoologyAPIError.invalidResponse }
+        return fileID
     }
 
     func submitAssignmentFile(data: Data, filename: String, mime: String, sectionID: String, assignmentID: String, auth: SchoologyAuth) async throws {

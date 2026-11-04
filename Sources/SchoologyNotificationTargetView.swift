@@ -9,12 +9,24 @@ struct SchoologyNotificationTargetView: View {
     private var realmID: String { notification.realmID ?? "" }
     var body: some View {
         Group {
-            if type == "assignment", realm == "sections", !realmID.isEmpty {
+            if type == "assignment", !realmID.isEmpty {
                 SchoologyAssignmentDetailView(sectionID: realmID, assignmentID: targetID, title: argument.title)
             } else if type == "discussion", ["sections", "groups", "schools"].contains(realm), !realmID.isEmpty {
                 SchoologyDiscussionDetailView(realm: realm, realmID: realmID, itemID: targetID, title: argument.title)
             } else if type == "event", !realm.isEmpty, !realmID.isEmpty {
                 SchoologyEventDetailView(realm: realm, realmID: realmID, eventID: targetID, title: argument.title)
+            } else if type == "user" {
+                if notification.type == "badge_award", let currentUserID = session.auth?.userID {
+                    SchoologyPersonProfileView(userID: currentUserID)
+                } else {
+                    SchoologyPersonProfileView(userID: targetID)
+                }
+            } else if type == "group" {
+                GroupProfileView(group: session.groups.first(where: { $0.id == targetID }) ?? SchoologyGroup(id: targetID, title: argument.title))
+            } else if type == "section" {
+                SchoologyCourseProfileView(course: session.courses.first(where: { $0.id == targetID }) ?? SchoologyCourse(id: targetID, title: argument.title, courseCode: "", section: "", profileURL: nil, schoolID: nil))
+            } else if type == "school" {
+                SchoolProfileView(schoolID: targetID)
             } else if let url = argument.url ?? fallbackURL {
                 SchoologyEmbeddedWebView(url: url, title: argument.title)
             } else {

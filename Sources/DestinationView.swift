@@ -46,6 +46,8 @@ struct DestinationView: View {
 
 struct HomeView: View {
     @Environment(AppSession.self) private var session
+    @State private var postableDestinations: [SchoologyUpdateDestination] = []
+    @State private var showingUpdateComposer = false
 
     var body: some View {
         @Bindable var model = session
@@ -87,11 +89,32 @@ struct HomeView: View {
                 compactHome
             }
         }
-        .refreshable { await session.refresh() }
+        .refreshable {
+            await session.refresh()
+            postableDestinations = await session.loadPostableUpdateDestinations()
+        }
+        .toolbar {
+            if !postableDestinations.isEmpty {
+                ToolbarItem(placement: .primaryAction) {
+                    Menu("Create", systemImage: "plus") {
+                        Button("Post Update", systemImage: "square.and.pencil") { showingUpdateComposer = true }
+                    }
+                }
+            }
+        }
+        .sheet(isPresented: $showingUpdateComposer) {
+            SchoologyUpdateComposerView(destinations: postableDestinations) {
+                Task {
+                    await session.refresh()
+                    postableDestinations = await session.loadPostableUpdateDestinations()
+                }
+            }
+        }
         .task {
             if !session.hasLoadedHomeActivities || !session.hasLoadedHomeCourses || !session.hasLoadedHomeUpcoming {
                 await session.refresh()
             }
+            postableDestinations = await session.loadPostableUpdateDestinations()
         }
     }
 

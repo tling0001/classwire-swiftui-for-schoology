@@ -59,7 +59,6 @@ struct GroupProfileView: View {
             if proxy.size.width >= 900 {
                 HStack(spacing: 0) {
                     VStack(alignment: .leading, spacing: 12) {
-                        groupHeader(profile)
                         ForEach([ProfileTab.updates,.members,.upcoming,.discussions,.albums,.resources]) { item in tabButton(item) }
                         Spacer()
                         if !schoolName.isEmpty, let schoolID = profile.group.schoolID {
@@ -71,7 +70,13 @@ struct GroupProfileView: View {
                     }
                     .padding(14).frame(width: max(176, proxy.size.width * 0.19), alignment: .topLeading).background(.regularMaterial)
                     Divider()
-                    groupContent(profile).frame(maxWidth: .infinity)
+                    VStack(spacing: 0) {
+                        SchoologyProfileInfobox(title: profile.group.title, subtitle: schoolName.isEmpty ? nil : schoolName,
+                            imageURL: profile.group.pictureURL, fallbackSymbol: "person.3.fill")
+                            .padding(14)
+                        groupContent(profile)
+                    }
+                    .frame(maxWidth: .infinity)
                     Divider()
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Upcoming").font(.headline)
@@ -89,6 +94,10 @@ struct GroupProfileView: View {
                 }
             } else {
                 VStack(spacing: 0) {
+                    SchoologyProfileInfobox(title: profile.group.title, subtitle: schoolName.isEmpty ? nil : schoolName,
+                        imageURL: profile.group.pictureURL, fallbackSymbol: "person.3.fill")
+                        .padding(.horizontal)
+                        .padding(.top, 12)
                     Picker("Group section", selection: $tab) {
                         ForEach([ProfileTab.updates,.members,.upcoming,.discussions,.albums,.resources]) { Text($0.rawValue).tag($0) }
                     }.schoologyNavigationTabPickerStyle().padding()
@@ -289,6 +298,9 @@ struct SchoolProfileView: View {
     @State private var error: String?
     @State private var discussionForbidden = false
     @State private var selectedDetail: SchoologyProfileItem?
+    @State private var schoolResources: [SchoologyProfileItem] = []
+    @State private var isRefreshingResources = false
+    @State private var resourcesError: String?
 
     var body: some View {
         Group {
@@ -311,13 +323,17 @@ struct SchoolProfileView: View {
             if proxy.size.width >= 900 {
                 HStack(spacing: 0) {
                     VStack(alignment: .leading, spacing: 12) {
-                        SchoologyProfileHeroImage(url: profile.school.pictureURL, fallbackSymbol: "building.2.crop.circle")
-                        Text(profile.school.title).font(.headline)
                         ForEach([ProfileTab.updates,.info,.upcoming,.resources,.discussions]) { item in tabButton(item) }
                         Spacer()
                     }.padding(14).frame(width: max(176, proxy.size.width * 0.19), alignment: .topLeading).background(.regularMaterial)
                     Divider()
-                    schoolContent(profile).frame(maxWidth: .infinity)
+                    VStack(spacing: 0) {
+                        SchoologyProfileInfobox(title: profile.school.title, imageURL: profile.school.pictureURL,
+                            fallbackSymbol: "building.2.crop.circle", details: [profile.school.address, profile.school.phone])
+                            .padding(14)
+                        schoolContent(profile)
+                    }
+                    .frame(maxWidth: .infinity)
                     Divider()
                     VStack(alignment: .leading) {
                         Text("Upcoming").font(.headline)
@@ -326,6 +342,10 @@ struct SchoolProfileView: View {
                 }
             } else {
                 VStack(spacing: 0) {
+                    SchoologyProfileInfobox(title: profile.school.title, imageURL: profile.school.pictureURL,
+                        fallbackSymbol: "building.2.crop.circle", details: [profile.school.address, profile.school.phone])
+                        .padding(.horizontal)
+                        .padding(.top, 12)
                     Picker("School section", selection: $tab) {
                         ForEach([ProfileTab.updates,.info,.upcoming,.resources,.discussions]) { Text($0.rawValue).tag($0) }
                     }.schoologyNavigationTabPickerStyle().padding()
@@ -345,28 +365,42 @@ struct SchoolProfileView: View {
         }.buttonStyle(.plain).foregroundStyle(tab == item ? SchoologyStyle.blue : .primary)
     }
 
+    @ViewBuilder
     private func schoolContent(_ profile: SchoologySchoolProfile) -> some View {
-        VStack(spacing: 0) {
+        if tab == .resources {
+            SchoologyResourcesContentView(
+                items: schoolResources,
+                source: .school(schoolID: schoolID),
+                isLoading: isRefreshingResources,
+                error: resourcesError,
+                emptyTitle: "No resources",
+                emptyDescription: "Resources shared with this school will appear here."
+            ) {
+                await refreshSchoolResources()
+            }
+        } else {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 12) {
                     switch tab {
                     case .updates: RecentActivityView(activities: profile.updates)
                     case .info:
-                        if profile.school.address.isEmpty && profile.school.phone.isEmpty { ContentUnavailableView("No school information", systemImage: "info.circle") }
+                        if profile.school.address.isEmpty && profile.school.phone.isEmpty {
+                            ContentUnavailableView("No school information", systemImage: "info.circle")
+                        }
                         if !profile.school.address.isEmpty { LabeledContent("Address", value: profile.school.address) }
                         if !profile.school.phone.isEmpty { LabeledContent("Phone", value: profile.school.phone) }
                     case .upcoming: ForEach(profile.upcoming) { event in eventCard(event) }
-                    case .resources: rows(profile.resources, empty: "No resources")
+                    case .resources: EmptyView()
                     case .discussions:
                         if discussionForbidden {
                             VStack(spacing: 10) {
-                                ContentUnavailableView("School discussions unavailable", systemImage: "lock", description: Text("Schoology does not allow this account to list school discussions through the API."))
+                                ContentUnavailableView("School discussions unavailable", systemImage: "lock",
+                                    description: Text("Schoology does not allow this account to list school discussions through the API."))
                                 if let url = URL(string: "https://app.schoology.com/school/\(schoolID)/discussions") {
                                     Link("Open School Discussions", destination: url)
                                 }
                             }
-                        }
-                        else {
+                        } else {
                             if discussions.isEmpty { ContentUnavailableView("No discussions", systemImage: "bubble.left.and.bubble.right") }
                             ForEach(discussions) { item in
                                 NavigationLink {
@@ -375,16 +409,34 @@ struct SchoolProfileView: View {
                                     VStack(alignment: .leading, spacing: 6) {
                                         Text(item.title).font(.headline)
                                         if !item.body.isEmpty { Text(item.body).font(.subheadline).foregroundStyle(.secondary).lineLimit(3) }
-                                    }.padding(14).frame(maxWidth: .infinity, alignment: .leading)
-                                        .background(.background, in: RoundedRectangle(cornerRadius: 12))
-                                }.buttonStyle(.plain)
+                                    }
+                                    .padding(14)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .background(.background, in: RoundedRectangle(cornerRadius: 12))
+                                }
+                                .buttonStyle(.plain)
                             }
                         }
                     default: EmptyView()
                     }
-                }.padding()
+                }
+                .padding()
             }
-        }.onChange(of: tab) { _, value in if value == .discussions { Task { await loadDiscussions() } } }
+            .onChange(of: tab) { _, value in
+                if value == .discussions { Task { await loadDiscussions() } }
+            }
+        }
+    }
+
+    private func refreshSchoolResources() async {
+        isRefreshingResources = true
+        resourcesError = nil
+        defer { isRefreshingResources = false }
+        do {
+            schoolResources = try await session.loadSchoolResources(schoolID: schoolID)
+        } catch {
+            resourcesError = error.localizedDescription
+        }
     }
 
     @ViewBuilder private func rows(_ items: [SchoologyProfileItem], empty: String) -> some View {
@@ -421,8 +473,13 @@ struct SchoolProfileView: View {
 
     private func load() async {
         isLoading = true; error = nil
-        do { profile = try await session.loadSchoolProfile(schoolID) }
-        catch let loadError { error = loadError.localizedDescription }
+        do {
+            let loaded = try await session.loadSchoolProfile(schoolID)
+            profile = loaded
+            schoolResources = loaded.resources
+        } catch let loadError {
+            error = loadError.localizedDescription
+        }
         isLoading = false
     }
 

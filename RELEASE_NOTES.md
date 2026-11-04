@@ -1,5 +1,35 @@
 # Release Notes
 
+## [2026.10.0-port.37]
+
+### Shared profile presentation
+- Add one adaptive Schoology profile infobox for courses, groups, and schools.
+- Place profile identity above portrait section pickers and above active content in wide layouts.
+- Keep wide navigation sidebars focused on navigation instead of repeating profile hero content.
+
+### School resources
+- Reuse the recursive shared resources browser for school resources, including nested folders and collection-backed folder loading.
+- Keep resource loading, empty, error, and refresh states consistent with standalone and group resources.
+
+### Permissions and creation
+- Read course update and document POST permissions through Schoology multioptions before exposing course actions.
+- Send multioptions requests as JSON, matching the official desktop port's Schoology API request format.
+- Add permission-aware course actions for posting updates and opening the official Schoology resource creator.
+- Add a homepage update composer only for courses and groups where Schoology confirms update POST access.
+- Share the update composer across homepage and course contexts, including file and Schoology resource attachments.
+
+### Messages
+- Add native file and Schoology resource attachments to the new-message composer.
+- Upload files through Schoology FileService and submit the Android-compatible `file-attachment` and `attachments` payload fields.
+
+### Notifications
+- Route assignment notification links using the notification's owning realm ID, matching Android's NotificationIntent behavior instead of requiring the notification realm string to be `sections`.
+- Open related user, group, course, and school items in native profile pages when possible.
+
+### Build
+- Increment the iOS and macOS bundle build number to 37.
+
+
 ## [2026.10.0-port.36]
 
 ### Navigation

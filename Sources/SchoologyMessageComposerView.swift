@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 struct SchoologyMessageComposerView: View {
     @Environment(AppSession.self) private var session
     @Environment(\.dismiss) private var dismiss
@@ -9,6 +10,12 @@ struct SchoologyMessageComposerView: View {
     @State private var subject = ""
     @State private var message = ""
     @State private var isSending = false
+    @State private var isUploading = false
+    @State private var showingFileImporter = false
+    @State private var showingResourcePicker = false
+    @State private var fileIDs: [String] = []
+    @State private var resourceIDs: [String] = []
+    @State private var attachmentNames: [String] = []
     @State private var error: String?
     var body: some View {
         NavigationStack {
@@ -40,14 +47,31 @@ struct SchoologyMessageComposerView: View {
                     TextField("Subject", text: $subject)
                     TextField("Write a message…", text: $message, axis: .vertical).lineLimit(6...16)
                 }
+                Section("Attachments") {
+                    Button("Attach File", systemImage: "paperclip") { showingFileImporter = true }
+                        .disabled(isSending || isUploading)
+                    Button("Attach Schoology Resource", systemImage: "folder") { showingResourcePicker = true }
+                        .disabled(isSending || isUploading)
+                    ForEach(Array(attachmentNames.enumerated()), id: \.offset) { _, name in
+                        Label(name, systemImage: "paperclip").foregroundStyle(.secondary)
+                    }
+                    if isUploading { ProgressView("Uploading attachment…") }
+                }
                 if let error { Section { Text(error).foregroundStyle(.red) } }
             }
             .navigationTitle("New Message")
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() }.disabled(isSending) }
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() }.disabled(isSending || isUploading) }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Send", systemImage: "paperplane.fill", action: send)
-                        .disabled(isSending || selectedRecipients.isEmpty || subject.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        .disabled(isSending || isUploading || selectedRecipients.isEmpty || subject.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+            .fileImporter(isPresented: $showingFileImporter, allowedContentTypes: [.item], allowsMultipleSelection: true, onCompletion: importFiles)
+            .sheet(isPresented: $showingResourcePicker) {
+                SchoologyResourcePickerView { resourceID, title in
+                    resourceIDs.append(resourceID)
+                    attachmentNames.append(title)
                 }
             }
             .task(id: recipientQuery) {
@@ -67,13 +91,40 @@ struct SchoologyMessageComposerView: View {
             }
         }
     }
+    private func importFiles(_ result: Result<[URL], Error>) {
+        switch result {
+        case .failure(let failure):
+            error = failure.localizedDescription
+        case .success(let urls):
+            Task {
+                isUploading = true
+                error = nil
+                defer { isUploading = false }
+                do {
+                    for url in urls {
+                        let accessed = url.startAccessingSecurityScopedResource()
+                        defer { if accessed { url.stopAccessingSecurityScopedResource() } }
+                        let data = try Data(contentsOf: url)
+                        let filename = url.lastPathComponent
+                        let mime = UTType(filenameExtension: url.pathExtension)?.preferredMIMEType ?? "application/octet-stream"
+                        let id = try await session.uploadMessageFile(data: data, filename: filename, mime: mime)
+                        fileIDs.append(id)
+                        attachmentNames.append(filename)
+                    }
+                } catch {
+                    self.error = error.localizedDescription
+                }
+            }
+        }
+    }
+
     private func send() {
         guard !isSending else { return }
         isSending = true
         error = nil
         Task {
             do {
-                try await session.sendMessage(recipientIDs: selectedRecipients.map(\.id), subject: subject, message: message)
+                try await session.sendMessage(recipientIDs: selectedRecipients.map(\.id), subject: subject, message: message, fileIDs: fileIDs, resourceIDs: resourceIDs)
                 onSent()
                 dismiss()
             } catch { self.error = error.localizedDescription }

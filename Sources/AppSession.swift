@@ -927,15 +927,25 @@ final class AppSession {
         return SchoologyMessageRecipient.decodeList(data)
     }
 
-    func sendMessage(recipientIDs: [String], subject: String, message: String) async throws {
+    func uploadMessageFile(data: Data, filename: String, mime: String) async throws -> String {
+        guard let auth else { throw SchoologyAPIError.notSignedIn }
+        return try await api.uploadMessageFile(data: data, filename: filename, mime: mime, auth: auth)
+    }
+
+    func sendMessage(recipientIDs: [String], subject: String, message: String, fileIDs: [String] = [], resourceIDs: [String] = []) async throws {
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         let ids = Array(Set(recipientIDs.filter { Int($0) != nil })).sorted()
         guard !ids.isEmpty, !subject.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
               !message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { throw SchoologyAPIError.invalidResponse }
-        _ = try await api.postJSON("messages", auth: auth, body: [
+        var payload: [String: Any] = [
             "recipient_ids": ids.joined(separator: ","), "subject": subject.trimmingCharacters(in: .whitespacesAndNewlines),
             "message": message.trimmingCharacters(in: .whitespacesAndNewlines)
-        ])
+        ]
+        let validFileIDs = fileIDs.compactMap(Int.init)
+        if !validFileIDs.isEmpty { payload["file-attachment"] = ["id": validFileIDs] }
+        let validResourceIDs = resourceIDs.compactMap(Int.init)
+        if !validResourceIDs.isEmpty { payload["attachments"] = validResourceIDs.map { ["resource": $0] } }
+        _ = try await api.postJSON("messages", auth: auth, body: payload)
     }
 
     func loadAssignment(sectionID: String, assignmentID: String) async throws -> SchoologyProfileItem {
@@ -1203,6 +1213,75 @@ final class AppSession {
         let name = SchoologyValue.string(school["title"] ?? school["name"])
         schoolNames[group.id] = name
         return name
+    }
+
+    func loadSchoolResources(schoolID: String, folderID: String? = nil, collectionID: String? = nil) async throws -> [SchoologyProfileItem] {
+        guard let auth else { throw SchoologyAPIError.notSignedIn }
+        var params = ["start": "0", "limit": "200", "with_attachments": "TRUE"]
+        if let folderID, !folderID.isEmpty, folderID != "0" { params["f"] = folderID }
+        let path: String
+        if let collectionID, !collectionID.isEmpty {
+            path = "collections/\(collectionID)/resources"
+        } else {
+            path = "schools/\(schoolID)/resources"
+        }
+        let data = try await api.get(path, auth: auth, params: params)
+        return SchoologyProfileItem.decodeList(Self.object(data), keys: ["resource", "resources", "resource_list", "items"])
+    }
+
+    func loadCoursePermissions(courseID: String) async -> SchoologyCoursePermissions? {
+        guard let auth else { return nil }
+        let paths = ["/v1/sections/\(courseID)/documents", "/v1/sections/\(courseID)/updates"]
+        guard let data = try? await api.postMultiOptions(paths, auth: auth) else { return nil }
+        let root = Self.object(data)
+        let rows = (root["response"] as? [[String: Any]]) ?? (root["responses"] as? [[String: Any]]) ?? []
+        var bodies: [String: String] = [:]
+        for row in rows {
+            guard let location = row["location"] as? String else { continue }
+            let body = row["body"] ?? ""
+            bodies[location] = (body as? String ?? String(describing: body)).lowercased()
+        }
+        func allowsPost(_ path: String) -> Bool {
+            bodies[path]?.range(of: #"\bpost\b"#, options: .regularExpression) != nil
+        }
+        return SchoologyCoursePermissions(
+            canPostUpdates: allowsPost("/v1/sections/\(courseID)/updates"),
+            canAddResources: allowsPost("/v1/sections/\(courseID)/documents")
+        )
+    }
+
+    func loadPostableUpdateDestinations() async -> [SchoologyUpdateDestination] {
+        guard let auth else { return [] }
+        let destinations =
+            courses.map { SchoologyUpdateDestination(realm: "sections", resourceID: $0.id, title: $0.title) } +
+            groups.map { SchoologyUpdateDestination(realm: "groups", resourceID: $0.id, title: $0.title) }
+        guard !destinations.isEmpty else { return [] }
+        let paths = destinations.map { "/v1/\($0.realm)/\($0.resourceID)/updates" }
+        guard let data = try? await api.postMultiOptions(paths, auth: auth) else { return [] }
+        let root = Self.object(data)
+        let rows = (root["response"] as? [[String: Any]]) ?? (root["responses"] as? [[String: Any]]) ?? []
+        var bodies: [String: String] = [:]
+        for row in rows {
+            guard let location = row["location"] as? String else { continue }
+            let body = row["body"] ?? ""
+            bodies[location] = (body as? String ?? String(describing: body)).lowercased()
+        }
+        return destinations.filter { destination in
+            bodies["/v1/\(destination.realm)/\(destination.resourceID)/updates"]?
+                .range(of: #"\bpost\b"#, options: .regularExpression) != nil
+        }
+    }
+
+    func postUpdate(destination: SchoologyUpdateDestination, body: String, fileIDs: [String] = [], resourceIDs: [String] = []) async throws {
+        guard let auth else { throw SchoologyAPIError.notSignedIn }
+        let text = body.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { throw SchoologyAPIError.invalidResponse }
+        var payload: [String: Any] = ["body": text]
+        let validFileIDs = fileIDs.compactMap(Int.init)
+        if !validFileIDs.isEmpty { payload["file-attachment"] = ["id": validFileIDs] }
+        let validResourceIDs = resourceIDs.compactMap(Int.init)
+        if !validResourceIDs.isEmpty { payload["attachments"] = validResourceIDs.map { ["resource": $0] } }
+        _ = try await api.postJSON("\(destination.realm)/\(destination.resourceID)/updates", auth: auth, body: payload)
     }
 
     func loadSchoolProfile(_ id: String) async throws -> SchoologySchoolProfile {

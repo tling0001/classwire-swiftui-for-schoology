@@ -24,6 +24,14 @@ struct SchoologyCourseProfileView: View {
     @State private var members: [SchoologyProfileItem] = []
     @State private var upcoming: [SchoologyUpcomingEvent] = []
     @State private var schoolName = ""
+    @State private var permissions: SchoologyCoursePermissions?
+    @State private var showingUpdateComposer = false
+    @State private var showingResourceCreator = false
+
+    private var resourceCreatorURL: URL? {
+        let host = session.canadianServer ? "app.schoologyca.com" : "app.schoology.com"
+        return URL(string: "https://\(host)/course/\(course.id)/materials")
+    }
 
     var body: some View {
         GeometryReader { proxy in
@@ -35,17 +43,50 @@ struct SchoologyCourseProfileView: View {
         }
         .navigationTitle(course.title)
         .toolbar {
-            ToolbarItem(placement: .primaryAction) {
+            if permissions?.canPostUpdates == true || permissions?.canAddResources == true {
+                ToolbarItem(placement: .primaryAction) {
+                    Menu("Course Actions", systemImage: "plus") {
+                        if permissions?.canPostUpdates == true {
+                            Button("Post Update", systemImage: "square.and.pencil") { showingUpdateComposer = true }
+                        }
+                        if permissions?.canAddResources == true {
+                            Button("Add Resources", systemImage: "folder.badge.plus") { showingResourceCreator = true }
+                        }
+                    }
+                }
+            }
+            ToolbarItem(placement: .secondaryAction) {
                 Button("Refresh", systemImage: "arrow.clockwise") { Task { await loadTab(tab, force: true) } }.disabled(loadingTabs.contains(tab))
             }
         }
+        .sheet(isPresented: $showingUpdateComposer) {
+            SchoologyUpdateComposerView(destinations: [
+                SchoologyUpdateDestination(realm: "sections", resourceID: course.id, title: course.title)
+            ]) { Task { await loadTab(.updates, force: true) } }
+        }
+        .navigationDestination(isPresented: $showingResourceCreator) {
+            if let url = resourceCreatorURL {
+                SchoologyEmbeddedWebView(url: url, title: "Add Resources")
+            } else {
+                ContentUnavailableView("Unable to open resources", systemImage: "exclamationmark.triangle")
+            }
+        }
         .task(id: tab) { await loadTab(tab) }
-        .task(id: course.id) { schoolName = await session.loadSchoolName(for: course) }
+        .task(id: course.id) {
+            async let loadedName = session.loadSchoolName(for: course)
+            async let loadedPermissions = session.loadCoursePermissions(courseID: course.id)
+            schoolName = await loadedName
+            permissions = await loadedPermissions
+        }
         .refreshable { await loadTab(tab, force: true) }
     }
 
     private var compactLayout: some View {
         VStack(spacing: 0) {
+            SchoologyProfileInfobox(title: course.title, subtitle: course.section.isEmpty ? nil : course.section,
+                imageURL: course.profileURL, fallbackSymbol: "book.closed.fill", details: [course.courseCode, schoolName])
+                .padding(.horizontal)
+                .padding(.top, 12)
             Picker("Course section", selection: $tab) {
                 ForEach(SchoologyCourseTab.allCases) { item in Text(item.rawValue).tag(item) }
             }
@@ -60,12 +101,6 @@ struct SchoologyCourseProfileView: View {
         HStack(spacing: 0) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 10) {
-                    SchoologyProfileHeroImage(url: course.profileURL, fallbackSymbol: "book.closed.fill")
-                    Text(course.title).font(.headline).fixedSize(horizontal: false, vertical: true)
-                    if !course.section.isEmpty { Text(course.section).font(.subheadline).foregroundStyle(.secondary) }
-                    if !course.courseCode.isEmpty { Text(course.courseCode).font(.caption).foregroundStyle(.secondary) }
-                    if !schoolName.isEmpty { Text(schoolName).font(.caption).foregroundStyle(SchoologyStyle.blue) }
-                    Divider().padding(.vertical, 3)
                     ForEach([SchoologyCourseTab.materials, .updates, .grades, .members, .courseApps]) { item in
                         courseTabButton(item)
                     }
@@ -78,6 +113,9 @@ struct SchoologyCourseProfileView: View {
 
             Divider()
             VStack(spacing: 0) {
+                SchoologyProfileInfobox(title: course.title, subtitle: course.section.isEmpty ? nil : course.section,
+                    imageURL: course.profileURL, fallbackSymbol: "book.closed.fill", details: [course.courseCode, schoolName])
+                    .padding(14)
                 HStack {
                     Text(tab.rawValue).font(.headline)
                     Spacer()

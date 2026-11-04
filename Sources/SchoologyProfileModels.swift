@@ -57,6 +57,18 @@ struct SchoologyProfileItem: Identifiable, Sendable {
         }
     }
 }
+struct SchoologyUpdateDestination: Identifiable, Hashable, Sendable {
+    let realm: String
+    let resourceID: String
+    let title: String
+    var id: String { "\(realm):\(resourceID)" }
+}
+
+struct SchoologyCoursePermissions: Sendable {
+    let canPostUpdates: Bool
+    let canAddResources: Bool
+}
+
 struct SchoologyGroupPermissions: Sendable {
     let canPostUpdates: Bool
     let canCreateDiscussion: Bool

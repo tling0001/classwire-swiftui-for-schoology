@@ -3,6 +3,7 @@ import SwiftUI
 enum SchoologyResourceBrowserSource: Sendable {
     case collection(collectionID: String)
     case group(groupID: String)
+    case school(schoolID: String)
 }
 
 struct SchoologyResourcesContentView: View {
@@ -137,6 +138,12 @@ struct SchoologyInlineResourceItemRow: View {
             case .group(let groupID):
                 loaded = try await session.loadGroupResources(
                     groupID: groupID,
+                    folderID: item.id,
+                    collectionID: item.collectionID
+                )
+            case .school(let schoolID):
+                loaded = try await session.loadSchoolResources(
+                    schoolID: schoolID,
                     folderID: item.id,
                     collectionID: item.collectionID
                 )

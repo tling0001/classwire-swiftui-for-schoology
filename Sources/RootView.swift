@@ -6,30 +6,39 @@ private enum SchoologySidebarSelection: Hashable {
     case group(String)
 }
 
+private enum SchoologyNavigationPath: Hashable {
+    case sidebar(SchoologySidebarSelection)
+    case person(String)
+}
+
 struct RootView: View {
     @Environment(AppSession.self) private var session
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var preferredCompactColumn: NavigationSplitViewColumn = .sidebar
     @State private var selectedRoute: SchoologySidebarSelection = .destination(.home)
-    @State private var detailPath: [String] = []
+    @State private var detailPath: [SchoologyNavigationPath] = []
 
     var body: some View {
         Group {
             if session.isSignedIn {
-                NavigationSplitView(selection: $selectedRoute) {
+                NavigationSplitView {
                     SchoologySidebar(selection: $selectedRoute)
                         #if os(macOS)
                         .navigationSplitViewColumnWidth(min: 250, ideal: 285, max: 360)
                         #endif
                 } detail: {
                     NavigationStack(path: $detailPath) {
-                        selectedRoot
-                            .navigationDestination(for: String.self) { userID in
-                                SchoologyPersonProfileView(userID: userID)
+                        selectedRoot(for: selectedRoute)
+                            .navigationDestination(for: SchoologyNavigationPath.self) { item in
+                                switch item {
+                                case .sidebar(let route):
+                                    selectedRoot(for: route)
+                                case .person(let userID):
+                                    SchoologyPersonProfileView(userID: userID)
+                                }
                             }
                     }
-                    // Every sidebar selection, including an individual course or group,
-                    // gets a distinct root identity. Pushed details remain on this stack.
+                    // Each selected sidebar destination receives a fresh root identity.
+                    // Pushed detail screens stay within that destination's own stack.
                     .id(selectedRoute)
                 }
                 .navigationSplitViewStyle(.balanced)
@@ -42,12 +51,16 @@ struct RootView: View {
                         session.destination = destination
                     }
                 }
+                .onChange(of: detailPath) { _, path in
+                    guard let last = path.last, case .sidebar(let route) = last else { return }
+                    selectedRoute = route
+                }
                 .onChange(of: session.destination) { _, destination in
                     selectedRoute = .destination(destination)
                 }
                 .onChange(of: session.pendingPersonProfileID) { _, userID in
                     guard let userID else { return }
-                    detailPath.append(userID)
+                    detailPath.append(.person(userID))
                     session.pendingPersonProfileID = nil
                 }
             } else {
@@ -58,8 +71,8 @@ struct RootView: View {
     }
 
     @ViewBuilder
-    private var selectedRoot: some View {
-        switch selectedRoute {
+    private func selectedRoot(for route: SchoologySidebarSelection) -> some View {
+        switch route {
         case .destination(let destination):
             DestinationView(destination: destination)
         case .course(let courseID):
@@ -85,9 +98,15 @@ private struct SchoologySidebar: View {
     @Binding var selection: SchoologySidebarSelection
 
     var body: some View {
+        #if os(macOS)
         List(selection: $selection) {
             sidebarSections
         }
+        #else
+        List {
+            sidebarSections
+        }
+        #endif
         .navigationTitle("Schoology")
         .listStyle(.sidebar)
         #if os(iOS)
@@ -101,9 +120,15 @@ private struct SchoologySidebar: View {
             destinationRow(.home)
             DisclosureGroup {
                 ForEach(session.courses) { course in
-                    NavigationLink(value: SchoologySidebarSelection.course(course.id)) {
+                    #if os(macOS)
+                    Label(course.title, systemImage: "book.closed")
+                        .lineLimit(1)
+                        .tag(SchoologySidebarSelection.course(course.id))
+                    #else
+                    NavigationLink(value: SchoologyNavigationPath.sidebar(.course(course.id))) {
                         Label(course.title, systemImage: "book.closed").lineLimit(1)
                     }
+                    #endif
                 }
             } label: {
                 Label("Courses", systemImage: "book.closed")
@@ -111,9 +136,15 @@ private struct SchoologySidebar: View {
 
             DisclosureGroup {
                 ForEach(session.groups) { group in
-                    NavigationLink(value: SchoologySidebarSelection.group(group.id)) {
+                    #if os(macOS)
+                    Label(group.title, systemImage: "person.3")
+                        .lineLimit(1)
+                        .tag(SchoologySidebarSelection.group(group.id))
+                    #else
+                    NavigationLink(value: SchoologyNavigationPath.sidebar(.group(group.id))) {
                         Label(group.title, systemImage: "person.3").lineLimit(1)
                     }
+                    #endif
                 }
             } label: {
                 Label("Groups", systemImage: "person.3")
@@ -147,9 +178,15 @@ private struct SchoologySidebar: View {
         }
     }
 
+    @ViewBuilder
     private func destinationRow(_ item: AppDestination) -> some View {
-        NavigationLink(value: SchoologySidebarSelection.destination(item)) {
+        #if os(macOS)
+        Label(item.rawValue, systemImage: item.symbol)
+            .tag(SchoologySidebarSelection.destination(item))
+        #else
+        NavigationLink(value: SchoologyNavigationPath.sidebar(.destination(item))) {
             Label(item.rawValue, systemImage: item.symbol)
         }
+        #endif
     }
 }
