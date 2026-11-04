@@ -1,3 +1,18 @@
+## [2026.10.0-port.39]
+
+### Navigation
+- Repair iOS sidebar navigation by removing the detail-stack identity reset and the feedback loop that changed the selected sidebar root while SwiftUI was processing a sidebar link.
+- Keep value-based sidebar links routed into the detail NavigationStack, while macOS retains native List selection.
+
+### Teacher grading
+- Open a student's full submission review from the teacher Submissions list.
+- Load that student's actual submission revisions, status, text, and file attachments using the official per-user submissions endpoint.
+- Show the student's profile photo and support editing the grade, overall comment, and student-visible comment setting in the same review.
+- Use converted PDFs for revision attachments when Schoology provides converted download URLs.
+
+### Build
+- Increment the iOS and macOS build number to 39.
+
 ## [2026.10.0-port.38]
 
 ### Person profiles

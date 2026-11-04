@@ -37,9 +37,6 @@ struct RootView: View {
                                 }
                             }
                     }
-                    // Each selected sidebar destination receives a fresh root identity.
-                    // Pushed detail screens stay within that destination's own stack.
-                    .id(selectedRoute)
                 }
                 .navigationSplitViewStyle(.balanced)
                 .task {
@@ -50,10 +47,6 @@ struct RootView: View {
                     if case .destination(let destination) = route {
                         session.destination = destination
                     }
-                }
-                .onChange(of: detailPath) { _, path in
-                    guard let last = path.last, case .sidebar(let route) = last else { return }
-                    selectedRoute = route
                 }
                 .onChange(of: session.destination) { _, destination in
                     selectedRoute = .destination(destination)

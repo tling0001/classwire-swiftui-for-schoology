@@ -938,6 +938,37 @@ final class AppSession {
             commentVisible: SchoologyValue.bool(row["comment_status"] ?? row["commentStatus"]))
     }
 
+    func loadTeacherAssignmentRevisions(sectionID: String, gradeItemID: String, userID: String) async throws -> [SchoologyAssignmentRevision] {
+        guard let auth else { throw SchoologyAPIError.notSignedIn }
+        let data = try await api.get(
+            "sections/\(sectionID)/submissions/\(gradeItemID)/\(userID)",
+            auth: auth,
+            params: ["with_attachments": "TRUE", "all_revisions": "TRUE", "start": "0", "limit": "200"]
+        )
+        let root = Self.object(data)
+        let nested = root["data"] as? [String: Any]
+        let rawRevisions = root["revision"] ?? root["revisions"] ?? nested?["revision"] ?? nested?["revisions"]
+        return SchoologyValue.list(rawRevisions, keys: ["revision", "revisions", "items"]).map { row in
+            let files = SchoologyValue.list(row["attachments"] ?? row["attachment"], keys: ["files", "file", "attachments", "items"])
+            let attachments = files.compactMap { file -> SchoologyAttachment? in
+                guard let url = SchoologyValue.url(file["file_download_url"] ?? file["fileDownloadURL"] ?? file["download_path"] ?? file["downloadPath"] ?? file["url"]) else { return nil }
+                let converted = SchoologyValue.url(file["file_converted_download_url"] ?? file["fileConvertedDownloadURL"] ?? file["converted_download_path"] ?? file["convertedDownloadPath"])
+                return SchoologyAttachment(
+                    title: SchoologyValue.string(file["filename"] ?? file["fileName"] ?? file["title"], fallback: url.lastPathComponent),
+                    url: url,
+                    viewURL: converted
+                )
+            }
+            return SchoologyAssignmentRevision(
+                id: SchoologyValue.string(row["revision_id"] ?? row["revisionId"] ?? row["id"], fallback: "0"),
+                created: SchoologyValue.string(row["created"] ?? row["timestamp"]),
+                body: SchoologyValue.plainText(SchoologyValue.string(row["body"] ?? row["message"])),
+                status: SchoologyValue.bool(row["draft"]) ? "Draft" : (SchoologyValue.bool(row["late"]) ? "Late" : "On time"),
+                attachments: attachments
+            )
+        }.sorted { (Int($0.id) ?? 0) > (Int($1.id) ?? 0) }
+    }
+
     func updateTeacherAssignmentGrade(sectionID: String, assignmentID: String, enrollmentID: String, grade: String, comment: String, commentVisible: Bool) async throws {
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         let value = grade.trimmingCharacters(in: .whitespacesAndNewlines)

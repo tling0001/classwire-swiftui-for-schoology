@@ -148,10 +148,14 @@ struct SchoologyAssignmentSubmissionView: View {
             }
         }
         .sheet(item: $selectedStudent) { student in
-            SchoologyTeacherGradeEditorView(sectionID: sectionID, assignmentID: context.gradeItemID,
-                enrollmentID: student.enrollmentID, studentName: student.name, maxPoints: context.maxPoints) {
-                    refreshID = UUID()
-                }
+            SchoologyTeacherStudentSubmissionView(
+                sectionID: sectionID,
+                gradeItemID: context.gradeItemID,
+                student: student,
+                maxPoints: context.maxPoints
+            ) {
+                refreshID = UUID()
+            }
         }
     }
     private func load() async {
