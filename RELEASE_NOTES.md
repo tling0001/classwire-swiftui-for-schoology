@@ -1,3 +1,13 @@
+## [2026.10.0-port.41]
+
+### Navigation and iOS build
+- Fix the iOS archive failure caused by using the macOS-only `List(selection:)` initializer in the shared sidebar.
+- Restore platform-appropriate sidebar behavior: iOS uses value-based navigation links into the detail stack, while macOS uses native list selection.
+- Keep sidebar navigation routes separate from person-profile drill-ins, and persist destination navigation without feeding detail-stack changes back into the sidebar selection.
+
+### Build
+- Increment the iOS and macOS bundle build number to 41.
+
 ## [2026.10.0-port.40]
 
 ### Navigation
