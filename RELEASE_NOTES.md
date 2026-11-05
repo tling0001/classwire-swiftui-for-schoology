@@ -1,5 +1,13 @@
 # Release notes
 
+## [2026.10.0-port.53]
+
+### Build fixes
+- Restore the shared push-registration notification name used by the notification service and Settings view, fixing the iOS Swift compilation errors.
+- Select the active macOS Developer ID provisioning profile by its Apple-reported profile type instead of assuming a fixed profile name.
+- Validate the selected profile's production APNs entitlement and pass its actual name to archive and export signing.
+- Increment the iOS and macOS build number to 53.
+
 ## [2026.10.0-port.52]
 
 ### Push notifications

@@ -79,20 +79,23 @@ jobs:
         uses: Apple-Actions/download-provisioning-profiles@v7
         with:
           bundle-id: com.schoologytauri.app
-          profile-type: MAC_APP_DIRECT
+          # Download active profiles for this App ID; select Developer ID by Apple's profile type.
           issuer-id: ${{ secrets.APPSTORE_ISSUER_ID || vars.APPSTORE_ISSUER_ID }}
           api-key-id: ${{ secrets.APPSTORE_API_KEY_ID || vars.APPSTORE_API_KEY_ID }}
           api-private-key: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
       - name: Validate Developer ID push profile
+        id: mac_profile_check
         env:
           PROFILES: ${{ steps.mac_profiles.outputs.profiles }}
+        shell: bash
         run: |
           set -euo pipefail
-          PROFILE_NAME="DeveloperID com.schoologytauri.app"
-          jq -e --arg name "$PROFILE_NAME" 'any(.[]; .name == $name)' <<<"$PROFILES" >/dev/null || {
-            echo "::error::Missing active MAC_APP_DIRECT profile '$PROFILE_NAME'. Create a Developer ID provisioning profile for com.schoologytauri.app with Push Notifications enabled." >&2
+          PROFILE_NAME="$(jq -r '[.[] | select(.type == "MAC_APP_DIRECT")][0].name // empty' <<<"$PROFILES")"
+          if [ -z "$PROFILE_NAME" ]; then
+            echo "::error::Apple returned no ACTIVE MAC_APP_DIRECT profile for com.schoologytauri.app. Confirm the profile uses this exact App ID and a valid Developer ID Application certificate, and that its status is ACTIVE."
+            echo "Profiles returned by Apple: $(jq -c '[.[] | {name, type}]' <<<"$PROFILES")"
             exit 1
-          }
+          fi
           mkdir -p "$RUNNER_TEMP/mac-profile-check"
           FOUND_PROFILE=""
           for candidate in "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"/*.provisionprofile; do
@@ -101,15 +104,16 @@ jobs:
             name="$(/usr/libexec/PlistBuddy -c 'Print :Name' "$RUNNER_TEMP/mac-profile-check/profile.plist" 2>/dev/null || true)"
             if [ "$name" = "$PROFILE_NAME" ]; then FOUND_PROFILE="$candidate"; break; fi
           done
-          test -n "$FOUND_PROFILE" || { echo "::error::Downloaded Developer ID provisioning profile was not found." >&2; exit 1; }
+          test -n "$FOUND_PROFILE" || { echo "::error::Apple listed '$PROFILE_NAME' but its downloaded .provisionprofile file was not found." >&2; exit 1; }
           aps="$(/usr/libexec/PlistBuddy -c 'Print :Entitlements:com.apple.developer.aps-environment' "$RUNNER_TEMP/mac-profile-check/profile.plist" 2>/dev/null || true)"
-          test "$aps" = "production" || { echo "::error::Developer ID profile must include com.apple.developer.aps-environment=production (found '$aps')." >&2; exit 1; }
+          test "$aps" = "production" || { echo "::error::Developer ID profile '$PROFILE_NAME' must include com.apple.developer.aps-environment=production (found '$aps')." >&2; exit 1; }
+          echo "name=$PROFILE_NAME" >> "$GITHUB_OUTPUT"
           echo "Validated $PROFILE_NAME with production APNs entitlement."
       - name: Archive macOS app
         env:
           SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID || vars.APPLE_TEAM_ID }}
-          PROFILE_NAME: DeveloperID com.schoologytauri.app
+          PROFILE_NAME: ${{ steps.mac_profile_check.outputs.name }}
           MARKETING_VERSION: ${{ steps.version.outputs.marketing }}
           CURRENT_PROJECT_VERSION: ${{ steps.version.outputs.build }}
         run: |
@@ -124,7 +128,7 @@ jobs:
         env:
           SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID || vars.APPLE_TEAM_ID }}
-          PROFILE_NAME: DeveloperID com.schoologytauri.app
+          PROFILE_NAME: ${{ steps.mac_profile_check.outputs.name }}
         run: |
           set -euo pipefail
           python3 - "$RUNNER_TEMP/macOS-ExportOptions.plist" "$APPLE_TEAM_ID" "$SIGNING_IDENTITY" "$PROFILE_NAME" <<'PY'

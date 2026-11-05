@@ -6,6 +6,10 @@ import UIKit
 import AppKit
 #endif
 
+extension Notification.Name {
+    static let schoologyPushRegistrationDidChange = Notification.Name("schoologyPushRegistrationDidChange")
+}
+
 @MainActor
 enum SchoologyPushNotifications {
     private(set) static var session: AppSession?
