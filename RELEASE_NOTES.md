@@ -1,3 +1,21 @@
+## [2026.10.0-port.42]
+
+### Home create actions
+- Discover discussion and event POST permissions for My Account, courses, and groups through Schoology multioptions.
+- Expose only the creation actions and destinations explicitly permitted by Schoology.
+- Add native discussion and event composers with publication, due date, grading, all-day, start/end date, RSVP, comments, file, and Schoology resource options.
+- Submit Android/Tauri-compatible discussion and event payloads to the selected Schoology destination.
+
+### Attachment viewing
+- Preserve converted PDF URLs for post and message attachments when Schoology reports conversion success, allowing View to open the converted PDF while Download retains the original.
+
+### macOS appearance
+- Persist the selected appearance and synchronize SwiftUI's preferred scheme with AppKit's Aqua, Dark Aqua, or system appearance.
+
+### Build
+- Resolve conditional sidebar List modifier inference on iOS and macOS.
+- Increment bundle build number to 42.
+
 ## [2026.10.0-port.41]
 
 ### Navigation and iOS build

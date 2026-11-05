@@ -47,13 +47,16 @@ final class AppSession {
     var homeCoursesError: String?
     var homeUpcomingError: String?
     var schoolNames: [String: String] = [:]
-    var appearance: AppAppearance = .system
+    var appearance: AppAppearance = .system {
+        didSet { UserDefaults.standard.set(appearance.rawValue, forKey: "schoology.appearance") }
+    }
     var canadianServer = UserDefaults.standard.bool(forKey: "schoology.canadian")
 
     private let api = SchoologyAPI.shared
     private let schoolBrowserAuthenticator = SchoolBrowserAuthenticator()
 
     init() {
+        appearance = AppAppearance(rawValue: UserDefaults.standard.string(forKey: "schoology.appearance") ?? "") ?? .system
         auth = KeychainStore.loadAuth()
         if let auth {
             Task { await restore(auth) }
@@ -1171,6 +1174,33 @@ final class AppSession {
         _ = try await api.post("groups/\(groupID)/updates", auth: auth, params: ["body": body])
     }
 
+    private func createPostDate(_ date: Date, allDay: Bool, endOfDay: Bool = false) -> String {
+        let formatter = DateFormatter(); formatter.locale = Locale(identifier: "en_US_POSIX"); formatter.timeZone = TimeZone.current
+        formatter.dateFormat = allDay ? (endOfDay ? "yyyy-MM-dd '23:59:00'" : "yyyy-MM-dd '00:00:00'") : "yyyy-MM-dd HH:mm:ss"
+        return formatter.string(from: date)
+    }
+
+    func createHomeDiscussion(destination: SchoologyHomeCreateDestination, title: String, body: String, published: Bool, dueDate: Date?, graded: Bool, maxPoints: Double?, factor: Double, fileIDs: [String] = [], resourceIDs: [String] = []) async throws {
+        guard let auth else { throw SchoologyAPIError.notSignedIn }
+        guard destination.canCreateDiscussion, !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { throw SchoologyAPIError.invalidResponse }
+        var payload: [String: Any] = ["title": title.trimmingCharacters(in: .whitespacesAndNewlines), "body": body, "published": published ? 1 : 0]
+        if let dueDate { payload["due_date"] = createPostDate(dueDate, allDay: false) }
+        if graded { guard let maxPoints, maxPoints > 0, factor > 0 else { throw SchoologyAPIError.invalidResponse }; payload["graded"] = 1; payload["max_points"] = maxPoints; payload["factor"] = factor }
+        let files = fileIDs.compactMap(Int.init); if !files.isEmpty { payload["file-attachment"] = ["id": files] }
+        let resources = resourceIDs.compactMap(Int.init); if !resources.isEmpty { payload["attachments"] = resources.map { ["resource": $0] } }
+        _ = try await api.postJSON("\(destination.realm)/\(destination.resourceID)/discussions", auth: auth, body: payload)
+    }
+
+    func createHomeEvent(destination: SchoologyHomeCreateDestination, title: String, description: String, start: Date, allDay: Bool, end: Date?, rsvp: Int, commentsEnabled: Bool, fileIDs: [String] = [], resourceIDs: [String] = []) async throws {
+        guard let auth else { throw SchoologyAPIError.notSignedIn }
+        guard destination.canCreateEvent, !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, end.map({ $0 >= start }) ?? true else { throw SchoologyAPIError.invalidResponse }
+        var payload: [String: Any] = ["title": title.trimmingCharacters(in: .whitespacesAndNewlines), "description": description, "start": createPostDate(start, allDay: allDay), "is_all_day": allDay ? 1 : 0, "rsvp": rsvp, "comments_enabled": commentsEnabled ? 1 : 0]
+        if let end { payload["has_end"] = 1; payload["end"] = createPostDate(end, allDay: allDay, endOfDay: allDay) }
+        let files = fileIDs.compactMap(Int.init); if !files.isEmpty { payload["file-attachment"] = ["id": files] }
+        let resources = resourceIDs.compactMap(Int.init); if !resources.isEmpty { payload["attachments"] = resources.map { ["resource": $0] } }
+        _ = try await api.postJSON("\(destination.realm)/\(destination.resourceID)/events", auth: auth, body: payload)
+    }
+
     func createGroupDiscussion(groupID: String, title: String, body: String) async throws {
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         _ = try await api.post("groups/\(groupID)/discussions", auth: auth, params: [
@@ -1331,6 +1361,25 @@ final class AppSession {
             bodies["/v1/\(destination.realm)/\(destination.resourceID)/updates"]?
                 .range(of: #"\bpost\b"#, options: .regularExpression) != nil
         }
+    }
+
+    func loadHomeCreateDestinations() async -> [SchoologyHomeCreateDestination] {
+        guard let auth else { return [] }
+        let destinations = [SchoologyHomeCreateDestination(realm: "users", resourceID: auth.userID, title: "My Account", canCreateDiscussion: false, canCreateEvent: false)] +
+            courses.map { SchoologyHomeCreateDestination(realm: "sections", resourceID: $0.id, title: $0.title, canCreateDiscussion: false, canCreateEvent: false) } +
+            groups.map { SchoologyHomeCreateDestination(realm: "groups", resourceID: $0.id, title: $0.title, canCreateDiscussion: false, canCreateEvent: false) }
+        let paths = destinations.flatMap { ["/v1/\($0.realm)/\($0.resourceID)/discussions", "/v1/\($0.realm)/\($0.resourceID)/events"] }
+        guard let data = try? await api.postMultiOptions(paths, auth: auth) else { return [] }
+        let root = Self.object(data)
+        let rows = (root["response"] as? [[String: Any]]) ?? (root["responses"] as? [[String: Any]]) ?? []
+        var bodies: [String: String] = [:]
+        for row in rows { if let location = row["location"] as? String { bodies[location] = String(describing: row["body"] ?? "").lowercased() } }
+        return destinations.map { destination in
+            let base = "/v1/\(destination.realm)/\(destination.resourceID)/"
+            func canPost(_ suffix: String) -> Bool { bodies[base + suffix]?.range(of: #"\bpost\b"#, options: .regularExpression) != nil }
+            return SchoologyHomeCreateDestination(realm: destination.realm, resourceID: destination.resourceID, title: destination.title,
+                canCreateDiscussion: canPost("discussions"), canCreateEvent: canPost("events"))
+        }.filter { $0.canCreateDiscussion || $0.canCreateEvent }
     }
 
     func postUpdate(destination: SchoologyUpdateDestination, body: String, fileIDs: [String] = [], resourceIDs: [String] = []) async throws {

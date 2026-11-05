@@ -141,7 +141,10 @@ struct SchoologyActivity: Identifiable, Sendable {
                     attachment["title"] ?? attachment["filename"] ?? attachment["fileName"] ?? attachment["linkTitle"],
                     fallback: url.host ?? "Attachment"
                 )
-                return SchoologyAttachment(title: title, url: url)
+                let conversion = SchoologyValue.string(attachment["converted_status"] ?? attachment["convertedStatus"] ?? attachment["file_converted_status"] ?? attachment["fileConvertedStatus"]).lowercased()
+                let converted = SchoologyValue.url(attachment["file_converted_download_url"] ?? attachment["fileConvertedDownloadURL"] ?? attachment["converted_download_path"] ?? attachment["convertedDownloadPath"])
+                let viewURL = ["success", "converted", "1"].contains(conversion) ? converted : nil
+                return SchoologyAttachment(title: title, url: url, viewURL: viewURL)
             }
             return SchoologyActivity(
                 id: SchoologyValue.string(item["id"] ?? item["update_id"] ?? item["updateId"], fallback: String(index)),
@@ -431,9 +434,12 @@ struct SchoologyMessage: Identifiable, Hashable, Sendable {
                     attachment["linkURL"] ?? attachment["linkUrl"] ?? attachment["href"] ??
                     attachment["url"] ?? attachment["file_download_url"] ?? attachment["download_path"]
                 ) else { return nil }
+                let conversion = SchoologyValue.string(attachment["converted_status"] ?? attachment["convertedStatus"] ?? attachment["file_converted_status"] ?? attachment["fileConvertedStatus"]).lowercased()
+                let converted = SchoologyValue.url(attachment["file_converted_download_url"] ?? attachment["fileConvertedDownloadURL"] ?? attachment["converted_download_path"] ?? attachment["convertedDownloadPath"])
+                let viewURL = ["success", "converted", "1"].contains(conversion) ? converted : nil
                 return SchoologyAttachment(
                     title: SchoologyValue.string(attachment["title"] ?? attachment["filename"] ?? attachment["fileName"], fallback: url.lastPathComponent),
-                    url: url
+                    url: url, viewURL: viewURL
                 )
             }
             let status = SchoologyValue.string(item["message_status"] ?? item["messageStatus"])

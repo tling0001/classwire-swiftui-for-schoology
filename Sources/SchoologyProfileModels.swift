@@ -86,6 +86,21 @@ struct SchoologyUpdateDestination: Identifiable, Hashable, Sendable {
     var id: String { "\(realm):\(resourceID)" }
 }
 
+struct SchoologyHomeCreateDestination: Identifiable, Hashable, Sendable {
+    let realm: String
+    let resourceID: String
+    let title: String
+    let canCreateDiscussion: Bool
+    let canCreateEvent: Bool
+    var id: String { "\(realm):\(resourceID)" }
+}
+
+enum SchoologyHomeCreateAction: String, Identifiable {
+    case discussion, event
+    var id: String { rawValue }
+    var title: String { self == .discussion ? "New Discussion" : "New Event" }
+}
+
 struct SchoologyCoursePermissions: Sendable {
     let canPostUpdates: Bool
     let canAddResources: Bool

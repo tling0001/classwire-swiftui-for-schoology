@@ -47,7 +47,9 @@ struct DestinationView: View {
 struct HomeView: View {
     @Environment(AppSession.self) private var session
     @State private var postableDestinations: [SchoologyUpdateDestination] = []
+    @State private var createDestinations: [SchoologyHomeCreateDestination] = []
     @State private var showingUpdateComposer = false
+    @State private var selectedCreateAction: SchoologyHomeCreateAction?
 
     var body: some View {
         @Bindable var model = session
@@ -92,12 +94,15 @@ struct HomeView: View {
         .refreshable {
             await session.refresh()
             postableDestinations = await session.loadPostableUpdateDestinations()
+            createDestinations = await session.loadHomeCreateDestinations()
         }
         .toolbar {
-            if !postableDestinations.isEmpty {
+            if !postableDestinations.isEmpty || !createDestinations.isEmpty {
                 ToolbarItem(placement: .primaryAction) {
                     Menu("Create", systemImage: "plus") {
-                        Button("Post Update", systemImage: "square.and.pencil") { showingUpdateComposer = true }
+                        if !postableDestinations.isEmpty { Button("Post Update", systemImage: "square.and.pencil") { showingUpdateComposer = true } }
+                        if createDestinations.contains(where: \.canCreateDiscussion) { Button("Discussion", systemImage: "text.bubble") { selectedCreateAction = .discussion } }
+                        if createDestinations.contains(where: \.canCreateEvent) { Button("Event", systemImage: "calendar.badge.plus") { selectedCreateAction = .event } }
                     }
                 }
             }
@@ -110,11 +115,21 @@ struct HomeView: View {
                 }
             }
         }
-        .task {
-            if !session.hasLoadedHomeActivities || !session.hasLoadedHomeCourses || !session.hasLoadedHomeUpcoming {
-                await session.refresh()
+        .sheet(item: $selectedCreateAction) { action in
+            SchoologyHomeCreateComposerView(destinations: createDestinations, action: action) {
+                Task {
+                    await session.refresh()
+                    postableDestinations = await session.loadPostableUpdateDestinations()
+                    createDestinations = await session.loadHomeCreateDestinations()
+                }
             }
-            postableDestinations = await session.loadPostableUpdateDestinations()
+        }
+        .task {
+            if !session.hasLoadedHomeActivities || !session.hasLoadedHomeCourses || !session.hasLoadedHomeUpcoming { await session.refresh() }
+            async let updateAccess = session.loadPostableUpdateDestinations()
+            async let createAccess = session.loadHomeCreateDestinations()
+            postableDestinations = await updateAccess
+            createDestinations = await createAccess
         }
     }
 

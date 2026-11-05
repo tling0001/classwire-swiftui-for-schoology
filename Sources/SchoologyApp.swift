@@ -18,6 +18,15 @@ struct SchoologyApp: App {
                 .task { await updateService.checkForUpdates() }
                 .tint(SchoologyStyle.blue)
                 .preferredColorScheme(session.appearance.colorScheme)
+                #if os(macOS)
+                .onChange(of: session.appearance, initial: true) { _, appearance in
+                    switch appearance {
+                    case .system: NSApp.appearance = nil
+                    case .light: NSApp.appearance = NSAppearance(named: .aqua)
+                    case .dark: NSApp.appearance = NSAppearance(named: .darkAqua)
+                    }
+                }
+                #endif
         }
         #if os(macOS)
         .commands {

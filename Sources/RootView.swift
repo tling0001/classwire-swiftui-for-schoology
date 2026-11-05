@@ -101,15 +101,17 @@ private struct SchoologySidebar: View {
         List(selection: $selection) {
             sidebarSections
         }
+        .navigationTitle(Text("Schoology"))
+        .listStyle(.sidebar)
         #else
         List {
             sidebarSections
         }
-        #endif
-        .navigationTitle("Schoology")
+        .navigationTitle(Text("Schoology"))
         .listStyle(.sidebar)
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
+        #endif
         #endif
     }
 
