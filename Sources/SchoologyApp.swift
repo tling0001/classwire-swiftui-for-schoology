@@ -28,6 +28,14 @@ struct SchoologyApp: App {
                 }
                 #endif
         }
+        #if os(iOS)
+        .backgroundTask(.appRefresh(SchoologyBackgroundRefresh.identifier)) {
+            if session.isSignedIn {
+                await session.loadNotifications(force: true, markRead: false)
+                SchoologyBackgroundRefresh.schedule()
+            }
+        }
+        #endif
         #if os(macOS)
         .commands {
             SchoologyCommands(session: session)

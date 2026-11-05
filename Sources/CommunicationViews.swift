@@ -5,8 +5,10 @@ struct MessagesView: View {
     @State private var folder: SchoologyMessageFolder = .inbox
     @State private var messages: [SchoologyMessage] = []
     @State private var selectedMessage: SchoologyMessage?
-    @State private var isLoading = false
+    @State private var loadingFolder: SchoologyMessageFolder?
     @State private var loadError: String?
+
+    private var isLoading: Bool { loadingFolder == folder }
     @State private var showingComposer = false
 
     var body: some View {
@@ -49,21 +51,29 @@ struct MessagesView: View {
             .padding(.horizontal)
             .padding(.vertical, 10)
 
-            if isLoading && messages.isEmpty {
-                ProgressView("Loading messages…").frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if let loadError, messages.isEmpty {
-                ContentUnavailableView("Unable to load messages", systemImage: "exclamationmark.triangle", description: Text(loadError))
-            } else if messages.isEmpty {
-                ContentUnavailableView("No messages", systemImage: "envelope", description: Text(folder == .unread ? "Your inbox has no unread messages." : "Messages will appear here."))
+            if messages.isEmpty {
+                if isLoading {
+                    ProgressView("Loading messages…")
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else if let loadError {
+                    ContentUnavailableView("Unable to load messages", systemImage: "exclamationmark.triangle", description: Text(loadError))
+                } else {
+                    ContentUnavailableView("No messages", systemImage: "envelope", description: Text(folder == .unread ? "Your inbox has no unread messages." : "Messages will appear here."))
+                }
             } else {
-                List(messages) { message in
-                    if folder == .unread || folder == .inbox {
-                        Button { selectedMessage = message } label: { messageRow(message) }
-                            .buttonStyle(.plain)
-                    } else {
-                        Button { selectedMessage = message } label: { messageRow(message) }
-                            .buttonStyle(.plain)
+                if isLoading {
+                    HStack(spacing: 8) {
+                        ProgressView().controlSize(.small)
+                        Text("Loading \(folder.rawValue.lowercased())…")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 7)
+                }
+                List(messages) { message in
+                    Button { selectedMessage = message } label: { messageRow(message) }
+                        .buttonStyle(.plain)
                 }
                 .listStyle(.plain)
                 .refreshable { await loadFolder(force: true) }
@@ -77,8 +87,11 @@ struct MessagesView: View {
         }
         .sheet(isPresented: $showingComposer) {
             SchoologyMessageComposerView {
-                folder = .sent
-                Task { await loadFolder(force: true) }
+                if folder == .sent {
+                    Task { await loadFolder(force: true) }
+                } else {
+                    folder = .sent
+                }
             }
         }
     }
@@ -119,13 +132,17 @@ struct MessagesView: View {
     }
 
     private func loadFolder(force: Bool = false) async {
-        guard !isLoading else { return }
-        isLoading = true
-        loadError = nil
-        let result = await session.loadMessages(folder: folder, force: force)
+        let requestedFolder = folder
+        loadingFolder = requestedFolder
+        defer {
+            if loadingFolder == requestedFolder { loadingFolder = nil }
+        }
+        messages = session.cachedMessages(for: requestedFolder)
+        loadError = session.messageErrors[requestedFolder.rawValue]
+        let result = await session.loadMessages(folder: requestedFolder, force: force)
+        guard !Task.isCancelled, folder == requestedFolder else { return }
         messages = result
-        loadError = session.errorMessage
-        isLoading = false
+        loadError = session.messageErrors[requestedFolder.rawValue]
         if let selectedMessage, !result.contains(where: { $0.id == selectedMessage.id }) {
             self.selectedMessage = nil
         }

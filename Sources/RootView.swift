@@ -14,13 +14,15 @@ private enum SchoologyNavigationPath: Hashable {
 struct RootView: View {
     @Environment(AppSession.self) private var session
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var preferredCompactColumn: NavigationSplitViewColumn = .detail
     @State private var selectedRoute: SchoologySidebarSelection = .destination(.home)
     @State private var detailPath: [SchoologyNavigationPath] = []
 
     var body: some View {
         Group {
             if session.isSignedIn {
-                NavigationSplitView {
+                NavigationSplitView(preferredCompactColumn: $preferredCompactColumn) {
                     SchoologySidebar(selection: $selectedRoute)
                         #if os(macOS)
                         .navigationSplitViewColumnWidth(min: 250, ideal: 285, max: 360)
@@ -41,6 +43,9 @@ struct RootView: View {
                 .navigationSplitViewStyle(.balanced)
                 .task {
                     selectedRoute = .destination(session.destination)
+                    #if os(iOS)
+                    if session.isSignedIn { SchoologyBackgroundRefresh.schedule() }
+                    #endif
                 }
                 #if os(macOS)
                 .onChange(of: selectedRoute) { _, route in
@@ -49,14 +54,16 @@ struct RootView: View {
                         session.destination = destination
                     }
                 }
-                #endif
+                .onChange(of: session.destination) { _, destination in
+                    let route = SchoologySidebarSelection.destination(destination)
+                    if selectedRoute != route { selectedRoute = route }
+                }
+                #else
                 .onChange(of: detailPath) { _, path in
                     guard case .sidebar(.destination(let destination))? = path.last else { return }
                     session.destination = destination
                 }
-                .onChange(of: session.destination) { _, destination in
-                    selectedRoute = .destination(destination)
-                }
+                #endif
                 .onChange(of: session.pendingPersonProfileID) { _, userID in
                     guard let userID else { return }
                     detailPath.append(.person(userID))
@@ -67,6 +74,13 @@ struct RootView: View {
             }
         }
         .animation(reduceMotion ? nil : .snappy(duration: 0.24), value: session.isSignedIn)
+        .onChange(of: scenePhase) { _, phase in
+            #if os(iOS)
+            if phase == .background, session.isSignedIn {
+                SchoologyBackgroundRefresh.schedule()
+            }
+            #endif
+        }
     }
 
     @ViewBuilder

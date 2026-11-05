@@ -9,7 +9,7 @@ settings:
   base:
     SWIFT_VERSION: "6.0"
     MARKETING_VERSION: "2026.10.0"
-    CURRENT_PROJECT_VERSION: "42"
+    CURRENT_PROJECT_VERSION: "43"
     PRODUCT_NAME: Schoology
     INFOPLIST_KEY_CFBundleDisplayName: Schoology
     GENERATE_INFOPLIST_FILE: YES
@@ -32,6 +32,10 @@ targets:
         INFOPLIST_KEY_NSPhotoLibraryUsageDescription: Attach files and images to Schoology assignments.
         INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        UIBackgroundModes:
+          - fetch
+        BGTaskSchedulerPermittedIdentifiers:
+          - com.schoologytauri.app.notifications-refresh
         SUPPORTS_MACCATALYST: NO
     info:
       path: Config/Generated-iOS-Info.plist

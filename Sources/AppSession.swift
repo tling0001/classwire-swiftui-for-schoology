@@ -38,6 +38,8 @@ final class AppSession {
     var notificationsHasMore = true
     var notificationsError: String?
     var messageFolder = SchoologyMessageFolder.inbox
+    var cachedMessagesByFolder: [String: [SchoologyMessage]] = [:]
+    var messageErrors: [String: String] = [:]
     var activities: [SchoologyActivity] = []
     var upcomingEvents: [SchoologyUpcomingEvent] = []
     var hasLoadedHomeActivities = false
@@ -1074,10 +1076,19 @@ final class AppSession {
         return users
     }
 
+    func cachedMessages(for folder: SchoologyMessageFolder) -> [SchoologyMessage] {
+        cachedMessagesByFolder[folder.rawValue] ?? []
+    }
+
     func loadMessages(folder: SchoologyMessageFolder, force: Bool = false) async -> [SchoologyMessage] {
         guard let auth else { return [] }
         messageFolder = folder
+        if !force, let cached = cachedMessagesByFolder[folder.rawValue] {
+            messageErrors[folder.rawValue] = nil
+            return cached
+        }
         errorMessage = nil
+        messageErrors[folder.rawValue] = nil
         let endpoint = folder == .sent ? "messages/sent" : "messages/inbox"
         do {
             let data = try await api.get(endpoint, auth: auth, params: ["limit": "50"])
@@ -1095,10 +1106,14 @@ final class AppSession {
                     ?? (id == auth.userID ? user?.pictureURL : nil)
                     ?? hydrated[index].personPictureURL
             }
-            return folder == .unread ? hydrated.filter(\.isUnread) : hydrated
+            let result = folder == .unread ? hydrated.filter(\.isUnread) : hydrated
+            cachedMessagesByFolder[folder.rawValue] = result
+            return result
         } catch {
-            errorMessage = error.localizedDescription
-            return []
+            let message = error.localizedDescription
+            errorMessage = message
+            messageErrors[folder.rawValue] = message
+            return cachedMessagesByFolder[folder.rawValue] ?? []
         }
     }
 
@@ -1135,7 +1150,7 @@ final class AppSession {
         }
     }
 
-    func loadNotifications(force: Bool = false) async {
+    func loadNotifications(force: Bool = false, markRead: Bool = true) async {
         guard let auth, !isLoadingNotifications else { return }
         if !force && hasLoadedNotifications && !notificationsHasMore { return }
         let start = force ? 0 : notifications.count
@@ -1159,7 +1174,7 @@ final class AppSession {
             notificationsError = nil
             hasLoadedNotifications = true
             // Android marks the collection read after the first response reports unread items.
-            if start == 0 && page.unviewedCount > 0 {
+            if markRead && start == 0 && page.unviewedCount > 0 {
                 _ = try? await api.post("notifications/read", auth: auth)
             }
         } catch {
@@ -1466,6 +1481,8 @@ final class AppSession {
         courses = []
         groups = []
         notifications = []
+        cachedMessagesByFolder = [:]
+        messageErrors = [:]
         hasLoadedNotifications = false
         isLoadingNotifications = false
         isLoadingMoreNotifications = false

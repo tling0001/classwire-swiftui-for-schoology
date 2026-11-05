@@ -13,34 +13,45 @@ struct SchoologyLikesView: View {
         Group {
             if isLoading {
                 ProgressView("Loading likes…")
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .padding(36)
+                    .frame(maxWidth: .infinity)
             } else if let errorMessage {
                 ContentUnavailableView("Unable to load likes", systemImage: "exclamationmark.triangle", description: Text(errorMessage))
             } else if users.isEmpty {
                 ContentUnavailableView("No likes yet", systemImage: "hand.thumbsup")
             } else {
-                List(users) { user in
-                    Button {
-                        onSelect(user.id)
-                        dismiss()
-                    } label: {
-                        HStack(spacing: 12) {
-                            if let pictureURL = user.pictureURL {
-                                AuthenticatedSchoologyImage(url: pictureURL)
-                                    .frame(width: 36, height: 36)
-                                    .clipShape(Circle())
-                            } else {
-                                Image(systemName: "person.crop.circle.fill")
-                                    .font(.system(size: 34))
-                                    .foregroundStyle(.secondary)
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 0) {
+                        ForEach(users) { user in
+                            Button {
+                                onSelect(user.id)
+                                dismiss()
+                            } label: {
+                                HStack(spacing: 12) {
+                                    if let pictureURL = user.pictureURL {
+                                        AuthenticatedSchoologyImage(url: pictureURL)
+                                            .frame(width: 36, height: 36)
+                                            .clipShape(Circle())
+                                    } else {
+                                        Image(systemName: "person.crop.circle.fill")
+                                            .font(.system(size: 34))
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    Text(user.title)
+                                        .font(.body.weight(.medium))
+                                    Spacer(minLength: 0)
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 9)
+                                .contentShape(Rectangle())
                             }
-                            Text(user.title)
-                                .font(.body.weight(.medium))
+                            .buttonStyle(.plain)
                         }
-                        .padding(.vertical, 3)
                     }
+                    .padding(.vertical, 8)
                 }
-                .listStyle(.plain)
+                .frame(maxHeight: 520)
             }
         }
         .navigationTitle("Likes")

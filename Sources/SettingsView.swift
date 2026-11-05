@@ -12,6 +12,7 @@ struct SettingsView: View {
     @State private var isInstallingUpdate = false
     @State private var isInstallingClassic = false
     @State private var showingClassicConfirmation = false
+    @State private var showingIOSInstallNotice = false
     @State private var installError: String?
     @State private var classicInstallError: String?
 
@@ -92,7 +93,10 @@ struct SettingsView: View {
                             #if os(macOS)
                             Task { await installMacOSUpdate() }
                             #else
-                            if let url = updates.installURL { openURL(url) }
+                            if let url = updates.installURL {
+                                openURL(url)
+                                showingIOSInstallNotice = true
+                            }
                             #endif
                         }
                         .disabled(isUpdateInstallDisabled)
@@ -161,6 +165,11 @@ struct SettingsView: View {
             Button("Cancel", role: .cancel) { }
         } message: {
             Text("This replaces the current Schoology SwiftUI app with Schoology Classic. Your app will be updated in place and may close during installation.")
+        }
+        .alert("Installing update", isPresented: $showingIOSInstallNotice) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text("Schoology installation will start after closing Schoology or going to your Home Screen.")
         }
     }
 

@@ -1,3 +1,25 @@
+## [2026.10.0-port.43]
+
+### iOS navigation and updates
+- Restore the detail-first compact navigation state so iPhone opens directly to Home.
+- Prevent sidebar navigation path changes from feeding back into the root destination and replacing the active detail stack.
+- Show the Tauri-matching installation notice after handing an iOS update manifest to the system installer.
+
+### Messages
+- Cache Inbox, Unread, and Sent independently after their first load.
+- Load folders on demand, reuse cached results when switching, and show progress while a folder is loading.
+- Preserve cached messages if a refresh fails.
+
+### macOS presentation sizing
+- Size attachment and likes sheets to their content, with a scrollable maximum height instead of a tall fixed minimum.
+
+### Background notification refresh
+- Schedule opportunistic iOS background refreshes for Schoology notifications without marking them read.
+- Keep refresh work within iOS background execution limits; remote APNs delivery requires a separately configured provider service.
+
+### Build
+- Increment bundle build number to 43.
+
 ## [2026.10.0-port.42]
 
 ### Home create actions

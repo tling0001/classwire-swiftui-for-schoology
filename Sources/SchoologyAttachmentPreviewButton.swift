@@ -39,7 +39,9 @@ struct SchoologyAttachmentsView: View {
                 .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
         }
         #if os(macOS)
-        .frame(minWidth: 440, idealWidth: 520, minHeight: 440, idealHeight: 600)
+        .frame(minWidth: 440, idealWidth: 520)
+        .frame(height: min(max(CGFloat(attachments.count) * 92 + 72, 180), 560))
+        .schoologyFittedSheet()
         #else
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)

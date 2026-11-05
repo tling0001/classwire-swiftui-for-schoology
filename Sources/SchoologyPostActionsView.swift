@@ -112,10 +112,11 @@ struct SchoologyPostActionsView: View {
                     SchoologyLikesView(target: .update(activity.id)) { userID in
                         session.showPersonProfile(userID: userID)
                     }
+                    .schoologyFittedSheet()
                 }
             }
             #if os(macOS)
-            .frame(minWidth: 400, idealWidth: 520, minHeight: 560, idealHeight: 680)
+            .frame(minWidth: 400, idealWidth: 520)
             #else
             .presentationDetents(presentedSheet?.id == "likes" ? [.large] : [.medium, .large])
             .presentationDragIndicator(.visible)
