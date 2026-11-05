@@ -281,6 +281,7 @@ struct RecentActivityView: View {
 private struct SchoologyActivityCard: View {
     @Environment(AppSession.self) private var session
     let activity: SchoologyActivity
+    @ScaledMetric(relativeTo: .body) private var postMinimumFontSize: CGFloat = 15.5
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -309,7 +310,7 @@ private struct SchoologyActivityCard: View {
             }
 
             if !activity.body.isEmpty {
-                SchoologyRichTextText(activity.body)
+                SchoologyRichTextText(activity.body, minimumFontSize: postMinimumFontSize)
                     .font(.body)
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -323,14 +324,10 @@ private struct SchoologyActivityCard: View {
             }
 
             if !activity.attachments.isEmpty {
-                VStack(alignment: .leading, spacing: 8) {
-                    ForEach(activity.attachments) { attachment in
-                        SchoologyAttachmentPreviewButton(attachment: attachment)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(10)
-                            .background(.quaternary, in: RoundedRectangle(cornerRadius: 10))
-                    }
-                }
+                SchoologyAttachmentsButton(attachments: activity.attachments)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(10)
+                    .background(.quaternary, in: RoundedRectangle(cornerRadius: 10))
             }
 
             Divider()
@@ -629,6 +626,14 @@ struct UpcomingEventDetailView: View {
                 SchoologyEmbeddedWebView(url: url, title: event.title)
             } else {
                 unavailableTarget("Schoology did not provide an event destination.")
+            }
+        case "external_tool", "lti", "lti_assignment":
+            if let sectionID = event.sectionID, let assignmentID = event.assignmentID {
+                SchoologyAssignmentDetailView(sectionID: sectionID, assignmentID: assignmentID, title: event.title)
+            } else if let url = event.webURL {
+                SchoologyEmbeddedWebView(url: url, title: event.title)
+            } else {
+                unavailableTarget("Schoology did not provide an external-tool assignment destination.")
             }
         case "assessment", "assessment_v2", "managed_assessment", "quiz":
             if let url = event.webURL {

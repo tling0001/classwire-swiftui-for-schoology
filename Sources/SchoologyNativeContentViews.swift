@@ -8,66 +8,119 @@ struct SchoologyDiscussionDetailView: View {
     let itemID: String
     let title: String
     @State private var discussion: SchoologyProfileItem?
-    @State private var comments: [SchoologyProfileItem] = []
-    @State private var draft = ""
+    @State private var selectedTab: SchoologyAssignmentTab = .info
     @State private var loading = true
     @State private var error: String?
 
     var body: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 14) {
-                if loading { ProgressView("Loading discussion…").frame(maxWidth: .infinity) }
-                if let error { ContentUnavailableView("Unable to load discussion", systemImage: "exclamationmark.triangle", description: Text(error)) }
-                if let discussion {
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text(discussion.title).font(.title2.weight(.semibold))
-                        if !discussion.subtitle.isEmpty { Text(discussion.subtitle).font(.caption).foregroundStyle(.secondary) }
-                        SchoologyRichTextText(discussion.body.isEmpty ? "No discussion content." : discussion.body).textSelection(.enabled)
-                        if let url = discussion.url { Link(destination: url) { Label("Open attachment", systemImage: "paperclip") } }
-                    }.padding(16).frame(maxWidth: .infinity, alignment: .leading)
-                        .background(.background, in: RoundedRectangle(cornerRadius: 14))
-                }
-                Text("Discussion").font(.headline)
-                if comments.isEmpty && !loading { ContentUnavailableView("No replies yet", systemImage: "bubble.left") }
-                ForEach(comments) { comment in
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(comment.title).font(.subheadline.weight(.semibold))
-                        SchoologyRichTextText(comment.body).textSelection(.enabled)
-                        if !comment.subtitle.isEmpty { Text(comment.subtitle).font(.caption).foregroundStyle(.secondary) }
-                    }.padding(13).frame(maxWidth: .infinity, alignment: .leading)
-                        .background(.background, in: RoundedRectangle(cornerRadius: 12))
-                }
-                HStack(alignment: .bottom) {
-                    TextField("Add a reply…", text: $draft, axis: .vertical).lineLimit(2...5)
-                    Button("Post", systemImage: "paperplane.fill") { Task { await postReply() } }
-                        .disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                }.padding(12).background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
-            }.padding().frame(maxWidth: 900).frame(maxWidth: .infinity)
+        Group {
+            if loading && discussion == nil {
+                ProgressView("Loading discussion…").frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if let error, discussion == nil {
+                ContentUnavailableView("Unable to load discussion", systemImage: "exclamationmark.triangle", description: Text(error))
+            } else if let discussion {
+                discussionTabs(discussion)
+            }
         }
-        .navigationTitle(title)
+        .navigationTitle(discussion?.title ?? title)
         .task(id: itemID) { await load() }
         .refreshable { await load() }
     }
 
-    private func load() async {
-        loading = true; error = nil
-        do {
-            async let detail = session.loadDiscussion(realm: realm, realmID: realmID, discussionID: itemID)
-            async let replies = session.loadDiscussionComments(realm: realm, realmID: realmID, discussionID: itemID)
-            discussion = try await detail
-            comments = try await replies
-        } catch { self.error = error.localizedDescription }
-        loading = false
+    @ViewBuilder
+    private func discussionTabs(_ discussion: SchoologyProfileItem) -> some View {
+        #if os(macOS)
+        if #available(macOS 15.0, *) {
+            modernDiscussionTabs(discussion)
+        } else {
+            legacyDiscussionTabs(discussion)
+        }
+        #else
+        modernDiscussionTabs(discussion)
+        #endif
     }
 
-    private func postReply() async {
-        let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty else { return }
+    @available(macOS 15.0, *)
+    private func modernDiscussionTabs(_ discussion: SchoologyProfileItem) -> some View {
+        TabView(selection: $selectedTab) {
+            Tab("Info", systemImage: "info.circle", value: SchoologyAssignmentTab.info) {
+                infoPane(discussion)
+            }
+            Tab("Discussion", systemImage: "bubble.left", value: SchoologyAssignmentTab.comments) {
+                SchoologyEntityCommentsView(
+                    title: "Discussion",
+                    entityID: itemID,
+                    loadComments: { try await session.loadDiscussionComments(realm: realm, realmID: realmID, discussionID: itemID) },
+                    submitComment: { body, parentID in
+                        try await session.postDiscussionComment(realm: realm, realmID: realmID, discussionID: itemID, body: body, parentID: parentID)
+                    }
+                )
+            }
+        }
+    }
+
+    private func legacyDiscussionTabs(_ discussion: SchoologyProfileItem) -> some View {
+        TabView(selection: $selectedTab) {
+            infoPane(discussion)
+                .tabItem { Label("Info", systemImage: "info.circle") }
+                .tag(SchoologyAssignmentTab.info)
+            SchoologyEntityCommentsView(
+                title: "Discussion",
+                entityID: itemID,
+                loadComments: { try await session.loadDiscussionComments(realm: realm, realmID: realmID, discussionID: itemID) },
+                submitComment: { body, parentID in
+                    try await session.postDiscussionComment(realm: realm, realmID: realmID, discussionID: itemID, body: body, parentID: parentID)
+                }
+            )
+            .tabItem { Label("Discussion", systemImage: "bubble.left") }
+            .tag(SchoologyAssignmentTab.comments)
+        }
+    }
+
+    private func infoPane(_ discussion: SchoologyProfileItem) -> some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text(discussion.title).font(.title2.bold())
+                    if !discussion.subtitle.isEmpty {
+                        Label(discussion.subtitle, systemImage: "calendar").font(.subheadline).foregroundStyle(.secondary)
+                    }
+                    SchoologyRichTextText(discussion.body.isEmpty ? "No discussion content." : discussion.body)
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    if let url = discussion.url {
+                        if !discussion.fileName.isEmpty || !discussion.fileMIME.isEmpty || !url.pathExtension.isEmpty {
+                            SchoologyAttachmentsButton(attachments: [
+                                SchoologyAttachment(
+                                    title: discussion.fileName.isEmpty ? discussion.title : discussion.fileName,
+                                    url: url,
+                                    viewURL: discussion.fileViewURL
+                                )
+                            ])
+                        } else {
+                            Link(destination: url) { Label("Open attachment", systemImage: "paperclip") }
+                        }
+                    }
+                }
+                .padding(16)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(.background, in: RoundedRectangle(cornerRadius: 14))
+            }
+            .padding()
+            .frame(maxWidth: 900)
+            .frame(maxWidth: .infinity)
+        }
+    }
+
+    private func load() async {
+        loading = true
+        error = nil
         do {
-            try await session.postComment(realm: realm, realmID: realmID, entity: "discussions", entityID: itemID, body: text)
-            draft = ""
-            comments = try await session.loadDiscussionComments(realm: realm, realmID: realmID, discussionID: itemID)
-        } catch { self.error = error.localizedDescription }
+            discussion = try await session.loadDiscussion(realm: realm, realmID: realmID, discussionID: itemID)
+        } catch {
+            self.error = error.localizedDescription
+        }
+        loading = false
     }
 }
 

@@ -1,3 +1,27 @@
+## [2026.10.0-port.49]
+
+### Calendar and discussions
+- Reuse the Upcoming event list and detail router in Calendar's selected-day split, including quiz, assignment, discussion, event, and LTI destinations.
+- Add native Info and Discussion tabs to discussion details.
+- Share the same author-aware comment thread, replies, likes, and attachment actions between assignment comments and discussion threads.
+- Route assignment and discussion comments through the verified Schoology comment endpoints.
+
+### Messages and submissions
+- Align the multi-line message editor with the Subject field while preserving line breaks in the sent message payload.
+- Make text and file submission composers available from every assignment tab and return to Submissions after a successful submission.
+- Add optional assignment-level comments to text and file submissions; post them separately from the revision so they remain attached to the overall assignment discussion.
+- Prevent duplicate submission creation if posting the optional comment fails.
+
+### Attachments and reading
+- Reuse one attachments action list for posts, comments, and message details.
+- Preserve the original attachment filename in save/export flows.
+- Use native Liquid Glass View and Download buttons on supported OS versions, with a standard fallback.
+- Keep iPhone/iPad course-material folder rows compact and limit folder descriptions to one line.
+- Increase undersized imported post text while respecting Dynamic Type.
+
+### Build
+- Increment the iOS and macOS bundle build number to 49.
+
 ## [2026.10.0-port.48]
 
 ### Assignment submissions

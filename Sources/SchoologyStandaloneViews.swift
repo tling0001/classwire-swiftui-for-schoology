@@ -386,23 +386,11 @@ struct SchoologyCalendarView: View {
     }
 
     private var selectedDayContent: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(selectedDate.formatted(date: .complete, time: .omitted))
-                .font(.headline)
-            if session.isLoadingCalendar && session.calendarMonthEvents.isEmpty {
-                ProgressView("Loading calendar…")
-            } else if let error = session.calendarError, session.calendarMonthEvents.isEmpty {
-                ContentUnavailableView("Unable to load calendar", systemImage: "exclamationmark.triangle",
-                    description: Text(error))
-            } else if selectedEvents.isEmpty {
-                ContentUnavailableView("No events on this date", systemImage: "calendar")
-                    .frame(maxWidth: .infinity, minHeight: 160)
-            } else {
-                ForEach(selectedEvents) { event in
-                    SchoologyCalendarEventRow(event: event)
-                }
-            }
-        }
+        UpcomingEventList(
+            events: selectedEvents,
+            isLoading: session.isLoadingCalendar && session.calendarMonthEvents.isEmpty,
+            errorMessage: session.calendarError
+        )
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
@@ -436,51 +424,3 @@ struct SchoologyCalendarView: View {
     }
 }
 
-private struct SchoologyCalendarEventRow: View {
-    @Environment(AppSession.self) private var session
-    let event: SchoologyUpcomingEvent
-
-    var body: some View {
-        Group {
-            if event.type == "assignment", let assignmentID = event.assignmentID, let sectionID = event.sectionID {
-                NavigationLink {
-                    SchoologyAssignmentDetailView(sectionID: sectionID, assignmentID: assignmentID, title: event.title)
-                } label: { rowContent }
-            } else if event.type == "discussion" {
-                NavigationLink {
-                    SchoologyDiscussionDetailView(realm: event.sectionID == nil ? "users" : "sections",
-                        realmID: event.sectionID ?? session.auth?.userID ?? "", itemID: event.discussionID ?? event.id, title: event.title)
-                } label: { rowContent }
-            } else {
-                NavigationLink {
-                    SchoologyEventDetailView(realm: event.sectionID == nil ? "users" : "sections",
-                        realmID: event.sectionID ?? session.auth?.userID ?? "", eventID: event.id, title: event.title)
-                } label: { rowContent }
-            }
-        }
-    }
-
-    private var rowContent: some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon).font(.title3).foregroundStyle(SchoologyStyle.blue).frame(width: 30)
-            VStack(alignment: .leading, spacing: 3) {
-                Text(event.title).foregroundStyle(.primary)
-                Text(event.typeLabel).font(.caption).foregroundStyle(.secondary)
-            }
-            Spacer()
-            VStack(alignment: .trailing, spacing: 3) {
-                if let date = event.date { Text(date.formatted(date: .abbreviated, time: .omitted)).font(.caption) }
-                if !event.timeLabel.isEmpty { Text(event.timeLabel).font(.caption).foregroundStyle(.secondary) }
-            }
-        }.padding(.vertical, 4)
-    }
-
-    private var icon: String {
-        switch event.type {
-        case "assignment": "doc.text"
-        case "discussion": "text.bubble"
-        case "assessment", "assessment_v2", "managed_assessment", "quiz": "checklist"
-        default: "calendar"
-        }
-    }
-}

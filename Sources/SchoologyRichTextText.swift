@@ -11,13 +11,17 @@ struct SchoologyRichTextText: View {
     @Environment(AppSession.self) private var session
     @Environment(\.colorScheme) private var colorScheme
     let value: String
+    let minimumFontSize: CGFloat?
 
-    init(_ value: String) { self.value = value }
+    init(_ value: String, minimumFontSize: CGFloat? = nil) {
+        self.value = value
+        self.minimumFontSize = minimumFontSize
+    }
 
     var body: some View {
         if Self.containsHTML(value) {
             VStack(alignment: .leading, spacing: 10) {
-                if let attributed = Self.attributedHTML(value, colorScheme: colorScheme) {
+                if let attributed = Self.attributedHTML(value, colorScheme: colorScheme, minimumFontSize: minimumFontSize) {
                     Text(attributed)
                         .textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -47,7 +51,7 @@ struct SchoologyRichTextText: View {
         value.range(of: #"<[a-zA-Z][^>]*>"#, options: .regularExpression) != nil
     }
 
-    private static func attributedHTML(_ html: String, colorScheme: ColorScheme) -> AttributedString? {
+    private static func attributedHTML(_ html: String, colorScheme: ColorScheme, minimumFontSize: CGFloat?) -> AttributedString? {
         let document = """
         <!doctype html><html><head><meta charset="utf-8">
         <meta name="color-scheme" content="light dark">
@@ -84,6 +88,23 @@ struct SchoologyRichTextText: View {
         }
         for range in lowContrastRanges {
             mutable.addAttribute(.foregroundColor, value: adaptiveLabelColor, range: range)
+        }
+        if let minimumFontSize {
+            var resizedFonts: [(NSRange, Any)] = []
+            mutable.enumerateAttribute(.font, in: fullRange) { rawFont, range, _ in
+                #if os(iOS)
+                if let font = rawFont as? UIFont, font.pointSize < minimumFontSize {
+                    resizedFonts.append((range, UIFont(descriptor: font.fontDescriptor, size: minimumFontSize)))
+                }
+                #elseif os(macOS)
+                if let font = rawFont as? NSFont, font.pointSize < minimumFontSize {
+                    resizedFonts.append((range, NSFontManager.shared.convert(font, toSize: minimumFontSize)))
+                }
+                #endif
+            }
+            for (range, font) in resizedFonts {
+                mutable.addAttribute(.font, value: font, range: range)
+            }
         }
         return AttributedString(mutable)
     }

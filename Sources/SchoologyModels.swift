@@ -218,7 +218,7 @@ struct SchoologyUpcomingEvent: Identifiable, Sendable {
         case "assignment": "Assignment"
         case "assessment", "assessment_v2", "managed_assessment", "quiz": "Test or Quiz"
         case "discussion": "Discussion"
-        case "external_tool": "External Tool"
+        case "external_tool", "lti", "lti_assignment": "External Tool"
         case "event": "Event"
         default: "Upcoming"
         }

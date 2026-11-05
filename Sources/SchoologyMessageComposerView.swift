@@ -57,10 +57,7 @@ struct SchoologyMessageComposerView: View {
                                 .allowsHitTesting(false)
                         }
                     }
-                    .padding(8)
-                    .background(.quaternary.opacity(0.22), in: RoundedRectangle(cornerRadius: 9))
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 5)
+                    .frame(maxWidth: .infinity, minHeight: 132, alignment: .topLeading)
                 }
                 Section("Attachments") {
                     Button("Attach File", systemImage: "paperclip") { showingFileImporter = true }

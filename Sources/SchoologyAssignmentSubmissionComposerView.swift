@@ -18,6 +18,8 @@ struct SchoologyAssignmentSubmissionComposerView: View {
     @State private var uploadingFileID: String?
     @State private var completedUploadCount = 0
     @State private var errorMessage: String?
+    @State private var comment = ""
+    @State private var submissionCreated = false
 
     private var hasAttachments: Bool { !selectedFiles.isEmpty || !selectedResources.isEmpty }
 
@@ -74,6 +76,10 @@ struct SchoologyAssignmentSubmissionComposerView: View {
                         }
                     }
                 }
+                Section("Comment (Optional)") {
+                    TextField("Add a comment…", text: $comment, axis: .vertical)
+                        .lineLimit(2...5)
+                }
                 if isSubmitting && !selectedFiles.isEmpty {
                     Section("Upload Progress") {
                         ProgressView(value: Double(completedUploadCount), total: Double(max(selectedFiles.count, 1)))
@@ -93,7 +99,11 @@ struct SchoologyAssignmentSubmissionComposerView: View {
                     Button("Cancel") { dismiss() }.disabled(isSubmitting)
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Submit") { Task { await submit() } }.disabled(!hasAttachments || isSubmitting)
+                    if submissionCreated {
+                        Button("Done") { dismiss() }
+                    } else {
+                        Button("Submit") { Task { await submit() } }.disabled(!hasAttachments || isSubmitting)
+                    }
                 }
             }
         }
@@ -159,7 +169,17 @@ struct SchoologyAssignmentSubmissionComposerView: View {
                 sectionID: sectionID,
                 assignmentID: assignmentID
             )
+            submissionCreated = true
             onSubmitted()
+            let commentBody = comment.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !commentBody.isEmpty {
+                do {
+                    try await session.postAssignmentComment(sectionID: sectionID, assignmentID: assignmentID, body: commentBody)
+                } catch {
+                    errorMessage = "Your submission was uploaded, but its comment could not be posted: \(error.localizedDescription)"
+                    return
+                }
+            }
             dismiss()
         } catch {
             errorMessage = error.localizedDescription

@@ -6,7 +6,6 @@ struct SchoologyAssignmentSubmissionView: View {
     @State private var summary: SchoologyAssignmentSubmissionSummary?
     @State private var loading = true
     @State private var error: String?
-    @Binding var showingTextComposer: Bool
     @State private var selectedStudent: SchoologyAssignmentStudent?
     @Binding var refreshID: UUID
     var body: some View {
@@ -88,9 +87,6 @@ struct SchoologyAssignmentSubmissionView: View {
             }
         }
         .task(id: refreshID) { await load() }
-        .sheet(isPresented: $showingTextComposer) {
-            SchoologyTextSubmissionComposerView(sectionID: sectionID, context: context) { refreshID = UUID() }
-        }
         .sheet(item: $selectedStudent) { student in
             SchoologyTeacherStudentSubmissionView(
                 sectionID: sectionID,

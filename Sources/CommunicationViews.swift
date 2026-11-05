@@ -189,8 +189,8 @@ private struct MessageThreadView: View {
                                 SchoologyRichTextText(item.body.isEmpty ? " " : item.body)
                                     .frame(maxWidth: .infinity, alignment: .leading)
                                     .textSelection(.enabled)
-                                ForEach(item.attachments) { attachment in
-                                    SchoologyAttachmentPreviewButton(attachment: attachment)
+                                if !item.attachments.isEmpty {
+                                    SchoologyAttachmentsButton(attachments: item.attachments)
                                         .frame(maxWidth: .infinity, alignment: .leading)
                                 }
                             }

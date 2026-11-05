@@ -7,6 +7,7 @@ import AppKit
 
 private struct SchoologyAttachmentDocument: FileDocument {
     static var readableContentTypes: [UTType] { [.data] }
+    static var writableContentTypes: [UTType] { [.data] }
     var data: Data
 
     init(data: Data) { self.data = data }
@@ -86,29 +87,31 @@ private struct SchoologyAttachmentActionRow: View {
                 .font(.subheadline.weight(.medium))
                 .lineLimit(2)
             HStack(spacing: 12) {
-                Button {
-                    Task { await loadForViewing() }
-                } label: {
-                    if isLoadingView {
-                        ProgressView().frame(minWidth: 72, minHeight: 40)
-                    } else {
-                        Label("View", systemImage: "eye").frame(minWidth: 72, minHeight: 40)
+                actionButtonStyle(
+                    Button {
+                        Task { await loadForViewing() }
+                    } label: {
+                        if isLoadingView {
+                            ProgressView().frame(minWidth: 72, minHeight: 40)
+                        } else {
+                            Label("View", systemImage: "eye").frame(minWidth: 72, minHeight: 40)
+                        }
                     }
-                }
-                .buttonStyle(.bordered)
-                .disabled(isLoadingView || isLoadingDownload)
+                    .disabled(isLoadingView || isLoadingDownload)
+                )
 
-                Button {
-                    beginDownload()
-                } label: {
-                    if isLoadingDownload {
-                        ProgressView().frame(minWidth: 90, minHeight: 40)
-                    } else {
-                        Label("Download", systemImage: "arrow.down.to.line").frame(minWidth: 90, minHeight: 40)
+                actionButtonStyle(
+                    Button {
+                        beginDownload()
+                    } label: {
+                        if isLoadingDownload {
+                            ProgressView().frame(minWidth: 90, minHeight: 40)
+                        } else {
+                            Label("Download", systemImage: "arrow.down.to.line").frame(minWidth: 90, minHeight: 40)
+                        }
                     }
-                }
-                .buttonStyle(.bordered)
-                .disabled(isLoadingView || isLoadingDownload)
+                    .disabled(isLoadingView || isLoadingDownload)
+                )
             }
             if let errorMessage {
                 Text(errorMessage).font(.footnote).foregroundStyle(.red)
@@ -120,7 +123,7 @@ private struct SchoologyAttachmentActionRow: View {
         .fileExporter(
             isPresented: $isExportPresented,
             document: exportDocument,
-            contentTypes: [exportContentType],
+            contentTypes: [.data],
             defaultFilename: exportFilename
         ) { result in
             if case .failure(let error) = result {
@@ -141,6 +144,15 @@ private struct SchoologyAttachmentActionRow: View {
         #endif
     }
 
+    @ViewBuilder
+    private func actionButtonStyle<Content: View>(_ content: Content) -> some View {
+        if #available(iOS 26.0, macOS 26.0, *) {
+            content.buttonStyle(.glass)
+        } else {
+            content.buttonStyle(.bordered)
+        }
+    }
+
     private var icon: String {
         let ext = attachment.url.pathExtension.lowercased()
         if ["jpg","jpeg","png","gif","heic","webp"].contains(ext) { return "photo" }
@@ -156,7 +168,11 @@ private struct SchoologyAttachmentActionRow: View {
     }
 
     private var safeFilename: String {
-        var name = URL(fileURLWithPath: attachment.title).lastPathComponent
+        let suppliedName = attachment.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let candidate = suppliedName.isEmpty || suppliedName == "Attachment"
+            ? attachment.url.lastPathComponent
+            : suppliedName
+        var name = URL(fileURLWithPath: candidate).lastPathComponent
             .replacingOccurrences(of: "/", with: "_")
             .replacingOccurrences(of: ":", with: "_")
         if name.isEmpty || name == "." { name = "Attachment" }

@@ -69,10 +69,9 @@ struct SchoologyCommentRow: View {
                     .textSelection(.enabled)
             }
 
-            if !comment.isDeleted {
-                ForEach(comment.attachments) { attachment in
-                    SchoologyAttachmentPreviewButton(attachment: attachment)
-                }
+            if !comment.isDeleted, !comment.attachments.isEmpty {
+                SchoologyAttachmentsButton(attachments: comment.attachments)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
 
             HStack(spacing: 18) {

@@ -5,12 +5,9 @@ struct SchoologyAssignmentDetailView: View {
     let assignmentID: String
     let title: String
     @State private var context: SchoologyAssignmentContext?
-    @State private var comments: [SchoologyProfileItem] = []
     @State private var selectedTab: SchoologyAssignmentTab = .info
-    @State private var draft = ""
     @State private var loading = true
     @State private var error: String?
-    @State private var isPosting = false
     @State private var showingSubmissionTextComposer = false
     @State private var showingSubmissionUploadComposer = false
     @State private var submissionRefreshID = UUID()
@@ -57,6 +54,14 @@ struct SchoologyAssignmentDetailView: View {
                 }
             }
         }
+        .sheet(isPresented: $showingSubmissionTextComposer) {
+            if let context {
+                SchoologyTextSubmissionComposerView(sectionID: sectionID, context: context) {
+                    submissionRefreshID = UUID()
+                    selectedTab = .submissions
+                }
+            }
+        }
         .sheet(isPresented: $showingSubmissionUploadComposer) {
             if let context {
                 SchoologyAssignmentSubmissionComposerView(
@@ -64,6 +69,7 @@ struct SchoologyAssignmentDetailView: View {
                     assignmentID: context.assignment.id
                 ) {
                     submissionRefreshID = UUID()
+                    selectedTab = .submissions
                 }
             }
         }
@@ -125,7 +131,6 @@ struct SchoologyAssignmentDetailView: View {
         SchoologyAssignmentSubmissionView(
             sectionID: sectionID,
             context: context,
-            showingTextComposer: $showingSubmissionTextComposer,
             refreshID: $submissionRefreshID
         )
     }
@@ -164,34 +169,14 @@ struct SchoologyAssignmentDetailView: View {
     }
 
     private var commentsPane: some View {
-        VStack(spacing: 0) {
-            if let error {
-                ContentUnavailableView("Unable to load comments", systemImage: "exclamationmark.triangle", description: Text(error))
-            } else if comments.isEmpty {
-                ContentUnavailableView("No comments yet", systemImage: "bubble.left").frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 10) {
-                        ForEach(comments) { comment in
-                            VStack(alignment: .leading, spacing: 6) {
-                                Text(comment.title).font(.subheadline.bold())
-                                SchoologyRichTextText(comment.body).textSelection(.enabled)
-                                if !comment.subtitle.isEmpty { Text(comment.subtitle).font(.caption).foregroundStyle(.secondary) }
-                            }
-                            .padding(12).frame(maxWidth: .infinity, alignment: .leading)
-                            .background(.background, in: RoundedRectangle(cornerRadius: 12))
-                        }
-                    }
-                    .padding().frame(maxWidth: 900).frame(maxWidth: .infinity)
-                }
+        SchoologyEntityCommentsView(
+            title: "Comments",
+            entityID: assignmentID,
+            loadComments: { try await session.loadAssignmentComments(sectionID: sectionID, assignmentID: assignmentID) },
+            submitComment: { body, parentID in
+                try await session.postAssignmentComment(sectionID: sectionID, assignmentID: assignmentID, body: body, parentID: parentID)
             }
-            HStack(alignment: .bottom, spacing: 10) {
-                TextField("Add a comment…", text: $draft, axis: .vertical).lineLimit(2...5).textFieldStyle(.roundedBorder)
-                Button("Post", systemImage: "paperplane.fill", action: postComment)
-                    .disabled(isPosting || draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            }
-            .padding().background(.bar)
-        }
+        )
     }
 
     private func load() async {
@@ -200,28 +185,10 @@ struct SchoologyAssignmentDetailView: View {
         do {
             let loaded = try await session.loadAssignmentContext(sectionID: sectionID, assignmentID: assignmentID)
             context = loaded
-            if loaded.allowComments {
-                comments = try await session.loadAssignmentComments(sectionID: sectionID, assignmentID: assignmentID)
-            } else {
-                comments = []
-                if selectedTab == .comments { selectedTab = .info }
-            }
+            if !loaded.allowComments, selectedTab == .comments { selectedTab = .info }
             if !loaded.canSubmit && selectedTab == .submissions { selectedTab = .info }
         } catch { self.error = error.localizedDescription }
         loading = false
     }
 
-    private func postComment() {
-        let value = draft.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !value.isEmpty, let context, context.allowComments, !isPosting else { return }
-        isPosting = true
-        Task {
-            do {
-                try await session.postComment(realm: "sections", realmID: sectionID, entity: "assignments", entityID: assignmentID, body: value)
-                draft = ""
-                comments = try await session.loadAssignmentComments(sectionID: sectionID, assignmentID: assignmentID)
-            } catch { self.error = error.localizedDescription }
-            isPosting = false
-        }
-    }
 }

@@ -516,7 +516,11 @@ final class AppSession {
             .appendingPathComponent("SchoologyAttachments", isDirectory: true)
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        var filename = URL(fileURLWithPath: attachment.title).lastPathComponent
+        let suppliedName = attachment.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let candidate = suppliedName.isEmpty || suppliedName == "Attachment"
+            ? sourceURL.lastPathComponent
+            : suppliedName
+        var filename = URL(fileURLWithPath: candidate).lastPathComponent
             .replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: ":", with: "_")
         if filename.isEmpty || filename == "." { filename = "Attachment" }
         if forViewing, attachment.viewURL != nil {
@@ -782,16 +786,37 @@ final class AppSession {
         return liked
     }
 
-    func loadDiscussionComments(realm: String, realmID: String, discussionID: String) async throws -> [SchoologyProfileItem] {
+    func loadDiscussionComments(realm: String, realmID: String, discussionID: String) async throws -> [SchoologyComment] {
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         let data = try await api.get("\(realm)/\(realmID)/discussions/\(discussionID)/comments", auth: auth, params: ["start": "0", "limit": "100", "with_attachments": "TRUE", "richtext": "1"])
-        return SchoologyProfileItem.decodeList(Self.object(data), keys: ["comment", "comments", "items"])
+        return SchoologyComment.decodeList(Self.object(data))
     }
 
-    func loadAssignmentComments(sectionID: String, assignmentID: String) async throws -> [SchoologyProfileItem] {
+    func postDiscussionComment(realm: String, realmID: String, discussionID: String, body: String, parentID: String? = nil) async throws {
         guard let auth else { throw SchoologyAPIError.notSignedIn }
-        let data = try await api.get("sections/\(sectionID)/assignments/\(assignmentID)/comments", auth: auth, params: ["start": "0", "limit": "100", "with_attachments": "TRUE", "richtext": "1"])
-        return SchoologyProfileItem.decodeList(Self.object(data), keys: ["comment", "comments", "items"])
+        _ = try await api.post("\(realm)/\(realmID)/discussions/\(discussionID)/comments", auth: auth, params: [
+            "comment": body,
+            "parent_id": parentID ?? "0"
+        ])
+    }
+
+    func loadAssignmentComments(sectionID: String, assignmentID: String) async throws -> [SchoologyComment] {
+        guard let auth else { throw SchoologyAPIError.notSignedIn }
+        let data = try await api.get("course/\(sectionID)/materials/assignments/\(assignmentID)/comments", auth: auth, params: ["start": "0", "limit": "100", "with_attachments": "TRUE", "richtext": "1"])
+        return SchoologyComment.decodeList(Self.object(data))
+    }
+
+    /// Assignment comments belong to the assignment discussion, not to a submission revision.
+    func postAssignmentComment(sectionID: String, assignmentID: String, body: String, parentID: String? = nil) async throws {
+        guard let auth else { throw SchoologyAPIError.notSignedIn }
+        let replyID = Int(parentID ?? "0") ?? 0
+        let path = replyID > 0
+            ? "course/\(sectionID)/materials/assignments/\(assignmentID)/create_reply/\(replyID)"
+            : "course/\(sectionID)/materials/assignments/\(assignmentID)/create_comment"
+        _ = try await api.post(path, auth: auth, params: [
+            "comment": body,
+            "parent_id": String(replyID)
+        ])
     }
 
     func loadEventComments(realm: String, realmID: String, eventID: String) async throws -> [SchoologyProfileItem] {
@@ -1057,11 +1082,14 @@ final class AppSession {
     func sendMessage(recipientIDs: [String], subject: String, message: String, fileIDs: [String] = [], resourceIDs: [String] = []) async throws {
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         let ids = Array(Set(recipientIDs.filter { Int($0) != nil })).sorted()
+        let messageBody = message
+            .replacingOccurrences(of: "\r\n", with: "\n")
+            .replacingOccurrences(of: "\r", with: "\n")
         guard !ids.isEmpty, !subject.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-              !message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { throw SchoologyAPIError.invalidResponse }
+              !messageBody.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { throw SchoologyAPIError.invalidResponse }
         var payload: [String: Any] = [
             "recipient_ids": ids.joined(separator: ","), "subject": subject.trimmingCharacters(in: .whitespacesAndNewlines),
-            "message": message.trimmingCharacters(in: .whitespacesAndNewlines)
+            "message": messageBody
         ]
         let validFileIDs = fileIDs.compactMap(Int.init)
         if !validFileIDs.isEmpty { payload["file-attachment"] = ["id": validFileIDs] }

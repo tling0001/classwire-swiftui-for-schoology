@@ -54,7 +54,8 @@ struct SchoologyInlineCourseMaterialRow: View {
                             Text(item.body)
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
+                                .lineLimit(1)
+                                .truncationMode(.tail)
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -68,6 +69,7 @@ struct SchoologyInlineCourseMaterialRow: View {
             #else
             .controlSize(.regular)
             #endif
+            .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
             .onChange(of: isExpanded) { _, expanded in
                 guard expanded, children == nil, !isLoading else { return }
                 Task { await loadChildren() }
@@ -86,6 +88,7 @@ struct SchoologyInlineCourseMaterialRow: View {
             #else
             .controlSize(.regular)
             #endif
+            .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
         }
     }
 
