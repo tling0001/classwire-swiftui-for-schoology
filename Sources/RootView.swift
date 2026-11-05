@@ -29,6 +29,7 @@ struct RootView: View {
                 } detail: {
                     NavigationStack(path: $detailPath) {
                         selectedRoot(for: selectedRoute)
+                            .id(selectedRoute)
                             .navigationDestination(for: SchoologyNavigationPath.self) { item in
                                 switch item {
                                 case .person(let userID):

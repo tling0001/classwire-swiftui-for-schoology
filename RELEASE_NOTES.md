@@ -1,3 +1,20 @@
+## [2026.10.0-port.57]
+
+### Course Materials and attachments
+- Remove the oversized macOS control-size override from course material rows.
+- Replace the shared “View Attachments” button with an inline attachment list; selecting an attachment opens its own View and Download actions.
+
+### Navigation
+- Reset the selected detail root's identity when the macOS sidebar selection changes so the newly selected course reloads its own content and state.
+
+### Grades
+- Hydrate standalone course overall grades from section final-grade records, matching the signed-in user's enrollment as in the Android/Tauri implementation.
+- Respect Schoology's custom overall-grade setting and display text or numeric overrides when enabled; otherwise use the calculated final-period grade.
+- Resolve the final grading period and grading scale from the matching enrollment record, including letter-grade display and teacher comments.
+
+### Build
+- Increment iOS and macOS bundle build number to 57.
+
 # Release notes
 
 ## [2026.10.0-port.56]

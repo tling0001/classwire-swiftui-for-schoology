@@ -65,7 +65,7 @@ struct SchoologyUserGradeCourse: Identifiable, Sendable {
     let imageURL: URL?
 
     static func decodeList(_ value: Any?) -> [Self] {
-        SchoologyValue.list(value, keys: ["section", "sections", "items", "data", "response"]).compactMap { row in
+        SchoologyValue.list(value, keys: ["section", "sections", "grade", "grades", "items", "data", "response"]).compactMap { row in
             guard let rawID = row["section_id"] ?? row["sectionId"] ?? row["id"] else { return nil }
             let id = SchoologyValue.string(rawID)
             guard !id.isEmpty else { return nil }
@@ -74,9 +74,12 @@ struct SchoologyUserGradeCourse: Identifiable, Sendable {
             let periodValue = final["period"] ?? final["periods"] ?? final["final_period"] ?? final["finalPeriod"]
             let periods = SchoologyValue.list(periodValue, keys: ["period", "periods", "items"])
             let period = periods.first { SchoologyValue.string($0["period_id"] ?? $0["periodId"]) == "final" } ?? periods.first ?? final
-            let override = period["override_str"] ?? period["overrideStr"] ?? period["override_string"] ?? period["overrideString"] ??
-                final["override_str"] ?? final["overrideStr"]
-            let grade = override ?? period["grade"] ?? final["grade"] ?? final["calculated_grade"] ?? final["calculatedGrade"]
+            let overrideText = period["override_str"] ?? period["overrideStr"] ?? period["override_string"] ?? period["overrideString"] ??
+                final["override_str"] ?? final["overrideStr"] ?? final["override_string"] ?? final["overrideString"]
+            let numericOverride = period["override_numeric"] ?? period["overrideNumeric"] ??
+                final["override_numeric"] ?? final["overrideNumeric"]
+            let grade = overrideText ?? numericOverride ?? period["grade"] ?? final["grade"] ??
+                final["calculated_grade"] ?? final["calculatedGrade"]
             let gradeText = grade == nil || grade is NSNull || SchoologyValue.string(grade).isEmpty
                 ? "—" : SchoologyValue.string(grade)
             return Self(

@@ -27,10 +27,19 @@ struct SchoologyAttachmentPreviewButton: View {
     @State private var isPresented = false
     var body: some View {
         Button { isPresented = true } label: {
-            Label(attachment.title, systemImage: "paperclip")
-                .font(.subheadline).lineLimit(2)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .contentShape(Rectangle())
+            HStack(spacing: 10) {
+                Label(attachment.title, systemImage: "paperclip")
+                    .font(.subheadline)
+                    .lineLimit(2)
+                Spacer(minLength: 8)
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.tertiary)
+                    .accessibilityHidden(true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+            .padding(.vertical, 4)
         }
         .buttonStyle(.plain)
         .accessibilityHint("Opens attachment actions")
@@ -43,12 +52,16 @@ struct SchoologyAttachmentPreviewButton: View {
 
 struct SchoologyAttachmentsButton: View {
     let attachments: [SchoologyAttachment]
-    @State private var isPresented = false
+
     var body: some View {
-        Button { isPresented = true } label: {
-            Label("View Attachments (\(attachments.count))", systemImage: "paperclip")
+        VStack(alignment: .leading, spacing: 8) {
+            ForEach(attachments) { attachment in
+                SchoologyAttachmentPreviewButton(attachment: attachment)
+            }
         }
-        .sheet(isPresented: $isPresented) { SchoologyAttachmentsView(attachments: attachments) }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Attachments")
     }
 }
 
@@ -59,7 +72,7 @@ struct SchoologyAttachmentsView: View {
         NavigationStack {
             List(attachments) { attachment in SchoologyAttachmentActionRow(attachment: attachment) }
                 .schoologyInsetGroupedListStyle()
-                .navigationTitle("Attachments")
+                .navigationTitle(attachments.count == 1 ? attachments[0].title : "Attachments")
                 .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
         }
         #if os(macOS)

@@ -64,7 +64,6 @@ struct SchoologyInlineCourseMaterialRow: View {
                 .contentShape(Rectangle())
             }
             #if os(macOS)
-            .controlSize(.large)
             .padding(.vertical, 4)
             #else
             .controlSize(.regular)
@@ -83,7 +82,6 @@ struct SchoologyInlineCourseMaterialRow: View {
                     .contentShape(Rectangle())
             }
             #if os(macOS)
-            .controlSize(.large)
             .padding(.vertical, 4)
             #else
             .controlSize(.regular)
