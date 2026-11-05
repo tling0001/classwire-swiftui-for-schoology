@@ -276,12 +276,18 @@ final class AppSession {
             (fileRoot != nil && file["url"] != nil)
         let attachment: SchoologyAttachment?
         if isFile {
-            let rawDownloadURL = file["file_download_url"] ?? file["fileDownloadURL"] ??
-                file["download_path"] ?? file["downloadPath"] ?? file["download_url"] ??
-                file["downloadUrl"] ?? file["resolveDownloadUrl"] ?? file["resolve_download_url"] ??
-                file["url"] ?? document["file_download_url"] ?? document["fileDownloadURL"] ??
-                document["download_path"] ?? document["downloadPath"] ??
-                (documentType == "file" ? document["url"] : nil)
+            // Keep each lookup small enough for Swift's type checker on both SDKs.
+            let fileDownloadURLValue: Any? = file["file_download_url"] ?? file["fileDownloadURL"]
+            let filePathValue: Any? = file["download_path"] ?? file["downloadPath"]
+            let fileDownloadAliasValue: Any? = file["download_url"] ?? file["downloadUrl"]
+            let fileResolvedURLValue: Any? = file["resolveDownloadUrl"] ?? file["resolve_download_url"]
+            let fileDirectURLValue: Any? = file["url"]
+            let documentDownloadURLValue: Any? = document["file_download_url"] ?? document["fileDownloadURL"]
+            let documentPathValue: Any? = document["download_path"] ?? document["downloadPath"]
+            let documentDirectURLValue: Any? = documentType == "file" ? document["url"] : nil
+            let rawDownloadURL: Any? = fileDownloadURLValue ?? filePathValue ??
+                fileDownloadAliasValue ?? fileResolvedURLValue ?? fileDirectURLValue ??
+                documentDownloadURLValue ?? documentPathValue ?? documentDirectURLValue
             guard let downloadURL = SchoologyValue.url(rawDownloadURL) ?? convertedURL else {
                 throw SchoologyAPIError.invalidResponse
             }
@@ -299,11 +305,13 @@ final class AppSession {
         let linksRoot = attachmentContainer["links"] ?? (attachmentRoot as? [String: Any])?["links"]
         let link = SchoologyValue.list(linksRoot, keys: ["link", "links", "items"]).first ??
             (linksRoot as? [String: Any]) ?? [:]
-        let rawLink = document["web_url"] ?? document["webUrl"] ??
-            document["url"] ?? document["href"] ?? document["launch_url"] ?? document["launchUrl"] ??
-            document["location"] ??
-            link["link_url"] ?? link["linkURL"] ?? link["url"] ?? link["href"] ??
-            template["url"] ?? template["web_url"] ?? template["webUrl"] ?? template["href"]
+        let documentWebURL: Any? = document["web_url"] ?? document["webUrl"]
+        let documentLaunchURL: Any? = document["launch_url"] ?? document["launchUrl"]
+        let documentLocationURL: Any? = document["url"] ?? document["href"] ?? document["location"]
+        let linkDestinationURL: Any? = link["link_url"] ?? link["linkURL"] ?? link["url"] ?? link["href"]
+        let templateDestinationURL: Any? = template["url"] ?? template["web_url"] ?? template["webUrl"] ?? template["href"]
+        let rawLink: Any? = documentWebURL ?? documentLaunchURL ?? documentLocationURL ??
+            linkDestinationURL ?? templateDestinationURL
         return (attachment, SchoologyValue.url(rawLink))
     }
 

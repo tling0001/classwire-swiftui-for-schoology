@@ -1,5 +1,14 @@
 # Release notes
 
+## [2026.10.0-port.56]
+
+### Build fix
+- Split course document attachment and link URL parsing into explicitly typed intermediate lookups to resolve Swift compiler type-check timeouts on iOS and macOS.
+- Preserve attachment URL precedence, converted-preview behavior, and link destination fallback.
+
+### Build
+- Increment iOS and macOS build number to 56.
+
 ## [2026.10.0-port.55]
 
 ### Course materials and attachments
