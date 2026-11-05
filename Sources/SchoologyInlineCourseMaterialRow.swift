@@ -43,21 +43,31 @@ struct SchoologyInlineCourseMaterialRow: View {
                     }
                 }
             } label: {
-                VStack(alignment: .leading, spacing: 4) {
-                    Label(item.title, systemImage: "folder")
-                    if !item.body.isEmpty {
-                        Text(item.body)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
+                HStack(alignment: .center, spacing: 9) {
+                    Image(systemName: "folder.fill")
+                        .foregroundStyle(.secondary)
+                        .frame(width: 20)
+                        .accessibilityHidden(true)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(item.title).font(.body)
+                        if !item.body.isEmpty {
+                            Text(item.body)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                .padding(.vertical, 4)
                 .contentShape(Rectangle())
             }
+            #if os(macOS)
             .controlSize(.large)
             .padding(.vertical, 4)
+            #else
+            .controlSize(.regular)
+            #endif
             .onChange(of: isExpanded) { _, expanded in
                 guard expanded, children == nil, !isLoading else { return }
                 Task { await loadChildren() }
@@ -70,8 +80,12 @@ struct SchoologyInlineCourseMaterialRow: View {
                     .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                     .contentShape(Rectangle())
             }
+            #if os(macOS)
             .controlSize(.large)
             .padding(.vertical, 4)
+            #else
+            .controlSize(.regular)
+            #endif
         }
     }
 

@@ -1,4 +1,7 @@
 import SwiftUI
+#if os(iOS)
+import UserNotifications
+#endif
 
 struct DestinationView: View {
     let destination: AppDestination
@@ -15,7 +18,12 @@ struct DestinationView: View {
             case .resources: SchoologyResourcesView()
             case .grades: SchoologyGradesView()
             case .calendar: SchoologyCalendarView()
-            case .profile: SignedInProfileView()
+            case .profile:
+                if let userID = session.auth?.userID {
+                    SchoologyPersonProfileView(userID: userID)
+                } else {
+                    ContentUnavailableView("Profile unavailable", systemImage: "person.crop.circle")
+                }
             case .people: SchoologyPeopleDirectoryScreen()
             case .settings: SettingsView()
             default: PlaceholderView(destination: destination)
@@ -55,6 +63,9 @@ struct HomeView: View {
     @State private var createDestinations: [SchoologyHomeCreateDestination] = []
     @State private var showingUpdateComposer = false
     @State private var selectedCreateAction: SchoologyHomeCreateAction?
+    @AppStorage("schoology.notifications.promptDismissed") private var didDismissNotificationPrompt = false
+    @State private var shouldShowNotificationPrompt = false
+    @State private var notificationPromptError: String?
 
     var body: some View {
         @Bindable var model = session
@@ -64,6 +75,7 @@ struct HomeView: View {
                     ScrollView {
                         LazyVStack(alignment: .leading, spacing: 18) {
                             welcomeHeader
+                            notificationPermissionPrompt
                             Picker("Home", selection: Binding(
                                 get: { model.homeSection == .upcoming ? HomeSection.recent : model.homeSection },
                                 set: { model.homeSection = $0 }
@@ -135,8 +147,67 @@ struct HomeView: View {
             async let createAccess = session.loadHomeCreateDestinations()
             postableDestinations = await updateAccess
             createDestinations = await createAccess
+            #if os(iOS)
+            await refreshNotificationPrompt()
+            #endif
         }
     }
+
+    @ViewBuilder
+    private var notificationPermissionPrompt: some View {
+        #if os(iOS)
+        if shouldShowNotificationPrompt {
+            VStack(alignment: .leading, spacing: 10) {
+                Label("Stay up to date", systemImage: "bell.badge").font(.headline)
+                Text("Allow Schoology to notify you about new messages, comments, and course activity.")
+                    .font(.subheadline).foregroundStyle(.secondary)
+                if let notificationPromptError {
+                    Text(notificationPromptError).font(.caption).foregroundStyle(.red)
+                }
+                HStack {
+                    Button("Not Now") {
+                        didDismissNotificationPrompt = true
+                        shouldShowNotificationPrompt = false
+                    }
+                    .buttonStyle(.plain)
+                    Spacer()
+                    Button("Enable Notifications", systemImage: "bell.badge") {
+                        Task { await enableNotifications() }
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14))
+            .accessibilityElement(children: .contain)
+        }
+        #endif
+    }
+
+    #if os(iOS)
+    private func refreshNotificationPrompt() async {
+        guard !didDismissNotificationPrompt else { return }
+        let status = await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
+        if status == .notDetermined {
+            shouldShowNotificationPrompt = true
+        } else {
+            didDismissNotificationPrompt = true
+        }
+    }
+
+    private func enableNotifications() async {
+        notificationPromptError = nil
+        do {
+            let granted = try await SchoologyPushNotifications.requestAuthorization()
+            if granted { await SchoologyPushNotifications.setEnabled(true) }
+            didDismissNotificationPrompt = true
+            shouldShowNotificationPrompt = false
+        } catch {
+            notificationPromptError = error.localizedDescription
+        }
+    }
+    #endif
 
     private var welcomeHeader: some View {
         HStack(spacing: 12) {
@@ -160,6 +231,7 @@ struct HomeView: View {
         return ScrollView {
             LazyVStack(alignment: .leading, spacing: 18) {
                 welcomeHeader
+                notificationPermissionPrompt
                 Picker("Home", selection: $model.homeSection) {
                     ForEach(HomeSection.allCases) { section in Text(section.rawValue).tag(section) }
                 }

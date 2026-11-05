@@ -971,17 +971,25 @@ final class AppSession {
             body: ["body": value, "draft": draft ? 1 : 0])
     }
 
-    func submitAssignmentFile(data: Data, filename: String, mime: String, sectionID: String, assignmentID: String) async throws {
+    func uploadAssignmentFile(data: Data, filename: String, mime: String) async throws -> String {
         guard let auth else { throw SchoologyAPIError.notSignedIn }
-        try await api.submitAssignmentFile(data: data, filename: filename, mime: mime, sectionID: sectionID, assignmentID: assignmentID, auth: auth)
+        return try await api.uploadAssignmentFile(data: data, filename: filename, mime: mime, auth: auth)
     }
 
-
-    func submitAssignmentResource(sectionID: String, assignmentID: String, resourceID: String) async throws {
+    /// Submit uploaded files and Schoology resources together as one revision.
+    func submitAssignmentFiles(fileIDs: [String], resourceIDs: [String], sectionID: String, assignmentID: String) async throws {
         guard let auth else { throw SchoologyAPIError.notSignedIn }
-        guard !sectionID.isEmpty, !assignmentID.isEmpty, !resourceID.isEmpty else { throw SchoologyAPIError.invalidResponse }
-        _ = try await api.postJSON("course/\(sectionID)/materials/assignments/\(assignmentID)/dropbox/create_resource_submission",
-            auth: auth, body: ["files": [["schoology_resource_id": resourceID]]])
+        guard !sectionID.isEmpty, !assignmentID.isEmpty,
+              !fileIDs.isEmpty || !resourceIDs.isEmpty else {
+            throw SchoologyAPIError.invalidResponse
+        }
+        let files: [[String: String]] = fileIDs.map { ["id": $0] } +
+            resourceIDs.map { ["schoology_resource_id": $0] }
+        _ = try await api.postJSON(
+            "section/\(sectionID)/assignment/\(assignmentID)/submission",
+            auth: auth,
+            body: ["files": files]
+        )
     }
 
     func loadTeacherAssignmentGrade(sectionID: String, assignmentID: String, enrollmentID: String) async throws -> SchoologyTeacherGrade {

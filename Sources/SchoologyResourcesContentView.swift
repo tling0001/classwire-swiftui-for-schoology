@@ -100,6 +100,8 @@ struct SchoologyInlineResourceItemRow: View {
                     guard expanded, children == nil, !isLoading else { return }
                     Task { await loadChildren() }
                 }
+            } else if let attachment {
+                SchoologyAttachmentPreviewButton(attachment: attachment)
             } else if let url = item.url {
                 NavigationLink {
                     SchoologyEmbeddedWebView(url: url, title: item.title)
@@ -114,6 +116,20 @@ struct SchoologyInlineResourceItemRow: View {
                 }
             }
         }
+    }
+
+    private var attachment: SchoologyAttachment? {
+        guard let url = item.url ?? item.fileViewURL else { return nil }
+        let kind = item.kind.lowercased()
+        let hasFileExtension = !url.pathExtension.isEmpty
+        let isFile = item.fileViewURL != nil || !item.fileMIME.isEmpty ||
+            kind.contains("file") || kind.contains("document") || hasFileExtension
+        guard isFile else { return nil }
+        return SchoologyAttachment(
+            title: item.fileName.isEmpty ? item.title : item.fileName,
+            url: url,
+            viewURL: item.fileViewURL == url ? nil : item.fileViewURL
+        )
     }
 
     private var resourceSymbol: String {

@@ -275,35 +275,3 @@ struct NotificationsView: View {
     }
 }
 
-struct SignedInProfileView: View {
-    @Environment(AppSession.self) private var session
-
-    var body: some View {
-        List {
-            Section {
-                HStack(spacing: 14) {
-                    if let picture = session.user?.pictureURL {
-                        AuthenticatedSchoologyImage(url: picture)
-                            .frame(width: 68, height: 68)
-                            .clipShape(Circle())
-                    } else {
-                        Image(systemName: "person.crop.circle.fill")
-                            .font(.system(size: 58))
-                            .foregroundStyle(SchoologyStyle.blue)
-                    }
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(session.user?.nameDisplay ?? "Schoology user")
-                            .font(.title3.weight(.semibold))
-                        Text("Signed in account").font(.caption).foregroundStyle(.secondary)
-                    }
-                }
-                .padding(.vertical, 8)
-            }
-            Section("Account") {
-                LabeledContent("Name", value: session.user?.nameDisplay ?? "—")
-                LabeledContent("User ID", value: session.user?.id ?? "—")
-            }
-        }
-        .navigationTitle("Profile")
-    }
-}

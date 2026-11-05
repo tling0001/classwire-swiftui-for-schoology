@@ -511,7 +511,7 @@ actor SchoologyAPI {
         return fileID
     }
 
-    func submitAssignmentFile(data: Data, filename: String, mime: String, sectionID: String, assignmentID: String, auth: SchoologyAuth) async throws {
+    func uploadAssignmentFile(data: Data, filename: String, mime: String, auth: SchoologyAuth) async throws -> String {
         await syncServerTime()
         let boundary = UUID().uuidString
         let safeFilename = filename
@@ -522,7 +522,7 @@ actor SchoologyAPI {
         var multipart = Data()
         multipart.append(Data("--\(boundary)\r\n".utf8))
         multipart.append(Data("Content-Disposition: form-data; name=\"file\"; filename=\"\(safeFilename)\"\r\n".utf8))
-        multipart.append(Data("Content-Type: multipart/form-data\r\n".utf8))
+        multipart.append(Data("Content-Type: \(mime)\r\n".utf8))
         multipart.append(Data("Content-Length: \(data.count)\r\n\r\n".utf8))
         multipart.append(data)
         multipart.append(Data("\r\n--\(boundary)--\r\n".utf8))
@@ -551,8 +551,7 @@ actor SchoologyAPI {
         guard let fileID = uploaded["fileMetadataId"].map({ String(describing: $0) }), !fileID.isEmpty else {
             throw SchoologyAPIError.invalidResponse
         }
-        _ = try await postJSON("section/\(sectionID)/assignment/\(assignmentID)/submission", auth: auth,
-            body: ["files": [["id": fileID]]])
+        return fileID
     }
 
     private func send(

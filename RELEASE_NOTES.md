@@ -1,3 +1,27 @@
+## [2026.10.0-port.48]
+
+### Assignment submissions
+- Replace separate file/resource submission actions with one Upload Submission flow.
+- Stage multiple files and Schoology resources before submitting, then create one revision with a combined files payload.
+- Show selected attachment names and per-file upload/completion feedback; choosing attachments no longer submits immediately.
+- Match Android's native submission model and endpoint for file IDs and Schoology resource IDs.
+
+### Course materials and resources
+- Align folder icons vertically with folder names and indent descriptions with the folder text.
+- Keep larger course-material row sizing exclusive to macOS; retain compact rows on iPhone and iPad.
+- Open resource files through shared attachment preview/download actions and open resource links in the authenticated WebView.
+
+### Posts, profile, and appearance
+- Replace the duplicate signed-in account summary with the shared native person-profile page.
+- Make the post comments action show Comment, the 1–2 count, or More Comments (N) without a separate View More Comments button.
+- Correct only rich-text foreground colors that fail contrast in the active appearance, preserving readable author styling.
+
+### Notifications
+- Add a non-modal first-launch notification opt-in prompt on Home, with a clear explanation and Not Now option before Apple's permission request.
+
+### Build
+- Increment the iOS and macOS bundle build number to 48.
+
 ## [2026.10.0-port.47]
 
 ### Build fixes

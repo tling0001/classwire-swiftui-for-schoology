@@ -10,7 +10,6 @@ struct SchoologyPostActionsView: View {
     @State private var errorMessage: String?
     @State private var presentedSheet: PresentedSheet?
     @State private var recentComments: [SchoologyComment] = []
-    @State private var recentCommentTotal = 0
     @State private var isLoadingRecentComments = false
 
     private enum PresentedSheet: String, Identifiable {
@@ -28,19 +27,12 @@ struct SchoologyPostActionsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {
             HStack(spacing: 18) {
-                Button("Comment", systemImage: "bubble.right") {
+                Button {
                     presentedSheet = .comments
+                } label: {
+                    Label(commentActionTitle, systemImage: "bubble.right")
                 }
                 .disabled(!canComment)
-
-                if commentsCount > 0 {
-                    Button {
-                        presentedSheet = .comments
-                    } label: {
-                        Label("\(commentsCount)", systemImage: "bubble.right")
-                    }
-                    .disabled(!canComment)
-                }
 
                 Button(isLiked ? "Unlike" : "Like", systemImage: isLiked ? "hand.thumbsup.fill" : "hand.thumbsup") {
                     toggleLike()
@@ -72,15 +64,6 @@ struct SchoologyPostActionsView: View {
                             onReply: { _ in presentedSheet = .comments },
                             onOpenProfile: { userID in session.showPersonProfile(userID: userID) }
                         )
-                    }
-                    if recentCommentTotal > 2 {
-                        Button("View more comments", systemImage: "ellipsis") {
-                            presentedSheet = .comments
-                        }
-                        .font(.caption.weight(.semibold))
-                        .buttonStyle(.plain)
-                        .foregroundStyle(SchoologyStyle.blue)
-                        .padding(.leading, 8)
                     }
                 }
                 .padding(.leading, 12)
@@ -124,6 +107,14 @@ struct SchoologyPostActionsView: View {
         }
     }
 
+    private var commentActionTitle: String {
+        switch commentsCount {
+        case 0: "Comment"
+        case 1, 2: String(commentsCount)
+        default: "More Comments (\(commentsCount))"
+        }
+    }
+
     private var canComment: Bool {
         guard let realm = activity.commentRealm, let realmID = activity.commentRealmID else { return false }
         return ["sections", "groups", "schools", "users"].contains(realm) && !realmID.isEmpty
@@ -133,7 +124,6 @@ struct SchoologyPostActionsView: View {
         guard commentsCount > 0, canComment,
               let realm = activity.commentRealm, let realmID = activity.commentRealmID else {
             recentComments = []
-            recentCommentTotal = 0
             return
         }
         isLoadingRecentComments = true
@@ -141,11 +131,10 @@ struct SchoologyPostActionsView: View {
         do {
             let all = try await session.loadUpdateComments(realm: realm, realmID: realmID, updateID: activity.id)
             let ordered = SchoologyComment.ordered(all)
-            recentCommentTotal = ordered.count
+            commentsCount = max(commentsCount, ordered.count)
             recentComments = Array(ordered.suffix(2))
         } catch {
             recentComments = []
-            recentCommentTotal = 0
         }
     }
 

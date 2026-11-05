@@ -1,9 +1,15 @@
 import Foundation
 import SwiftUI
+#if os(iOS)
+import UIKit
+#elseif os(macOS)
+import AppKit
+#endif
 
 /// Renders Schoology HTML as attributed text, retaining links, emphasis, and inline font styling.
 struct SchoologyRichTextText: View {
     @Environment(AppSession.self) private var session
+    @Environment(\.colorScheme) private var colorScheme
     let value: String
 
     init(_ value: String) { self.value = value }
@@ -11,7 +17,7 @@ struct SchoologyRichTextText: View {
     var body: some View {
         if Self.containsHTML(value) {
             VStack(alignment: .leading, spacing: 10) {
-                if let attributed = Self.attributedHTML(value) {
+                if let attributed = Self.attributedHTML(value, colorScheme: colorScheme) {
                     Text(attributed)
                         .textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -41,7 +47,7 @@ struct SchoologyRichTextText: View {
         value.range(of: #"<[a-zA-Z][^>]*>"#, options: .regularExpression) != nil
     }
 
-    private static func attributedHTML(_ html: String) -> AttributedString? {
+    private static func attributedHTML(_ html: String, colorScheme: ColorScheme) -> AttributedString? {
         let document = """
         <!doctype html><html><head><meta charset="utf-8">
         <meta name="color-scheme" content="light dark">
@@ -53,7 +59,7 @@ struct SchoologyRichTextText: View {
         </style></head><body>\(html)</body></html>
         """
         guard let data = document.data(using: .utf8),
-              let value = try? NSAttributedString(
+              let imported = try? NSAttributedString(
                 data: data,
                 options: [
                     .documentType: NSAttributedString.DocumentType.html,
@@ -61,7 +67,76 @@ struct SchoologyRichTextText: View {
                 ],
                 documentAttributes: nil
               ) else { return nil }
-        return AttributedString(value)
+
+        let mutable = NSMutableAttributedString(attributedString: imported)
+        let fullRange = NSRange(location: 0, length: mutable.length)
+        var lowContrastRanges: [NSRange] = []
+        mutable.enumerateAttributes(in: fullRange) { attributes, range, _ in
+            guard let rawForeground = attributes[.foregroundColor],
+                  let foreground = rgbComponents(rawForeground, colorScheme: colorScheme) else { return }
+            let background = attributes[.backgroundColor].flatMap {
+                rgbComponents($0, colorScheme: colorScheme)
+            } ?? rgbComponents(systemBackgroundColor, colorScheme: colorScheme)
+            guard let background else { return }
+            if contrastRatio(foreground, background) < 4.5 {
+                lowContrastRanges.append(range)
+            }
+        }
+        for range in lowContrastRanges {
+            mutable.addAttribute(.foregroundColor, value: adaptiveLabelColor, range: range)
+        }
+        return AttributedString(mutable)
+    }
+
+    private static func contrastRatio(_ first: (Double, Double, Double), _ second: (Double, Double, Double)) -> Double {
+        func luminance(_ color: (Double, Double, Double)) -> Double {
+            func linear(_ value: Double) -> Double {
+                value <= 0.04045 ? value / 12.92 : pow((value + 0.055) / 1.055, 2.4)
+            }
+            return 0.2126 * linear(color.0) + 0.7152 * linear(color.1) + 0.0722 * linear(color.2)
+        }
+        let a = luminance(first)
+        let b = luminance(second)
+        return (max(a, b) + 0.05) / (min(a, b) + 0.05)
+    }
+
+    private static func rgbComponents(_ rawColor: Any, colorScheme: ColorScheme) -> (Double, Double, Double)? {
+        #if os(iOS)
+        guard let color = rawColor as? UIColor else { return nil }
+        let style: UIUserInterfaceStyle = colorScheme == .dark ? .dark : .light
+        let resolved = color.resolvedColor(with: UITraitCollection(userInterfaceStyle: style))
+        var red: CGFloat = 0
+        var green: CGFloat = 0
+        var blue: CGFloat = 0
+        var alpha: CGFloat = 0
+        guard resolved.getRed(&red, green: &green, blue: &blue, alpha: &alpha) else { return nil }
+        return (Double(red), Double(green), Double(blue))
+        #elseif os(macOS)
+        guard let color = (rawColor as? NSColor)?.usingColorSpace(.deviceRGB) else { return nil }
+        return (Double(color.redComponent), Double(color.greenComponent), Double(color.blueComponent))
+        #else
+        return nil
+        #endif
+    }
+
+    private static var systemBackgroundColor: Any {
+        #if os(iOS)
+        UIColor.systemBackground
+        #elseif os(macOS)
+        NSColor.windowBackgroundColor
+        #else
+        NSColor.white
+        #endif
+    }
+
+    private static var adaptiveLabelColor: Any {
+        #if os(iOS)
+        UIColor.label
+        #elseif os(macOS)
+        NSColor.labelColor
+        #else
+        NSColor.black
+        #endif
     }
 
     private var embeddedURLs: [URL] {

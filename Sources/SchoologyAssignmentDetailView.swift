@@ -12,8 +12,8 @@ struct SchoologyAssignmentDetailView: View {
     @State private var error: String?
     @State private var isPosting = false
     @State private var showingSubmissionTextComposer = false
-    @State private var showingSubmissionFileImporter = false
-    @State private var showingSubmissionResourcePicker = false
+    @State private var showingSubmissionUploadComposer = false
+    @State private var submissionRefreshID = UUID()
 
     var body: some View {
         Group {
@@ -52,9 +52,18 @@ struct SchoologyAssignmentDetailView: View {
                 ToolbarItem(placement: .primaryAction) {
                     Menu("Create submission", systemImage: "plus") {
                         Button("Create Text Submission", systemImage: "square.and.pencil") { showingSubmissionTextComposer = true }
-                        Button("Upload Submission", systemImage: "arrow.up.doc") { showingSubmissionFileImporter = true }
-                        Button("Submit Schoology Resource", systemImage: "folder") { showingSubmissionResourcePicker = true }
+                        Button("Upload Submission", systemImage: "arrow.up.doc") { showingSubmissionUploadComposer = true }
                     }
+                }
+            }
+        }
+        .sheet(isPresented: $showingSubmissionUploadComposer) {
+            if let context {
+                SchoologyAssignmentSubmissionComposerView(
+                    sectionID: sectionID,
+                    assignmentID: context.assignment.id
+                ) {
+                    submissionRefreshID = UUID()
                 }
             }
         }
@@ -117,8 +126,7 @@ struct SchoologyAssignmentDetailView: View {
             sectionID: sectionID,
             context: context,
             showingTextComposer: $showingSubmissionTextComposer,
-            showingFileImporter: $showingSubmissionFileImporter,
-            showingResourcePicker: $showingSubmissionResourcePicker
+            refreshID: $submissionRefreshID
         )
     }
 
