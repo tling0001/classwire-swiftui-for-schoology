@@ -7,7 +7,6 @@ private enum SchoologySidebarSelection: Hashable {
 }
 
 private enum SchoologyNavigationPath: Hashable {
-    case sidebar(SchoologySidebarSelection)
     case person(String)
 }
 
@@ -32,8 +31,6 @@ struct RootView: View {
                         selectedRoot(for: selectedRoute)
                             .navigationDestination(for: SchoologyNavigationPath.self) { item in
                                 switch item {
-                                case .sidebar(let route):
-                                    selectedRoot(for: route)
                                 case .person(let userID):
                                     SchoologyPersonProfileView(userID: userID)
                                 }
@@ -59,10 +56,6 @@ struct RootView: View {
                     if selectedRoute != route { selectedRoute = route }
                 }
                 #else
-                .onChange(of: detailPath) { _, path in
-                    guard case .sidebar(.destination(let destination))? = path.last else { return }
-                    session.destination = destination
-                }
                 #endif
                 .onChange(of: session.pendingPersonProfileID) { _, userID in
                     guard let userID else { return }
@@ -140,7 +133,9 @@ private struct SchoologySidebar: View {
                         .lineLimit(1)
                         .tag(SchoologySidebarSelection.course(course.id))
                     #else
-                    NavigationLink(value: SchoologyNavigationPath.sidebar(.course(course.id))) {
+                    NavigationLink {
+                        SchoologyCourseProfileView(course: course)
+                    } label: {
                         Label(course.title, systemImage: "book.closed").lineLimit(1)
                     }
                     #endif
@@ -156,7 +151,9 @@ private struct SchoologySidebar: View {
                         .lineLimit(1)
                         .tag(SchoologySidebarSelection.group(group.id))
                     #else
-                    NavigationLink(value: SchoologyNavigationPath.sidebar(.group(group.id))) {
+                    NavigationLink {
+                        GroupProfileView(group: group)
+                    } label: {
                         Label(group.title, systemImage: "person.3").lineLimit(1)
                     }
                     #endif
@@ -199,7 +196,9 @@ private struct SchoologySidebar: View {
         Label(item.rawValue, systemImage: item.symbol)
             .tag(SchoologySidebarSelection.destination(item))
         #else
-        NavigationLink(value: SchoologyNavigationPath.sidebar(.destination(item))) {
+        NavigationLink {
+            DestinationView(destination: item)
+        } label: {
             Label(item.rawValue, systemImage: item.symbol)
         }
         #endif

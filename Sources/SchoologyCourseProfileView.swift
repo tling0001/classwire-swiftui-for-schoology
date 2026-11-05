@@ -84,7 +84,7 @@ struct SchoologyCourseProfileView: View {
     private var compactLayout: some View {
         VStack(spacing: 0) {
             SchoologyProfileInfobox(title: course.title, subtitle: course.section.isEmpty ? nil : course.section,
-                imageURL: course.profileURL, fallbackSymbol: "book.closed.fill", details: [course.courseCode, schoolName])
+                imageURL: course.profileURL, fallbackSymbol: "book.closed.fill", details: [schoolName])
                 .padding(.horizontal)
                 .padding(.top, 12)
             Picker("Course section", selection: $tab) {
@@ -114,7 +114,7 @@ struct SchoologyCourseProfileView: View {
             Divider()
             VStack(spacing: 0) {
                 SchoologyProfileInfobox(title: course.title, subtitle: course.section.isEmpty ? nil : course.section,
-                    imageURL: course.profileURL, fallbackSymbol: "book.closed.fill", details: [course.courseCode, schoolName])
+                    imageURL: course.profileURL, fallbackSymbol: "book.closed.fill", details: [schoolName])
                     .padding(14)
                 HStack {
                     Text(tab.rawValue).font(.headline)

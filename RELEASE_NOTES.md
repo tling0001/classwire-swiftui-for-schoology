@@ -1,3 +1,17 @@
+## [2026.10.0-port.45]
+
+### iOS navigation
+- Use destination-based navigation links from the iPhone sidebar for Home sections, courses, and groups, while keeping the detail stack for secondary profile navigation.
+- Keep sidebar navigation separate from the detail path so selecting a sidebar item opens the same native screen used by the working course dashboard links.
+- Preserve selection-based navigation on macOS.
+
+### Course, group, and school headers
+- Make profile headers compact and align their avatar and typography with the Home welcome header.
+- Remove the course code/identifier from the course header while retaining the school name when available.
+
+### Build
+- Increment bundle build number to 45.
+
 ## [2026.10.0-port.44]
 
 ### Course Pages

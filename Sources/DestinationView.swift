@@ -22,6 +22,11 @@ struct DestinationView: View {
             }
         }
         .navigationTitle(destination.rawValue)
+        .onAppear {
+            if session.destination != destination {
+                session.destination = destination
+            }
+        }
         .toolbar {
             if destination != .messages {
                 ToolbarItem(placement: .primaryAction) {
