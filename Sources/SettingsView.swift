@@ -372,14 +372,38 @@ struct SchoologyNotificationSettingsSection: View {
     var body: some View {
         #if os(macOS)
         Section("Notifications") {
-            Text("Push delivery isn't available in the current Developer ID build because the macOS target doesn't have a Push Notifications provisioning profile.")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-            Button("Open Notification Settings", systemImage: "gear") {
-                openSystemNotificationSettings()
+            if isAuthorized {
+                Toggle("Schoology notifications", isOn: $notificationsEnabled)
+                    .onChange(of: notificationsEnabled) { _, enabled in
+                        Task { await SchoologyPushNotifications.setEnabled(enabled) }
+                    }
+                Toggle("Notification sound", isOn: $notificationSound)
+                    .disabled(!notificationsEnabled)
+                Text("Alerts follow your macOS notification settings. Sound preference applies while Schoology is open.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            } else {
+                Button(authorizationStatus == .denied ? "Open Notification Settings" : "Enable Schoology Notifications",
+                       systemImage: authorizationStatus == .denied ? "gear" : "bell.badge") {
+                    if authorizationStatus == .denied { openSystemNotificationSettings() }
+                    else { Task { await requestPermission() } }
+                }
+                Text(authorizationStatus == .denied
+                     ? "Notifications are blocked for Schoology. Allow them in System Settings to receive alerts."
+                     : "Allow Schoology to send alerts for new messages, comments, and other activity.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
             }
+            if let errorMessage { Text(errorMessage).font(.footnote).foregroundStyle(.red) }
+            if let pushRegistrationError { Text("Push registration failed: \(pushRegistrationError)").font(.footnote).foregroundStyle(.red) }
         }
-        .task { await refreshAuthorization() }
+        .task {
+            await refreshAuthorization()
+            pushRegistrationError = SchoologyPushNotifications.registrationError
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .schoologyPushRegistrationDidChange)) { _ in
+            pushRegistrationError = SchoologyPushNotifications.registrationError
+        }
         #else
         Section("Notifications") {
             if isAuthorized {

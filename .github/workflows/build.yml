@@ -74,10 +74,42 @@ jobs:
         run: brew install xcodegen
       - name: Generate Xcode project
         run: xcodegen generate
+      - name: Download Developer ID provisioning profile
+        id: mac_profiles
+        uses: Apple-Actions/download-provisioning-profiles@v7
+        with:
+          bundle-id: com.schoologytauri.app
+          profile-type: MAC_APP_DIRECT
+          issuer-id: ${{ secrets.APPSTORE_ISSUER_ID || vars.APPSTORE_ISSUER_ID }}
+          api-key-id: ${{ secrets.APPSTORE_API_KEY_ID || vars.APPSTORE_API_KEY_ID }}
+          api-private-key: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
+      - name: Validate Developer ID push profile
+        env:
+          PROFILES: ${{ steps.mac_profiles.outputs.profiles }}
+        run: |
+          set -euo pipefail
+          PROFILE_NAME="DeveloperID com.schoologytauri.app"
+          jq -e --arg name "$PROFILE_NAME" 'any(.[]; .name == $name)' <<<"$PROFILES" >/dev/null || {
+            echo "::error::Missing active MAC_APP_DIRECT profile '$PROFILE_NAME'. Create a Developer ID provisioning profile for com.schoologytauri.app with Push Notifications enabled." >&2
+            exit 1
+          }
+          mkdir -p "$RUNNER_TEMP/mac-profile-check"
+          FOUND_PROFILE=""
+          for candidate in "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"/*.provisionprofile; do
+            [ -f "$candidate" ] || continue
+            security cms -D -i "$candidate" > "$RUNNER_TEMP/mac-profile-check/profile.plist" 2>/dev/null || continue
+            name="$(/usr/libexec/PlistBuddy -c 'Print :Name' "$RUNNER_TEMP/mac-profile-check/profile.plist" 2>/dev/null || true)"
+            if [ "$name" = "$PROFILE_NAME" ]; then FOUND_PROFILE="$candidate"; break; fi
+          done
+          test -n "$FOUND_PROFILE" || { echo "::error::Downloaded Developer ID provisioning profile was not found." >&2; exit 1; }
+          aps="$(/usr/libexec/PlistBuddy -c 'Print :Entitlements:com.apple.developer.aps-environment' "$RUNNER_TEMP/mac-profile-check/profile.plist" 2>/dev/null || true)"
+          test "$aps" = "production" || { echo "::error::Developer ID profile must include com.apple.developer.aps-environment=production (found '$aps')." >&2; exit 1; }
+          echo "Validated $PROFILE_NAME with production APNs entitlement."
       - name: Archive macOS app
         env:
           SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID || vars.APPLE_TEAM_ID }}
+          PROFILE_NAME: DeveloperID com.schoologytauri.app
           MARKETING_VERSION: ${{ steps.version.outputs.marketing }}
           CURRENT_PROJECT_VERSION: ${{ steps.version.outputs.build }}
         run: |
@@ -86,19 +118,20 @@ jobs:
             -destination 'generic/platform=macOS' -archivePath "$RUNNER_TEMP/Schoology-macOS.xcarchive" \
             ARCHS="arm64 x86_64" ONLY_ACTIVE_ARCH=NO CODE_SIGN_STYLE=Manual \
             CODE_SIGN_IDENTITY="$SIGNING_IDENTITY" DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
-            ENABLE_HARDENED_RUNTIME=YES MARKETING_VERSION="$MARKETING_VERSION" \
-            CURRENT_PROJECT_VERSION="$CURRENT_PROJECT_VERSION" archive
+            PROVISIONING_PROFILE_SPECIFIER="$PROFILE_NAME" ENABLE_HARDENED_RUNTIME=YES \
+            MARKETING_VERSION="$MARKETING_VERSION" CURRENT_PROJECT_VERSION="$CURRENT_PROJECT_VERSION" archive
       - name: Export Developer ID app
         env:
           SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID || vars.APPLE_TEAM_ID }}
+          PROFILE_NAME: DeveloperID com.schoologytauri.app
         run: |
           set -euo pipefail
-          python3 - "$RUNNER_TEMP/macOS-ExportOptions.plist" "$APPLE_TEAM_ID" "$SIGNING_IDENTITY" <<'PY'
+          python3 - "$RUNNER_TEMP/macOS-ExportOptions.plist" "$APPLE_TEAM_ID" "$SIGNING_IDENTITY" "$PROFILE_NAME" <<'PY'
           import plistlib, sys
-          path, team, identity = sys.argv[1:]
+          path, team, identity, profile = sys.argv[1:]
           with open(path, "wb") as stream:
-              plistlib.dump({"method":"developer-id","destination":"export","signingStyle":"manual","teamID":team,"signingCertificate":identity,"stripSwiftSymbols":True}, stream)
+              plistlib.dump({"method":"developer-id","destination":"export","signingStyle":"manual","teamID":team,"signingCertificate":identity,"provisioningProfiles":{"com.schoologytauri.app":profile},"stripSwiftSymbols":True}, stream)
           PY
           xcodebuild -exportArchive -archivePath "$RUNNER_TEMP/Schoology-macOS.xcarchive" \
             -exportPath "$RUNNER_TEMP/macOS-export" -exportOptionsPlist "$RUNNER_TEMP/macOS-ExportOptions.plist"

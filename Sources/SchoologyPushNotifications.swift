@@ -6,18 +6,12 @@ import UIKit
 import AppKit
 #endif
 
-extension Notification.Name {
-    static let schoologyPushRegistrationDidChange = Notification.Name("schoologyPushRegistrationDidChange")
-}
-
 @MainActor
 enum SchoologyPushNotifications {
     private(set) static var session: AppSession?
-    private(set) static var activeDeviceToken: String? = UserDefaults.standard.string(forKey: "schoology.notifications.deviceToken")
+    private(set) static var activeDeviceToken: String?
     private(set) static var registrationError: String?
-
-    private static let tokenDefaultsKey = "schoology.notifications.deviceToken"
-    private static let registeredUserDefaultsKey = "schoology.notifications.registeredUserID"
+    private static var registeredUserID: String?
 
     static var notificationsEnabled: Bool {
         UserDefaults.standard.bool(forKey: "schoology.notifications.enabled")
@@ -31,7 +25,11 @@ enum SchoologyPushNotifications {
 
     static func configure(_ session: AppSession) {
         self.session = session
-        activeDeviceToken = UserDefaults.standard.string(forKey: tokenDefaultsKey)
+        // Older builds persisted APNs tokens. Apple requires requesting a fresh
+        // token at launch, so remove those legacy values during migration.
+        UserDefaults.standard.removeObject(forKey: "schoology.notifications.deviceToken")
+        UserDefaults.standard.removeObject(forKey: "schoology.notifications.registeredUserID")
+        registeredUserID = nil
     }
 
     static func requestAuthorization() async throws -> Bool {
@@ -41,22 +39,16 @@ enum SchoologyPushNotifications {
     static func setEnabled(_ enabled: Bool) async {
         UserDefaults.standard.set(enabled, forKey: "schoology.notifications.enabled")
         if enabled {
-            UserDefaults.standard.set(true, forKey: "schoology.notifications.everEnabled")
             await registerIfAuthorized()
         } else {
-            let hasStoredToken = activeDeviceToken != nil || UserDefaults.standard.string(forKey: tokenDefaultsKey) != nil
-            await unregisterStoredToken()
-            if !hasStoredToken { setRegistrationError(nil) }
+            await unregisterActiveToken()
+            registeredUserID = nil
         }
     }
 
     static func registerIfAuthorized() async {
-        #if os(macOS)
-        // The current Developer ID target has no APNs provisioning profile.
-        return
-        #else
         guard notificationsEnabled else {
-            await unregisterStoredToken()
+            await unregisterActiveToken()
             return
         }
         let settings = await UNUserNotificationCenter.current().notificationSettings()
@@ -67,15 +59,12 @@ enum SchoologyPushNotifications {
             setRegistrationError("Allow notifications for Schoology in system settings before registering this device.")
             return
         }
-        registerWithAPNs()
-        await registerCachedTokenIfNeeded()
-        #endif
-    }
-
-    private static func registerWithAPNs() {
         #if os(iOS)
         UIApplication.shared.registerForRemoteNotifications()
+        #elseif os(macOS)
+        NSApplication.shared.registerForRemoteNotifications()
         #endif
+        await registerCurrentTokenIfNeeded()
     }
 
     static func didRegister(deviceToken: Data, platform: String) async {
@@ -84,20 +73,9 @@ enum SchoologyPushNotifications {
             setRegistrationError("Apple returned an empty push notification device token.")
             return
         }
-        let previousToken = UserDefaults.standard.string(forKey: tokenDefaultsKey)
-        if previousToken != token {
-            UserDefaults.standard.removeObject(forKey: registeredUserDefaultsKey)
-        }
         activeDeviceToken = token
-        UserDefaults.standard.set(token, forKey: tokenDefaultsKey)
-        if !notificationsEnabled {
-            await unregisterStoredToken()
-            return
-        }
-        if let userID = session?.auth?.userID,
-           UserDefaults.standard.string(forKey: registeredUserDefaultsKey) == userID {
-            return
-        }
+        registeredUserID = nil
+        guard notificationsEnabled else { return }
         await registerDeviceToken(token, platform: platform)
     }
 
@@ -105,11 +83,8 @@ enum SchoologyPushNotifications {
         setRegistrationError(error.localizedDescription)
     }
 
-    private static func registerCachedTokenIfNeeded() async {
-        guard notificationsEnabled,
-              let token = activeDeviceToken ?? UserDefaults.standard.string(forKey: tokenDefaultsKey),
-              let auth = session?.auth else { return }
-        guard UserDefaults.standard.string(forKey: registeredUserDefaultsKey) != auth.userID else { return }
+    private static func registerCurrentTokenIfNeeded() async {
+        guard notificationsEnabled, let token = activeDeviceToken else { return }
         #if os(iOS)
         let platform = "iOS"
         #else
@@ -120,10 +95,11 @@ enum SchoologyPushNotifications {
 
     private static func registerDeviceToken(_ token: String, platform: String) async {
         guard let auth = session?.auth else {
-            // Keep the APNs token; sign-in/restore will retry once credentials are available.
+            // Keep the token in memory only; sign-in/restore retries registration.
             setRegistrationError(nil)
             return
         }
+        guard registeredUserID != auth.userID else { return }
 
         #if os(iOS)
         let deviceName = UIDevice.current.name
@@ -140,28 +116,34 @@ enum SchoologyPushNotifications {
             "device_os_version": osVersion,
             "app_version": "2026.10.0"
         ]
+        guard let bodyData = try? JSONSerialization.data(withJSONObject: body, options: [.sortedKeys]) else {
+            setRegistrationError("Could not encode the push registration request.")
+            return
+        }
         do {
-            // Match Schoology's Android registrar: POST checks the current token
-            // status; PUT updates the registration when the status isn't active.
-            let data = try await SchoologyAPI.shared.postJSON(path, auth: auth, body: body)
-            let root = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] ?? [:]
-            let payload = (root["data"] as? [String: Any]) ?? (root["response"] as? [String: Any]) ?? root
-            if Int(SchoologyValue.string(payload["status"])) != 1 {
-                _ = try await SchoologyAPI.shared.putJSON(path, auth: auth, body: body)
+            // Match the Android registrar's status check and update/create fallback.
+            do {
+                let statusData = try await SchoologyAPI.shared.get(path, auth: auth)
+                let root = (try? JSONSerialization.jsonObject(with: statusData)) as? [String: Any] ?? [:]
+                let payload = (root["data"] as? [String: Any]) ?? (root["response"] as? [String: Any]) ?? root
+                if Int(SchoologyValue.string(payload["status"])) != 1 {
+                    _ = try await SchoologyAPI.shared.putJSONData(path, auth: auth, bodyData: bodyData)
+                }
+            } catch {
+                _ = try await SchoologyAPI.shared.postJSONData(path, auth: auth, bodyData: bodyData)
             }
-            UserDefaults.standard.set(auth.userID, forKey: registeredUserDefaultsKey)
+            registeredUserID = auth.userID
             setRegistrationError(nil)
         } catch {
             setRegistrationError(error.localizedDescription)
         }
     }
 
-    private static func unregisterStoredToken() async {
-        guard let token = activeDeviceToken ?? UserDefaults.standard.string(forKey: tokenDefaultsKey),
-              let auth = session?.auth else { return }
+    private static func unregisterActiveToken() async {
+        guard let token = activeDeviceToken, let auth = session?.auth else { return }
         do {
             _ = try await SchoologyAPI.shared.delete("alert/device/\(token)", auth: auth)
-            UserDefaults.standard.removeObject(forKey: registeredUserDefaultsKey)
+            registeredUserID = nil
             setRegistrationError(nil)
         } catch {
             setRegistrationError(error.localizedDescription)
@@ -169,14 +151,13 @@ enum SchoologyPushNotifications {
     }
 
     static func unregisterForSignOut(auth: SchoologyAuth?) async {
-        guard let token = activeDeviceToken ?? UserDefaults.standard.string(forKey: tokenDefaultsKey),
-              let auth else { return }
+        guard let token = activeDeviceToken, let auth else { return }
         do {
             _ = try await SchoologyAPI.shared.delete("alert/device/\(token)", auth: auth)
         } catch {
             setRegistrationError(error.localizedDescription)
         }
-        UserDefaults.standard.removeObject(forKey: registeredUserDefaultsKey)
+        registeredUserID = nil
     }
 
     private static func setRegistrationError(_ message: String?) {

@@ -306,6 +306,28 @@ actor SchoologyAPI {
         return try await send(url: url, method: "POST", body: payload, auth: auth, signed: true, extra: [], contentType: "application/json")
     }
 
+    func postJSONData(_ path: String, auth: SchoologyAuth, params: [String: String] = [:], bodyData: Data) async throws -> Data {
+        await syncServerTime()
+        var components = URLComponents(string: "https://\(apiHost)/v1/\(path)")!
+        components.queryItems = params.sorted { $0.key < $1.key }.map { URLQueryItem(name: $0.key, value: $0.value) }
+        guard let url = components.url,
+              let object = try? JSONSerialization.jsonObject(with: bodyData),
+              JSONSerialization.isValidJSONObject(object),
+              let payload = String(data: bodyData, encoding: .utf8) else { throw SchoologyAPIError.invalidResponse }
+        return try await send(url: url, method: "POST", body: payload, auth: auth, signed: true, extra: [], contentType: "application/json")
+    }
+
+    func putJSONData(_ path: String, auth: SchoologyAuth, params: [String: String] = [:], bodyData: Data) async throws -> Data {
+        await syncServerTime()
+        var components = URLComponents(string: "https://\(apiHost)/v1/\(path)")!
+        components.queryItems = params.sorted { $0.key < $1.key }.map { URLQueryItem(name: $0.key, value: $0.value) }
+        guard let url = components.url,
+              let object = try? JSONSerialization.jsonObject(with: bodyData),
+              JSONSerialization.isValidJSONObject(object),
+              let payload = String(data: bodyData, encoding: .utf8) else { throw SchoologyAPIError.invalidResponse }
+        return try await send(url: url, method: "PUT", body: payload, auth: auth, signed: true, extra: [], contentType: "application/json")
+    }
+
     func putJSON(_ path: String, auth: SchoologyAuth, params: [String: String] = [:], body: [String: Any]) async throws -> Data {
         await syncServerTime()
         var components = URLComponents(string: "https://\(apiHost)/v1/\(path)")!

@@ -1,5 +1,19 @@
 # Release notes
 
+## [2026.10.0-port.52]
+
+### Push notifications
+- Fix Swift 6 actor-isolation errors by passing immutable JSON data across the Schoology API actor boundary.
+- Enable native macOS APNs registration and foreground/tap handling.
+- Stop persisting APNs device tokens; request a fresh token from Apple at launch and retain it only in memory.
+- Add macOS notification permission, enable/disable, sound, and registration-error controls.
+- Sign and export the macOS app with a Developer ID provisioning profile carrying the production APNs entitlement.
+- Follow the Android registration sequence: GET token status, PUT an inactive registration, or POST when the status lookup fails.
+
+### CI
+- Validate the Developer ID provisioning profile and its APNs entitlement before archiving.
+- Map the Developer ID profile into the notarized app export options.
+
 ## [2026.10.0-port.51]
 
 ### Notifications
