@@ -1,3 +1,19 @@
+## [2026.10.0-port.50]
+
+### Upcoming
+- Reuse the shared Upcoming event list and destination router in course, group, and school profiles on compact and wide layouts.
+- Route group and school discussions/events through their owning profile context while preserving course and assignment destinations.
+
+### Course materials
+- Let iPhone and iPad course-material folder rows use their natural SwiftUI height instead of imposing a fixed minimum row height.
+
+### Grades
+- Match the Tauri gradebook's teacher-override behavior for final grades, including explicit letter/percentage overrides, numeric overrides, grading-scale letter conversion, and hide-numeric scales.
+- Resolve the signed-in student's final-grade record by enrollment instead of selecting another student's record.
+
+### Build
+- Increment the iOS and macOS bundle build number to 50.
+
 ## [2026.10.0-port.49]
 
 ### Calendar and discussions

@@ -81,17 +81,17 @@ struct GroupProfileView: View {
                     }
                     .frame(maxWidth: .infinity)
                     Divider()
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Upcoming").font(.headline)
-                        if loadingTabs.contains(.upcoming) && profile.upcoming.isEmpty {
-                            ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
-                        } else {
-                            ScrollView { LazyVStack(alignment: .leading, spacing: 8) {
-                                ForEach(profile.upcoming) { event in eventCard(event) }
-                            }}
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text("Upcoming").font(.headline).padding(14)
+                        Divider()
+                        ScrollView {
+                            UpcomingEventList(events: profile.upcoming,
+                                isLoading: loadingTabs.contains(.upcoming) && !loadedTabs.contains(.upcoming),
+                                errorMessage: tabErrors[.upcoming], fallbackRealm: "groups", fallbackRealmID: group.id)
+                                .padding(10)
                         }
                     }
-                    .padding(14).frame(width: max(250, proxy.size.width * 0.2743))
+                    .frame(width: max(250, proxy.size.width * 0.2743))
                     .background(.thinMaterial)
                     .task(id: isLoading) { if !isLoading { await loadTab(.upcoming) } }
                 }
@@ -155,7 +155,9 @@ struct GroupProfileView: View {
                             switch tab {
                             case .updates: RecentActivityView(activities: profile.updates)
                             case .members: EmptyView()
-                            case .upcoming: ForEach(profile.upcoming) { event in eventCard(event) }
+                            case .upcoming:
+                                UpcomingEventList(events: profile.upcoming, isLoading: loadingTabs.contains(.upcoming) && !loadedTabs.contains(.upcoming),
+                                    errorMessage: tabErrors[.upcoming], fallbackRealm: "groups", fallbackRealmID: group.id)
                             case .discussions: profileRows(profile.discussions, empty: "No discussions")
                             case .albums: profileRows(profile.albums, empty: "No albums")
                             case .resources: EmptyView()
@@ -209,26 +211,6 @@ struct GroupProfileView: View {
                 }.buttonStyle(.plain)
             }
         }
-    }
-
-    private func eventCard(_ event: SchoologyUpcomingEvent) -> some View {
-        NavigationLink {
-            if event.type == "assignment", let assignmentID = event.assignmentID {
-                SchoologyAssignmentDetailView(sectionID: event.sectionID ?? group.id, assignmentID: assignmentID, title: event.title)
-            } else if event.type == "discussion", let discussionID = event.discussionID {
-                SchoologyDiscussionDetailView(realm: "groups", realmID: group.id, itemID: discussionID, title: event.title)
-            } else {
-                SchoologyEventDetailView(realm: "groups", realmID: group.id, eventID: event.id, title: event.title)
-            }
-        } label: {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(event.title).font(.subheadline.weight(.semibold))
-                Text([event.typeLabel,event.date?.formatted(date: .abbreviated,time: .shortened) ?? ""].filter { !$0.isEmpty }.joined(separator: " • "))
-                    .font(.caption).foregroundStyle(.secondary)
-            }.padding(11).frame(maxWidth: .infinity, alignment: .leading)
-                .background(.background, in: RoundedRectangle(cornerRadius: 10))
-                .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(.quaternary))
-        }.buttonStyle(.plain)
     }
 
     private func load() async {
@@ -333,10 +315,16 @@ struct SchoolProfileView: View {
                     }
                     .frame(maxWidth: .infinity)
                     Divider()
-                    VStack(alignment: .leading) {
-                        Text("Upcoming").font(.headline)
-                        ForEach(profile.upcoming) { event in eventCard(event) }
-                    }.padding(14).frame(width: max(250, proxy.size.width * 0.2743)).background(.thinMaterial)
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text("Upcoming").font(.headline).padding(14)
+                        Divider()
+                        ScrollView {
+                            UpcomingEventList(events: profile.upcoming, fallbackRealm: "schools", fallbackRealmID: schoolID)
+                                .padding(10)
+                        }
+                    }
+                    .frame(width: max(250, proxy.size.width * 0.2743))
+                    .background(.thinMaterial)
                 }
             } else {
                 VStack(spacing: 0) {
@@ -387,7 +375,8 @@ struct SchoolProfileView: View {
                         }
                         if !profile.school.address.isEmpty { LabeledContent("Address", value: profile.school.address) }
                         if !profile.school.phone.isEmpty { LabeledContent("Phone", value: profile.school.phone) }
-                    case .upcoming: ForEach(profile.upcoming) { event in eventCard(event) }
+                    case .upcoming:
+                        UpcomingEventList(events: profile.upcoming, fallbackRealm: "schools", fallbackRealmID: schoolID)
                     case .resources: EmptyView()
                     case .discussions:
                         if discussionForbidden {
@@ -448,25 +437,6 @@ struct SchoolProfileView: View {
                 .background(.background, in: RoundedRectangle(cornerRadius: 12))
                 .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(.quaternary))
         }}
-    }
-
-    private func eventCard(_ event: SchoologyUpcomingEvent) -> some View {
-        NavigationLink {
-            if event.type == "assignment", let sectionID = event.sectionID, let assignmentID = event.assignmentID {
-                SchoologyAssignmentDetailView(sectionID: sectionID, assignmentID: assignmentID, title: event.title)
-            } else if event.type == "discussion", let discussionID = event.discussionID {
-                SchoologyDiscussionDetailView(realm: "schools", realmID: schoolID, itemID: discussionID, title: event.title)
-            } else {
-                SchoologyEventDetailView(realm: "schools", realmID: schoolID, eventID: event.id, title: event.title)
-            }
-        } label: {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(event.title).font(.subheadline.weight(.semibold))
-                Text([event.typeLabel,event.date?.formatted(date: .abbreviated,time: .shortened) ?? ""].filter { !$0.isEmpty }.joined(separator: " • "))
-                    .font(.caption).foregroundStyle(.secondary)
-            }.padding(11).frame(maxWidth: .infinity, alignment: .leading)
-                .background(.background, in: RoundedRectangle(cornerRadius: 10))
-        }.buttonStyle(.plain)
     }
 
     private func load() async {

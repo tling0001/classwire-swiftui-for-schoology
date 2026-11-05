@@ -442,6 +442,8 @@ struct UpcomingEventList: View {
     let events: [SchoologyUpcomingEvent]
     var isLoading = false
     var errorMessage: String?
+    var fallbackRealm: String? = nil
+    var fallbackRealmID: String? = nil
 
     var body: some View {
         if isLoading {
@@ -467,7 +469,7 @@ struct UpcomingEventList: View {
                         VStack(spacing: 0) {
                             ForEach(day.events) { event in
                                 NavigationLink {
-                                    UpcomingEventDetailView(event: event)
+                                    UpcomingEventDetailView(event: event, fallbackRealm: fallbackRealm, fallbackRealmID: fallbackRealmID)
                                 } label: {
                                     HStack(spacing: 12) {
                                         Image(systemName: icon(for: event.type))
@@ -506,7 +508,7 @@ struct UpcomingEventList: View {
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.secondary)
                     ForEach(undatedEvents) { event in
-                        NavigationLink(event.title, destination: UpcomingEventDetailView(event: event))
+                        NavigationLink(event.title, destination: UpcomingEventDetailView(event: event, fallbackRealm: fallbackRealm, fallbackRealmID: fallbackRealmID))
                             .buttonStyle(.plain)
                     }
                 }
@@ -601,12 +603,14 @@ private struct CourseDashboardDetailView: View {
 struct UpcomingEventDetailView: View {
     @Environment(AppSession.self) private var session
     let event: SchoologyUpcomingEvent
+    var fallbackRealm: String? = nil
+    var fallbackRealmID: String? = nil
 
     @ViewBuilder
     var body: some View {
         switch event.type.lowercased() {
         case "assignment":
-            if let sectionID = event.sectionID, let assignmentID = event.assignmentID {
+            if let sectionID = event.sectionID ?? (fallbackRealm == "sections" ? fallbackRealmID : nil), let assignmentID = event.assignmentID {
                 SchoologyAssignmentDetailView(sectionID: sectionID, assignmentID: assignmentID, title: event.title)
             } else {
                 unavailableTarget("This assignment is missing its section or assignment identifier.")
@@ -614,6 +618,8 @@ struct UpcomingEventDetailView: View {
         case "discussion":
             if let sectionID = event.sectionID, let discussionID = event.discussionID {
                 SchoologyDiscussionDetailView(realm: "sections", realmID: sectionID, itemID: discussionID, title: event.title)
+            } else if let realm = fallbackRealm, let realmID = fallbackRealmID, let discussionID = event.discussionID {
+                SchoologyDiscussionDetailView(realm: realm, realmID: realmID, itemID: discussionID, title: event.title)
             } else if let url = event.webURL {
                 SchoologyEmbeddedWebView(url: url, title: event.title)
             } else {
@@ -622,13 +628,15 @@ struct UpcomingEventDetailView: View {
         case "event":
             if let sectionID = event.sectionID {
                 SchoologyEventDetailView(realm: "sections", realmID: sectionID, eventID: event.id, title: event.title)
+            } else if let realm = fallbackRealm, let realmID = fallbackRealmID {
+                SchoologyEventDetailView(realm: realm, realmID: realmID, eventID: event.id, title: event.title)
             } else if let url = event.webURL {
                 SchoologyEmbeddedWebView(url: url, title: event.title)
             } else {
                 unavailableTarget("Schoology did not provide an event destination.")
             }
         case "external_tool", "lti", "lti_assignment":
-            if let sectionID = event.sectionID, let assignmentID = event.assignmentID {
+            if let sectionID = event.sectionID ?? (fallbackRealm == "sections" ? fallbackRealmID : nil), let assignmentID = event.assignmentID {
                 SchoologyAssignmentDetailView(sectionID: sectionID, assignmentID: assignmentID, title: event.title)
             } else if let url = event.webURL {
                 SchoologyEmbeddedWebView(url: url, title: event.title)

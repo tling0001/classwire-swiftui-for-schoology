@@ -307,8 +307,13 @@ final class AppSession {
         async let categoriesRequest = api.get("sections/\(courseID)/grading_categories", auth: auth)
         async let itemsRequest = api.get("sections/\(courseID)/grade_items", auth: auth, params: ["limit": "2000"])
         async let userGradesRequest = api.get("users/\(auth.userID)/grades", auth: auth, params: ["section_id": courseID])
-        let (sectionData, periodsData, categoriesData, itemsData, userGradesData) =
-            try await (sectionRequest, periodsRequest, categoriesRequest, itemsRequest, userGradesRequest)
+        async let sectionGradesRequest = try? await api.get("sections/\(courseID)/grades", auth: auth)
+        async let gradingScalesRequest = try? await api.get("sections/\(courseID)/grading_scales", auth: auth)
+        async let enrollmentsRequest = try? await api.get("sections/\(courseID)/enrollments", auth: auth,
+            params: ["start": "0", "limit": "200", "enrollment_status": "1"])
+        let (sectionData, periodsData, categoriesData, itemsData, userGradesData, sectionGradesData, gradingScalesData, enrollmentsData) =
+            try await (sectionRequest, periodsRequest, categoriesRequest, itemsRequest, userGradesRequest,
+                sectionGradesRequest, gradingScalesRequest, enrollmentsRequest)
 
         let section = Self.object(sectionData)
         let gradeItems = SchoologyValue.list(Self.object(itemsData), keys: ["assignment", "assignments", "items"])
@@ -336,17 +341,89 @@ final class AppSession {
             return id.isEmpty ? nil : (id, row)
         }, uniquingKeysWith: { first, _ in first })
 
-        let rawFinal = current?["final_grade"] ?? current?["finalGrade"] ?? current?["final_grades"] ?? current?["finalGrades"]
-        let finalRecord = (rawFinal as? [[String: Any]])?.first ?? (rawFinal as? [String: Any])
-        let finalPeriods = SchoologyValue.list(finalRecord?["period"] ?? finalRecord?["periods"] ?? finalRecord?["final_period"] ?? finalRecord?["finalPeriod"], keys: ["period", "periods", "items"])
-        let finalPeriod = finalPeriods.first { SchoologyValue.string($0["period_id"] ?? $0["periodId"]) == "final" } ?? finalPeriods.first
-        let overallRaw = finalPeriod?["override_str"] ?? finalPeriod?["overrideStr"] ??
+        let sectionGradeRoot = Self.object(sectionGradesData ?? Data())
+        let rawSectionFinal = sectionGradeRoot["final_grade"] ?? sectionGradeRoot["finalGrade"] ??
+            sectionGradeRoot["final_grades"] ?? sectionGradeRoot["finalGrades"]
+        let sectionGradeRows = (rawSectionFinal as? [[String: Any]]) ??
+            ((rawSectionFinal as? [String: Any]).map { [$0] } ??
+                SchoologyValue.list(sectionGradeRoot, keys: ["final_grade", "finalGrade", "final_grades", "finalGrades", "items"]))
+        let enrollmentRows = SchoologyValue.list(Self.object(enrollmentsData ?? Data()),
+            keys: ["enrollment", "enrollments", "items"])
+        let myEnrollment = enrollmentRows.first {
+            SchoologyValue.string($0["uid"] ?? $0["user_id"] ?? $0["userId"]) == auth.userID
+        }
+        let enrollmentID = SchoologyValue.string(myEnrollment?["id"])
+        let resolvedSectionGrade = sectionGradeRows.first {
+            !enrollmentID.isEmpty && SchoologyValue.string($0["enrollment_id"] ?? $0["enrollmentId"]) == enrollmentID
+        } ?? (sectionGradeRows.count == 1 ? sectionGradeRows.first : nil)
+        let fallbackFinal = current?["final_grade"] ?? current?["finalGrade"] ?? current?["final_grades"] ?? current?["finalGrades"]
+        let fallbackFinalRecord = (fallbackFinal as? [[String: Any]])?.first ?? (fallbackFinal as? [String: Any])
+        let finalRecord = resolvedSectionGrade ?? fallbackFinalRecord
+        let rawFinalPeriods = finalRecord?["period"] ?? finalRecord?["periods"] ??
+            finalRecord?["final_period"] ?? finalRecord?["finalPeriod"] ??
+            finalRecord?["final_grade_period"] ?? finalRecord?["finalGradePeriod"]
+        let finalPeriods = (rawFinalPeriods as? [[String: Any]]) ??
+            ((rawFinalPeriods as? [String: Any]).map { [$0] } ??
+                SchoologyValue.list(finalRecord, keys: ["period", "periods", "final_period", "finalPeriod", "items"]))
+        let finalPeriod = finalPeriods.first {
+            SchoologyValue.string($0["period_id"] ?? $0["periodId"]) == "final"
+        } ?? finalPeriods.first
+        let sectionPayload = (section["section"] as? [String: Any]) ?? section
+        let defaultScale = SchoologyValue.string((sectionPayload["options"] as? [String: Any])?["default_grading_scale_id"])
+        let explicitOverride = SchoologyValue.string(
+            finalPeriod?["override_str"] ?? finalPeriod?["overrideStr"] ??
             finalPeriod?["override_string"] ?? finalPeriod?["overrideString"] ??
+            finalPeriod?["grade_override"] ?? finalPeriod?["gradeOverride"] ??
             finalRecord?["override_str"] ?? finalRecord?["overrideStr"] ??
             finalRecord?["override_string"] ?? finalRecord?["overrideString"] ??
-            finalPeriod?["grade"] ?? finalRecord?["grade"] ??
+            finalRecord?["grade_override"] ?? finalRecord?["gradeOverride"]
+        ).trimmingCharacters(in: .whitespacesAndNewlines)
+        let numericOverride = finalPeriod?["override_numeric"] ?? finalPeriod?["overrideNumeric"] ??
+            finalRecord?["override_numeric"] ?? finalRecord?["overrideNumeric"]
+        let rawGrade = numericOverride ?? finalPeriod?["grade"] ?? finalRecord?["grade"] ??
             finalRecord?["calculated_grade"] ?? finalRecord?["calculatedGrade"]
-        let overall = overallRaw == nil || overallRaw is NSNull ? "—" : SchoologyValue.string(overallRaw, fallback: "—")
+        let scaleID = SchoologyValue.string(finalPeriod?["scale_id"] ?? finalPeriod?["scaleId"] ??
+            finalRecord?["scale_id"] ?? finalRecord?["scaleId"], fallback: defaultScale)
+        let scaleRoot = Self.object(gradingScalesData ?? Data())
+        let availableScales = SchoologyValue.list(scaleRoot,
+            keys: ["grading_scale", "gradingScale", "scales", "scale", "data", "items"])
+        let gradingScale = availableScales.first {
+            SchoologyValue.string($0["id"] ?? $0["scale_id"] ?? $0["scaleId"]) == scaleID
+        } ?? (availableScales.count == 1 ? availableScales.first : nil)
+        let scaleType = SchoologyValue.integer(gradingScale?["type"] ?? gradingScale?["scale_type"] ?? gradingScale?["scaleType"])
+        let gradeNumber = Double(SchoologyValue.string(rawGrade).replacingOccurrences(of: "%", with: "").trimmingCharacters(in: .whitespacesAndNewlines))
+        let formattedPercentage: String? = gradeNumber.map { number in
+            var value = String(format: "%.2f", number)
+            while value.contains(".") && value.last == "0" { value.removeLast() }
+            if value.last == "." { value.removeLast() }
+            return value + "%"
+        }
+        let scaleObject = (gradingScale?["scale"] as? [String: Any]) ?? [:]
+        let levelValue = scaleObject["level"] ?? scaleObject["levels"] ?? gradingScale?["levels"] ?? gradingScale?["level"]
+        let scaleLevels = SchoologyValue.list(levelValue, keys: ["level", "levels", "items"])
+        let matchedLetter = gradeNumber.flatMap { number -> String? in
+            guard scaleType == 1 else { return nil }
+            let levels = scaleLevels.compactMap { level -> (String, Double)? in
+                let title = SchoologyValue.string(level["grade"] ?? level["title"] ?? level["name"])
+                let cutoff = Double(SchoologyValue.string(level["cutoff"] ?? level["average"] ?? level["percent"] ?? level["percentage"]))
+                guard !title.isEmpty, let cutoff else { return nil }
+                return (title, cutoff)
+            }.sorted { $0.1 > $1.1 }
+            return levels.first(where: { number >= $0.1 })?.0
+        }
+        let hideNumeric = SchoologyValue.bool(gradingScale?["hide_numeric"] ?? gradingScale?["hideNumeric"])
+        let overall: String
+        if !explicitOverride.isEmpty {
+            overall = explicitOverride
+        } else if let formattedPercentage {
+            if let matchedLetter {
+                overall = hideNumeric ? matchedLetter : "\(matchedLetter) (\(formattedPercentage))"
+            } else {
+                overall = formattedPercentage
+            }
+        } else {
+            overall = rawGrade == nil || rawGrade is NSNull ? "—" : SchoologyValue.string(rawGrade, fallback: "—")
+        }
         let overallCommentRaw = finalRecord?["comment"] ?? finalPeriod?["comment"]
         let overallComment = SchoologyValue.plainText(SchoologyValue.string(
             (overallCommentRaw as? [String: Any])?["comment"] ?? (overallCommentRaw as? [String: Any])?["body"] ?? overallCommentRaw
@@ -438,8 +515,6 @@ final class AppSession {
             gradePeriods.append(SchoologyGradePeriod(id: periodID, title: periodID == "0" ? "Other" : "Grading Period", categories: categories))
         }
 
-        let sectionPayload = (section["section"] as? [String: Any]) ?? section
-        let defaultScale = SchoologyValue.string((sectionPayload["options"] as? [String: Any])?["default_grading_scale_id"])
         return SchoologyGradebook(
             courseID: courseID,
             overallGrade: overall,

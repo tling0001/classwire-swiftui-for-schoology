@@ -139,15 +139,10 @@ struct SchoologyCourseProfileView: View {
                 Text("Upcoming").font(.headline).padding(14)
                 Divider()
                 ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 8) {
-                        if loadingTabs.contains(.upcoming) && upcoming.isEmpty {
-                            ProgressView("Loading upcoming…").frame(maxWidth: .infinity).padding(.top, 24)
-                        } else if upcoming.isEmpty && loadedTabs.contains(.upcoming) {
-                            ContentUnavailableView("Nothing upcoming", systemImage: "calendar").padding(.top, 24)
-                        }
-                        ForEach(upcoming) { event in courseUpcomingRow(event) }
-                    }
-                    .padding(10)
+                    UpcomingEventList(events: upcoming,
+                        isLoading: loadingTabs.contains(.upcoming) && !loadedTabs.contains(.upcoming),
+                        errorMessage: tabErrors[.upcoming], fallbackRealm: "sections", fallbackRealmID: course.id)
+                        .padding(10)
                 }
             }
             .frame(width: max(250, width * 0.2743))
@@ -206,29 +201,6 @@ struct SchoologyCourseProfileView: View {
         }.frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, 7).contentShape(Rectangle())
     }
 
-    private func courseUpcomingRow(_ event: SchoologyUpcomingEvent) -> some View {
-        NavigationLink {
-            if event.type == "assignment", let assignmentID = event.assignmentID {
-                SchoologyAssignmentDetailView(sectionID: event.sectionID ?? course.id, assignmentID: assignmentID, title: event.title)
-            } else if event.type == "discussion", let discussionID = event.discussionID {
-                SchoologyDiscussionDetailView(realm: "sections", realmID: course.id, itemID: discussionID, title: event.title)
-            } else {
-                SchoologyEventDetailView(realm: "sections", realmID: course.id, eventID: event.id, title: event.title)
-            }
-        } label: {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(event.title).font(.subheadline.weight(.semibold)).foregroundStyle(.primary)
-                Text([event.typeLabel, event.timeLabel].filter { !$0.isEmpty }.joined(separator: " • "))
-                    .font(.caption).foregroundStyle(.secondary)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(11)
-            .background(.background, in: RoundedRectangle(cornerRadius: 10))
-            .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(.quaternary))
-        }
-        .buttonStyle(.plain)
-    }
-
     @ViewBuilder private var content: some View {
         switch tab {
         case .materials:
@@ -265,24 +237,12 @@ struct SchoologyCourseProfileView: View {
                 }
             }
         case .upcoming:
-            List(upcoming) { event in
-                NavigationLink {
-                    if event.type == "assignment", let assignmentID = event.assignmentID {
-                        SchoologyAssignmentDetailView(sectionID: event.sectionID ?? course.id, assignmentID: assignmentID, title: event.title)
-                    } else if event.type == "discussion", let discussionID = event.discussionID {
-                        SchoologyDiscussionDetailView(realm: "sections", realmID: course.id, itemID: discussionID, title: event.title)
-                    } else {
-                        SchoologyEventDetailView(realm: "sections", realmID: course.id, eventID: event.id, title: event.title)
-                    }
-                } label: {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(event.title)
-                        Text([event.typeLabel, event.timeLabel].filter { !$0.isEmpty }.joined(separator: " • "))
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                }
+            ScrollView {
+                UpcomingEventList(events: upcoming,
+                    isLoading: loadingTabs.contains(.upcoming) && !loadedTabs.contains(.upcoming),
+                    errorMessage: tabErrors[.upcoming], fallbackRealm: "sections", fallbackRealmID: course.id)
+                    .padding()
             }
-            .overlay { if upcoming.isEmpty && loadedTabs.contains(.upcoming) { ContentUnavailableView("Nothing upcoming", systemImage: "calendar") } }
         }
     }
 
