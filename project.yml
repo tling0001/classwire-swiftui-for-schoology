@@ -34,6 +34,7 @@ targets:
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         UIBackgroundModes:
           - fetch
+          - remote-notification
         BGTaskSchedulerPermittedIdentifiers:
           - com.schoologytauri.app.notifications-refresh
         SUPPORTS_MACCATALYST: NO

@@ -1,3 +1,18 @@
+## [2026.10.0-port.44]
+
+### Course Pages
+- Recognize Schoology Pages in course Materials, including nested folders.
+- Load page content through the authenticated Sections Pages API.
+- Render rich HTML in an in-app WebKit view with responsive media, relative asset URLs, and system light/dark colors.
+- Decode page-specific IDs from course material records.
+
+### iOS Ad Hoc build and notification preparation
+- Fix the Swift concurrency compile error in the iOS background refresh handler by awaiting the MainActor-isolated sign-in state.
+- Add the remote-notification background mode in preparation for APNs background delivery; actual delivery still requires the App ID capability, a matching profile, device-token registration, and a provider service.
+
+### Build
+- Increment bundle build number to 44.
+
 ## [2026.10.0-port.43]
 
 ### iOS navigation and updates

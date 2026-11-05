@@ -211,6 +211,22 @@ final class AppSession {
         }
     }
 
+    func loadCoursePage(courseID: String, pageID: String) async throws -> SchoologyPage {
+        guard let auth else { throw SchoologyAPIError.notSignedIn }
+        let data = try await api.get("sections/\(courseID)/pages/\(pageID)", auth: auth)
+        let response = Self.object(data)
+        let page = response["page"] as? [String: Any] ?? response
+        let host = canadianServer ? "app.schoologyca.com" : "app.schoology.com"
+        guard let baseURL = URL(string: "https://\(host)/") else {
+            throw SchoologyAPIError.invalidResponse
+        }
+        return SchoologyPage(
+            title: SchoologyValue.string(page["title"], fallback: "Page"),
+            body: SchoologyValue.string(page["body"] ?? page["description"] ?? page["content"]),
+            baseURL: baseURL
+        )
+    }
+
     func loadCourseMaterials(courseID: String, folderID: String = "0") async throws -> [SchoologyProfileItem] {
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         let data = try await api.get("courses/\(courseID)/folder/\(folderID)", auth: auth)

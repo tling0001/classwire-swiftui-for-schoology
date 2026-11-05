@@ -32,7 +32,7 @@ struct SchoologyProfileItem: Identifiable, Sendable {
             } else if rawKind == "folder" {
                 rawID = item["id"] ?? item["folder_id"] ?? item["folderId"]
             } else if !rawKind.isEmpty {
-                rawID = item["template_id"] ?? item["templateID"] ?? item["templateId"] ?? item["assignment_id"] ?? item["assignmentId"] ?? item["discussion_id"] ?? item["discussionId"] ?? item["event_id"] ?? item["eventId"] ?? item["id"]
+                rawID = item["template_id"] ?? item["templateID"] ?? item["templateId"] ?? item["assignment_id"] ?? item["assignmentId"] ?? item["discussion_id"] ?? item["discussionId"] ?? item["event_id"] ?? item["eventId"] ?? item["page_id"] ?? item["pageId"] ?? item["id"]
             } else {
                 rawID = item["user_id"] ?? item["userId"] ?? item["uid"] ?? item["id"]
             }

@@ -360,6 +360,8 @@ struct SchoologyCourseMaterialDestinationView: View {
             SchoologyCourseResourceFolderView(courseID: courseID, item: item)
         } else if item.kind.contains("assignment") {
             SchoologyAssignmentDetailView(sectionID: courseID, assignmentID: item.id, title: item.title)
+        } else if item.kind.lowercased() == "page" {
+            SchoologyPageDetailView(courseID: courseID, pageID: item.id, title: item.title)
         } else if item.kind.contains("discussion") {
             SchoologyDiscussionDetailView(realm: "sections", realmID: courseID, itemID: item.id, title: item.title)
         } else if item.kind.contains("event") {

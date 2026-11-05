@@ -30,7 +30,7 @@ struct SchoologyApp: App {
         }
         #if os(iOS)
         .backgroundTask(.appRefresh(SchoologyBackgroundRefresh.identifier)) {
-            if session.isSignedIn {
+            if await session.isSignedIn {
                 await session.loadNotifications(force: true, markRead: false)
                 SchoologyBackgroundRefresh.schedule()
             }

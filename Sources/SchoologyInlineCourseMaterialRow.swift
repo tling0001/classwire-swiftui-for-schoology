@@ -71,6 +71,7 @@ struct SchoologyInlineCourseMaterialRow: View {
     private var symbol: String {
         let kind = item.kind.lowercased()
         if kind.contains("discussion") { return "text.bubble" }
+        if kind == "page" { return "doc.text" }
         if kind.contains("assignment") { return "doc.text" }
         if kind.contains("event") { return "calendar" }
         if ["assessment", "assessment_v2", "managed_assessment", "quiz"].contains(kind) { return "checklist" }
