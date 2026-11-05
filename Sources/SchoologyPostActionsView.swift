@@ -110,7 +110,7 @@ struct SchoologyPostActionsView: View {
     private var commentActionTitle: String {
         switch commentsCount {
         case 0: "Comment"
-        case 1, 2: String(commentsCount)
+        case 1, 2: "Comments (\(commentsCount))"
         default: "More Comments (\(commentsCount))"
         }
     }

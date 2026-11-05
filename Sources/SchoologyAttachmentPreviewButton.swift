@@ -23,6 +23,7 @@ private struct SchoologyAttachmentDocument: FileDocument {
 
 struct SchoologyAttachmentPreviewButton: View {
     let attachment: SchoologyAttachment
+    var automaticallyPresent = false
     @State private var isPresented = false
     var body: some View {
         Button { isPresented = true } label: {
@@ -33,6 +34,9 @@ struct SchoologyAttachmentPreviewButton: View {
         }
         .buttonStyle(.plain)
         .accessibilityHint("Opens attachment actions")
+        .task {
+            if automaticallyPresent { isPresented = true }
+        }
         .sheet(isPresented: $isPresented) { SchoologyAttachmentsView(attachments: [attachment]) }
     }
 }

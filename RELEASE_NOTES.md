@@ -1,5 +1,19 @@
 # Release notes
 
+## [2026.10.0-port.55]
+
+### Course materials and attachments
+- Resolve course document materials through the official section document endpoint and read nested file attachments, matching the Tauri port's material lookup.
+- Open the native View / Download actions directly when a course material is a file, including files whose download URL is supplied only by the document detail response.
+- Preserve converted preview URLs only when Schoology reports successful conversion, and keep the original file URL for downloads.
+- Forward the Schoology mobile cookie through HTTPS file redirects while keeping OAuth authorization restricted to the configured API host.
+
+### Posts
+- Label one or two post comments explicitly as Comments (1) and Comments (2).
+
+### Build
+- Increment the iOS and macOS build number to 55.
+
 ## [2026.10.0-port.54]
 
 ### macOS build fix

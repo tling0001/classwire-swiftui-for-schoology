@@ -403,10 +403,10 @@ actor SchoologyAPI {
             request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
             request.setValue("*/*", forHTTPHeaderField: "Accept")
             request.setValue("https://\(webHost)/", forHTTPHeaderField: "Referer")
+            request.setValue(mobileCookie, forHTTPHeaderField: "Cookie")
             if currentURL.host?.caseInsensitiveCompare(apiHost) == .orderedSame {
                 request.setValue("Android", forHTTPHeaderField: "X-Schoology-Client")
                 request.setValue("2026.10.0", forHTTPHeaderField: "X-Schoology-App-Version")
-                request.setValue(mobileCookie, forHTTPHeaderField: "Cookie")
                 request.setValue(try authorization(method: "GET", url: currentURL, auth: auth, extra: []), forHTTPHeaderField: "Authorization")
             }
             let (data, response) = try await session.data(for: request, delegate: redirectDelegate)

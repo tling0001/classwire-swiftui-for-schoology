@@ -320,11 +320,33 @@ struct SchoologyCourseMaterialDestinationView: View {
     @Environment(AppSession.self) private var session
     let courseID: String
     let item: SchoologyProfileItem
+    @State private var resolvedAttachment: SchoologyAttachment?
+    @State private var resolvedLinkURL: URL?
+    @State private var isResolvingAttachment = false
+    @State private var attachmentError: String?
 
     @ViewBuilder
     var body: some View {
         if item.kind == "folder" {
             SchoologyCourseResourceFolderView(courseID: courseID, item: item)
+        } else if item.kind.lowercased() == "document" {
+            Group {
+                if isResolvingAttachment {
+                    ProgressView("Loading material…")
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else if let resolvedAttachment {
+                    SchoologyAttachmentPreviewButton(attachment: resolvedAttachment, automaticallyPresent: true)
+                        .padding()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                } else if let url = resolvedLinkURL ?? item.url {
+                    SchoologyEmbeddedWebView(url: url, title: item.title)
+                } else if let attachmentError {
+                    ContentUnavailableView("Unable to open material", systemImage: "exclamationmark.triangle", description: Text(attachmentError))
+                } else {
+                    SchoologyProfileItemDetailSheet(item: item)
+                }
+            }
+            .task(id: item.id) { await resolveAttachment() }
         } else if item.kind.contains("assignment") {
             SchoologyAssignmentDetailView(sectionID: courseID, assignmentID: item.id, title: item.title)
         } else if item.kind.lowercased() == "page" {
@@ -340,12 +362,12 @@ struct SchoologyCourseMaterialDestinationView: View {
             } else {
                 SchoologyProfileItemDetailSheet(item: item)
             }
-        } else if let url = item.url, isFileAttachment {
+        } else if let url = item.url ?? item.fileViewURL, isFileAttachment {
             SchoologyAttachmentPreviewButton(attachment: SchoologyAttachment(
                 title: item.fileName.isEmpty ? item.title : item.fileName,
                 url: url,
-                viewURL: item.fileViewURL
-            ))
+                viewURL: item.fileViewURL == url ? nil : item.fileViewURL
+            ), automaticallyPresent: true)
                 .padding()
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         } else if let url = item.url {
@@ -358,8 +380,23 @@ struct SchoologyCourseMaterialDestinationView: View {
     private var isFileAttachment: Bool {
         let kind = item.kind.lowercased()
         if ["file", "document", "attachment", "file_attachment"].contains(kind) { return true }
-        let ext = item.url?.pathExtension.lowercased() ?? ""
+        let ext = (item.url ?? item.fileViewURL)?.pathExtension.lowercased() ?? ""
         return ["pdf", "doc", "docx", "ppt", "pptx", "xls", "xlsx", "csv", "txt", "rtf",
                 "jpg", "jpeg", "png", "gif", "heic", "webp"].contains(ext)
+    }
+
+    @MainActor
+    private func resolveAttachment() async {
+        guard resolvedAttachment == nil, !isResolvingAttachment else { return }
+        isResolvingAttachment = true
+        attachmentError = nil
+        defer { isResolvingAttachment = false }
+        do {
+            let detail = try await session.loadCourseMaterialDetail(courseID: courseID, item: item)
+            resolvedAttachment = detail.attachment
+            resolvedLinkURL = detail.linkURL
+        } catch {
+            attachmentError = error.localizedDescription
+        }
     }
 }

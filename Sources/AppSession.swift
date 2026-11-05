@@ -235,6 +235,78 @@ final class AppSession {
         return SchoologyProfileItem.decodeList(Self.object(data), keys: ["folder-item", "folder_item", "folderItems", "items", "documents"])
     }
 
+    func loadCourseMaterialDetail(courseID: String, item: SchoologyProfileItem) async throws -> (attachment: SchoologyAttachment?, linkURL: URL?) {
+        guard let auth else { throw SchoologyAPIError.notSignedIn }
+        let data = try await api.get("sections/\(courseID)/documents/\(item.id)", auth: auth)
+        let root = Self.object(data)
+        let document = root["document"] as? [String: Any] ?? root
+        let template = document["template"] as? [String: Any] ?? [:]
+        let fields = document["template_fields"] as? [String: Any] ?? [:]
+        let documentType = SchoologyValue.string(
+            document["document_type"] ?? document["documentType"] ??
+            document["template_document_type"] ?? document["templateDocumentType"] ??
+            template["template_document_type"] ?? template["templateDocumentType"] ??
+            fields["document_type"] ?? fields["documentType"]
+        ).lowercased()
+        let attachmentRoot = document["attachments"] ?? document["attachment"] ??
+            template["attachments"] ?? template["attachment"] ??
+            fields["attachments"] ?? fields["attachment"]
+        let attachmentContainer = attachmentRoot as? [String: Any] ?? [:]
+        let nestedRoot = attachmentContainer["attachments"] ?? attachmentRoot
+        let fileRoot = attachmentContainer["files"] ?? attachmentContainer["file"] ?? nestedRoot
+        let file = SchoologyValue.list(fileRoot, keys: ["file", "files", "items"]).first ??
+            (fileRoot as? [String: Any]) ?? document
+        let conversionStatus = SchoologyValue.string(
+            file["converted_status"] ?? file["convertedStatus"] ??
+            file["file_converted_status"] ?? file["fileConvertedStatus"] ??
+            document["converted_status"] ?? document["convertedStatus"]
+        ).lowercased()
+        let convertedURL = SchoologyValue.url(
+            file["file_converted_download_url"] ?? file["fileConvertedDownloadURL"] ??
+            file["converted_download_path"] ?? file["convertedDownloadPath"] ??
+            document["file_converted_download_url"] ?? document["fileConvertedDownloadURL"] ??
+            document["converted_download_path"] ?? document["convertedDownloadPath"]
+        )
+        let isFile = documentType == "file" ||
+            ["file", "attachment", "file_attachment"].contains(SchoologyValue.string(document["type"]).lowercased()) ||
+            file["file_download_url"] != nil || file["fileDownloadURL"] != nil ||
+            file["download_path"] != nil || file["downloadPath"] != nil ||
+            file["download_url"] != nil || file["downloadUrl"] != nil ||
+            file["file_converted_download_url"] != nil || file["fileConvertedDownloadURL"] != nil ||
+            (fileRoot != nil && file["url"] != nil)
+        let attachment: SchoologyAttachment?
+        if isFile {
+            let rawDownloadURL = file["file_download_url"] ?? file["fileDownloadURL"] ??
+                file["download_path"] ?? file["downloadPath"] ?? file["download_url"] ??
+                file["downloadUrl"] ?? file["resolveDownloadUrl"] ?? file["resolve_download_url"] ??
+                file["url"] ?? document["file_download_url"] ?? document["fileDownloadURL"] ??
+                document["download_path"] ?? document["downloadPath"] ??
+                (documentType == "file" ? document["url"] : nil)
+            guard let downloadURL = SchoologyValue.url(rawDownloadURL) ?? convertedURL else {
+                throw SchoologyAPIError.invalidResponse
+            }
+            let filename = SchoologyValue.string(
+                file["filename"] ?? file["fileName"] ?? file["title"] ??
+                document["filename"] ?? document["fileName"] ?? document["title"],
+                fallback: item.fileName.isEmpty ? item.title : item.fileName
+            )
+            let viewURL = ["success", "converted", "1"].contains(conversionStatus) ? convertedURL : nil
+            attachment = SchoologyAttachment(title: filename, url: downloadURL, viewURL: viewURL == downloadURL ? nil : viewURL)
+        } else {
+            attachment = nil
+        }
+
+        let linksRoot = attachmentContainer["links"] ?? (attachmentRoot as? [String: Any])?["links"]
+        let link = SchoologyValue.list(linksRoot, keys: ["link", "links", "items"]).first ??
+            (linksRoot as? [String: Any]) ?? [:]
+        let rawLink = document["web_url"] ?? document["webUrl"] ??
+            document["url"] ?? document["href"] ?? document["launch_url"] ?? document["launchUrl"] ??
+            document["location"] ??
+            link["link_url"] ?? link["linkURL"] ?? link["url"] ?? link["href"] ??
+            template["url"] ?? template["web_url"] ?? template["webUrl"] ?? template["href"]
+        return (attachment, SchoologyValue.url(rawLink))
+    }
+
     func loadCourseUpdates(courseID: String) async throws -> [SchoologyActivity] {
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         let data = try await api.get("sections/\(courseID)/updates", auth: auth, params: ["start": "0", "limit": "50", "with_attachments": "TRUE", "richtext": "1"])
