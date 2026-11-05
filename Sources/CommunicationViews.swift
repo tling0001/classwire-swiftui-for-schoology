@@ -29,12 +29,10 @@ struct MessagesView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             } else {
-                NavigationStack {
-                    messageList
-                        .navigationDestination(item: $selectedMessage) { message in
-                            MessageThreadView(message: message, folder: folder)
-                        }
-                }
+                messageList
+                    .navigationDestination(item: $selectedMessage) { message in
+                        MessageThreadView(message: message, folder: folder)
+                    }
             }
         }
         .task(id: folder) { await loadFolder() }

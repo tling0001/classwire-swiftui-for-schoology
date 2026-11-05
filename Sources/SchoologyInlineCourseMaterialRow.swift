@@ -52,9 +52,12 @@ struct SchoologyInlineCourseMaterialRow: View {
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
-                .padding(.vertical, 3)
+                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                .padding(.vertical, 4)
                 .contentShape(Rectangle())
             }
+            .controlSize(.large)
+            .padding(.vertical, 4)
             .onChange(of: isExpanded) { _, expanded in
                 guard expanded, children == nil, !isLoading else { return }
                 Task { await loadChildren() }
@@ -64,7 +67,11 @@ struct SchoologyInlineCourseMaterialRow: View {
                 SchoologyCourseMaterialDestinationView(courseID: courseID, item: item)
             } label: {
                 Label(item.title, systemImage: symbol)
+                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                    .contentShape(Rectangle())
             }
+            .controlSize(.large)
+            .padding(.vertical, 4)
         }
     }
 

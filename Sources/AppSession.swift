@@ -1138,7 +1138,7 @@ final class AppSession {
         let sourceFolder = folder == .sent ? "sent" : "inbox"
         errorMessage = nil
         do {
-            let data = try await api.get("messages/\(sourceFolder)/\(message.id)", auth: auth, params: ["with_attachments": "TRUE"])
+            let data = try await api.get("messages/\(sourceFolder)/\(message.id)", auth: auth, params: ["with_attachments": "TRUE", "richtext": "1"])
             let json = Self.object(data)
             let payload = (json["data"] as? [String: Any]) ?? (json["response"] as? [String: Any]) ?? json
             let rows = SchoologyMessage.decodeList(json)

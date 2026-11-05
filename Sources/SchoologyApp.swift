@@ -9,13 +9,22 @@ import AppKit
 struct SchoologyApp: App {
     @State private var session = AppSession()
     @State private var updateService = AppUpdateService()
+    #if os(iOS)
+    @UIApplicationDelegateAdaptor(SchoologyNotificationAppDelegate.self) private var notificationDelegate
+    #elseif os(macOS)
+    @NSApplicationDelegateAdaptor(SchoologyNotificationAppDelegate.self) private var notificationDelegate
+    #endif
 
     var body: some Scene {
         WindowGroup {
             RootView()
                 .environment(session)
                 .environment(updateService)
-                .task { await updateService.checkForUpdates() }
+                .task {
+                    SchoologyPushNotifications.configure(session)
+                    await SchoologyPushNotifications.registerIfAuthorized()
+                    await updateService.checkForUpdates()
+                }
                 .tint(SchoologyStyle.blue)
                 .preferredColorScheme(session.appearance.colorScheme)
                 #if os(macOS)

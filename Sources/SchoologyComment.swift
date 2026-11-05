@@ -89,7 +89,7 @@ struct SchoologyComment: Identifiable, Sendable {
                     item["picture_url"] ?? item["pictureUrl"] ?? item["user_photo"] ??
                     item["avatar_url"] ?? item["avatarUrl"] ?? item["photo_url"] ?? item["photoUrl"]
                 ),
-                body: SchoologyValue.plainText(SchoologyValue.string(item["body"] ?? item["comment"] ?? item["message"])),
+                body: SchoologyValue.string(item["body"] ?? item["comment"] ?? item["message"]),
                 created: SchoologyValue.string(item["created"] ?? item["timestamp"] ?? item["last_updated"] ?? item["lastUpdated"]),
                 likes: SchoologyValue.integer(item["likes"] ?? item["like_count"] ?? item["likeCount"]),
                 isLiked: liked,

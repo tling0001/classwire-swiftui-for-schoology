@@ -151,7 +151,7 @@ struct SchoologyActivity: Identifiable, Sendable {
                 authorName: SchoologyValue.string(item["display_name"] ?? item["author_name"] ?? item["user_name"]),
                 authorID: authorID,
                 avatarURL: SchoologyValue.url(avatar),
-                body: SchoologyValue.plainText(rawBody),
+                body: rawBody,
                 created: SchoologyValue.string(item["created"] ?? item["timestamp"] ?? item["created_at"] ?? item["createdAt"]),
                 contextLabel: SchoologyValue.string(item["group_name"] ?? item["groupName"] ?? item["realm_title"] ?? item["realmTitle"]),
                 attachments: attachments,
@@ -451,7 +451,7 @@ struct SchoologyMessage: Identifiable, Hashable, Sendable {
             return SchoologyMessage(
                 id: SchoologyValue.string(rawID),
                 subject: SchoologyValue.string(item["subject"], fallback: "Message"),
-                body: SchoologyValue.plainText(SchoologyValue.string(item["message"] ?? item["body"])),
+                body: SchoologyValue.string(item["message"] ?? item["body"]),
                 created: SchoologyValue.string(item["last_updated"] ?? item["lastUpdated"] ?? item["created"] ?? item["timestamp"]),
                 status: status,
                 isUnread: status.lowercased() == "unread" ||

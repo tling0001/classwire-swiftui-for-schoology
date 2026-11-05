@@ -317,6 +317,11 @@ actor SchoologyAPI {
     }
 
 
+    func delete(_ path: String, auth: SchoologyAuth) async throws -> Data {
+        let url = URL(string: "https://\(apiHost)/v1/\(path)")!
+        return try await send(url: url, method: "DELETE", body: nil, auth: auth, signed: true, extra: [])
+    }
+
     func postMultiOptions(_ paths: [String], auth: SchoologyAuth) async throws -> Data {
         try await postJSON("multioptions", auth: auth, body: ["request": paths])
     }
@@ -375,7 +380,7 @@ actor SchoologyAPI {
             request.timeoutInterval = 45
             request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
             request.setValue("*/*", forHTTPHeaderField: "Accept")
-            request.setValue("https://\\(webHost)/", forHTTPHeaderField: "Referer")
+            request.setValue("https://\(webHost)/", forHTTPHeaderField: "Referer")
             if currentURL.host?.caseInsensitiveCompare(apiHost) == .orderedSame {
                 request.setValue("Android", forHTTPHeaderField: "X-Schoology-Client")
                 request.setValue("2026.10.0", forHTTPHeaderField: "X-Schoology-App-Version")

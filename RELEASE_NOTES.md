@@ -1,3 +1,21 @@
+## [2026.10.0-port.46]
+
+### Push notifications
+- Add native APNs registration and Schoology device-token registration through the existing `alert/device/{device_token}` API, matching the extracted iOS app and Android 2026.10.0 registrar.
+- Add notification permission, enable/disable, and foreground sound settings for iPhone, iPad, and macOS.
+- Add the APNs entitlement to both native targets. Device tokens remain memory-only and are not persisted locally.
+
+### Rich text and embedded content
+- Preserve Schoology HTML for posts, message threads, and comments.
+- Render inline links, emphasis, and font styling as attributed text, and show embedded iframe/embed pages in an authenticated in-app web view.
+
+### Messages and course materials
+- Remove the nested NavigationStack from Messages so it uses the app's root navigation stack on iPhone.
+- Increase course Materials folder and item hit areas to a settings-like minimum height across platforms.
+
+### Build
+- Increment iOS and macOS build number to 46.
+
 ## [2026.10.0-port.45]
 
 ### iOS navigation

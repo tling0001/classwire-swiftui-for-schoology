@@ -1,4 +1,8 @@
 import SwiftUI
+import UserNotifications
+#if os(iOS)
+import UIKit
+#endif
 #if os(macOS)
 import AppKit
 import CryptoKit
@@ -30,6 +34,8 @@ struct SettingsView: View {
                 .schoologyNavigationTabPickerStyle()
                 .tint(settingsAccent)
             }
+
+            SchoologyNotificationSettingsSection()
 
             Section("Software Update") {
                 LabeledContent("Current version", value: AppVersion.current)
@@ -352,4 +358,70 @@ struct SettingsView: View {
         }
     }
     #endif
+}
+
+
+struct SchoologyNotificationSettingsSection: View {
+    @Environment(\\.openURL) private var openURL
+    @AppStorage("schoology.notifications.enabled") private var notificationsEnabled = false
+    @AppStorage("schoology.notifications.sound") private var notificationSound = false
+    @State private var authorizationStatus: UNAuthorizationStatus = .notDetermined
+    @State private var errorMessage: String?
+
+    var body: some View {
+        Section("Notifications") {
+            if isAuthorized {
+                Toggle("Schoology notifications", isOn: $notificationsEnabled)
+                    .onChange(of: notificationsEnabled) { _, enabled in
+                        Task { await SchoologyPushNotifications.setEnabled(enabled) }
+                    }
+                Toggle("Notification sound", isOn: $notificationSound)
+                    .disabled(!notificationsEnabled)
+                #if os(iOS)
+                Text("Vibration and alert appearance follow your iPhone or iPad notification settings. Sound preference applies while Schoology is open.")
+                    .font(.footnote).foregroundStyle(.secondary)
+                #else
+                Text("Alert appearance is controlled by macOS. Sound preference applies while Schoology is open.")
+                    .font(.footnote).foregroundStyle(.secondary)
+                #endif
+            } else {
+                Button(authorizationStatus == .denied ? "Open Notification Settings" : "Enable Schoology Notifications",
+                       systemImage: authorizationStatus == .denied ? "gear" : "bell.badge") {
+                    if authorizationStatus == .denied { openSystemNotificationSettings() }
+                    else { Task { await requestPermission() } }
+                }
+                Text(authorizationStatus == .denied
+                     ? "Notifications are blocked for Schoology. Allow them in system settings to receive alerts."
+                     : "Allow Schoology to send alerts for new messages, comments, and other activity.")
+                    .font(.footnote).foregroundStyle(.secondary)
+            }
+            if let errorMessage { Text(errorMessage).font(.footnote).foregroundStyle(.red) }
+        }
+        .task { await refreshAuthorization() }
+    }
+
+    private var isAuthorized: Bool {
+        authorizationStatus == .authorized || authorizationStatus == .provisional || authorizationStatus == .ephemeral
+    }
+
+    @MainActor private func refreshAuthorization() async {
+        authorizationStatus = await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
+    }
+
+    @MainActor private func requestPermission() async {
+        do {
+            let granted = try await SchoologyPushNotifications.requestAuthorization()
+            await refreshAuthorization()
+            if granted { notificationsEnabled = true }
+            else { errorMessage = "Notification permission wasn't granted." }
+        } catch { errorMessage = error.localizedDescription }
+    }
+
+    private func openSystemNotificationSettings() {
+        #if os(iOS)
+        if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
+        #else
+        if let url = URL(string: "x-apple.systempreferences:com.apple.Notifications-Settings.extension") { openURL(url) }
+        #endif
+    }
 }
