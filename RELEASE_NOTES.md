@@ -1,3 +1,13 @@
+## [2026.10.0-port.40]
+
+### Navigation
+- Rebuild the sidebar around one shared `NavigationSplitView` selection binding on iOS, iPadOS, and macOS.
+- Make course, group, and destination links update the split-view selection directly instead of targeting a separate detail-stack route.
+- Keep the detail `NavigationStack` for deeper destinations such as person profiles, avoiding competing navigation ownership between the sidebar and detail stack.
+
+### Build
+- Increment the iOS and macOS bundle build number to 40.
+
 ## [2026.10.0-port.39]
 
 ### Navigation

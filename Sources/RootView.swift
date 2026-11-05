@@ -7,7 +7,6 @@ private enum SchoologySidebarSelection: Hashable {
 }
 
 private enum SchoologyNavigationPath: Hashable {
-    case sidebar(SchoologySidebarSelection)
     case person(String)
 }
 
@@ -30,8 +29,6 @@ struct RootView: View {
                         selectedRoot(for: selectedRoute)
                             .navigationDestination(for: SchoologyNavigationPath.self) { item in
                                 switch item {
-                                case .sidebar(let route):
-                                    selectedRoot(for: route)
                                 case .person(let userID):
                                     SchoologyPersonProfileView(userID: userID)
                                 }
@@ -91,16 +88,8 @@ private struct SchoologySidebar: View {
     @Binding var selection: SchoologySidebarSelection
 
     var body: some View {
-        Group {
-            #if os(macOS)
-            List(selection: $selection) {
-                sidebarSections
-            }
-            #else
-            List {
-                sidebarSections
-            }
-            #endif
+        List(selection: $selection) {
+            sidebarSections
         }
         .navigationTitle("Schoology")
         .listStyle(.sidebar)
@@ -115,15 +104,9 @@ private struct SchoologySidebar: View {
             destinationRow(.home)
             DisclosureGroup {
                 ForEach(session.courses) { course in
-                    #if os(macOS)
-                    Label(course.title, systemImage: "book.closed")
-                        .lineLimit(1)
-                        .tag(SchoologySidebarSelection.course(course.id))
-                    #else
-                    NavigationLink(value: SchoologyNavigationPath.sidebar(.course(course.id))) {
+                    NavigationLink(value: SchoologySidebarSelection.course(course.id)) {
                         Label(course.title, systemImage: "book.closed").lineLimit(1)
                     }
-                    #endif
                 }
             } label: {
                 Label("Courses", systemImage: "book.closed")
@@ -131,15 +114,9 @@ private struct SchoologySidebar: View {
 
             DisclosureGroup {
                 ForEach(session.groups) { group in
-                    #if os(macOS)
-                    Label(group.title, systemImage: "person.3")
-                        .lineLimit(1)
-                        .tag(SchoologySidebarSelection.group(group.id))
-                    #else
-                    NavigationLink(value: SchoologyNavigationPath.sidebar(.group(group.id))) {
+                    NavigationLink(value: SchoologySidebarSelection.group(group.id)) {
                         Label(group.title, systemImage: "person.3").lineLimit(1)
                     }
-                    #endif
                 }
             } label: {
                 Label("Groups", systemImage: "person.3")
@@ -175,13 +152,8 @@ private struct SchoologySidebar: View {
 
     @ViewBuilder
     private func destinationRow(_ item: AppDestination) -> some View {
-        #if os(macOS)
-        Label(item.rawValue, systemImage: item.symbol)
-            .tag(SchoologySidebarSelection.destination(item))
-        #else
-        NavigationLink(value: SchoologyNavigationPath.sidebar(.destination(item))) {
+        NavigationLink(value: SchoologySidebarSelection.destination(item)) {
             Label(item.rawValue, systemImage: item.symbol)
         }
-        #endif
     }
 }
