@@ -55,6 +55,14 @@ struct SchoologyLikesView: View {
             }
         }
         .navigationTitle("Likes")
+        #if os(macOS)
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("Close", systemImage: "xmark") { dismiss() }
+                    .help("Close Likes")
+            }
+        }
+        #endif
         .task(id: target) { await load() }
     }
 

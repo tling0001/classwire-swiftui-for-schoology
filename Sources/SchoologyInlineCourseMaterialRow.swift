@@ -15,59 +15,71 @@ struct SchoologyInlineCourseMaterialRow: View {
 
     var body: some View {
         if item.kind.lowercased() == "folder" {
-            DisclosureGroup(isExpanded: $isExpanded) {
-                if isLoading {
-                    HStack(spacing: 8) {
-                        ProgressView().controlSize(.small)
-                        Text("Loading folder…").font(.caption).foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 0) {
+                Button {
+                    withAnimation(reduceMotion ? nil : .snappy(duration: 0.24)) {
+                        isExpanded.toggle()
                     }
-                    .padding(.vertical, 6)
-                    .accessibilityElement(children: .combine)
-                    .transition(.opacity)
-                } else if let loadError {
-                    Label(loadError, systemImage: "exclamationmark.triangle")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .padding(.vertical, 6)
-                        .transition(.opacity.combined(with: .move(edge: .top)))
-                } else if let children, children.isEmpty {
-                    Text("This folder is empty")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .padding(.vertical, 6)
-                        .transition(.opacity.combined(with: .move(edge: .top)))
-                } else if let children {
-                    ForEach(children) { child in
-                        SchoologyInlineCourseMaterialRow(courseID: courseID, item: child)
-                            .transition(.opacity.combined(with: .move(edge: .top)))
+                } label: {
+                    HStack(alignment: .center, spacing: 9) {
+                        Image(systemName: "folder.fill")
+                            .foregroundStyle(.secondary)
+                            .frame(width: 20, height: 20)
+                            .accessibilityHidden(true)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(item.title).font(.body)
+                            if !item.body.isEmpty {
+                                Text(item.body)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(nil)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.tertiary)
+                            .frame(width: 20, height: 20)
+                            .accessibilityHidden(true)
                     }
+                    .frame(maxWidth: .infinity, minHeight: rowMinimumHeight, alignment: .leading)
+                    .contentShape(Rectangle())
                 }
-            } label: {
-                HStack(alignment: .center, spacing: 9) {
-                    Image(systemName: "folder.fill")
-                        .foregroundStyle(.secondary)
-                        .frame(width: 20)
-                        .accessibilityHidden(true)
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(item.title).font(.body)
-                        if !item.body.isEmpty {
-                            Text(item.body)
+                .buttonStyle(.plain)
+                .accessibilityValue(isExpanded ? "Expanded" : "Collapsed")
+                .accessibilityHint("Shows or hides the contents of this folder")
+
+                if isExpanded {
+                    VStack(alignment: .leading, spacing: 0) {
+                        if isLoading {
+                            HStack(spacing: 8) {
+                                ProgressView().controlSize(.small)
+                                Text("Loading folder…").font(.caption).foregroundStyle(.secondary)
+                            }
+                            .padding(.vertical, 6)
+                            .accessibilityElement(children: .combine)
+                        } else if let loadError {
+                            Label(loadError, systemImage: "exclamationmark.triangle")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
-                                .lineLimit(1)
-                                .truncationMode(.tail)
+                                .padding(.vertical, 6)
+                        } else if let children, children.isEmpty {
+                            Text("This folder is empty")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .padding(.vertical, 6)
+                        } else if let children {
+                            ForEach(children) { child in
+                                SchoologyInlineCourseMaterialRow(courseID: courseID, item: child)
+                            }
                         }
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.leading, 29)
+                    .padding(.vertical, 4)
+                    .transition(.opacity)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .contentShape(Rectangle())
             }
-            #if os(macOS)
-            .padding(.vertical, 4)
-            #else
-            .controlSize(.regular)
-            #endif
             .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
             .onChange(of: isExpanded) { _, expanded in
                 guard expanded, children == nil, !isLoading else { return }
@@ -81,16 +93,22 @@ struct SchoologyInlineCourseMaterialRow: View {
                 SchoologyCourseMaterialDestinationView(courseID: courseID, item: item)
             } label: {
                 Label(item.title, systemImage: symbol)
-                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                    .frame(maxWidth: .infinity, minHeight: rowMinimumHeight, alignment: .leading)
                     .contentShape(Rectangle())
             }
-            #if os(macOS)
-            .padding(.vertical, 4)
-            #else
+            #if !os(macOS)
             .controlSize(.regular)
             #endif
             .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
         }
+    }
+
+    private var rowMinimumHeight: CGFloat {
+        #if os(macOS)
+        28
+        #else
+        44
+        #endif
     }
 
     private var isFileMaterial: Bool {
@@ -138,6 +156,14 @@ struct SchoologyCourseMaterialFileRow: View {
     let courseID: String
     let item: SchoologyProfileItem
 
+    private var rowMinimumHeight: CGFloat {
+        #if os(macOS)
+        28
+        #else
+        44
+        #endif
+    }
+
     @State private var selectedAttachment: SchoologyAttachment?
     @State private var linkedURL: URL?
     @State private var isShowingLinkedMaterial = false
@@ -157,7 +183,7 @@ struct SchoologyCourseMaterialFileRow: View {
                 Text(item.title).lineLimit(2).frame(maxWidth: .infinity, alignment: .leading)
                 Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.tertiary).accessibilityHidden(true)
             }
-            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            .frame(maxWidth: .infinity, minHeight: rowMinimumHeight, alignment: .leading)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

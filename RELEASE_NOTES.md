@@ -1,3 +1,20 @@
+## [2026.10.0-port.59]
+
+### Course Materials
+- Let folder descriptions wrap to their full height instead of truncating after one line.
+- Use compact native macOS material rows while retaining touch-friendly 44-point rows on iPhone and iPad.
+- Replace the folder disclosure label with a full-row accessible toggle and center its chevron against the complete row content.
+
+### Recent Activity
+- Publish Recent Activity as soon as its own request finishes instead of waiting for course, group, and upcoming requests.
+- Move optional author-profile hydration off the initial refresh path and merge only missing author details into the current feed.
+
+### Likes
+- Add an explicit macOS Close button to the Likes sheet.
+
+### Build
+- Increment the iOS and macOS bundle build number to 59.
+
 ## [2026.10.0-port.58]
 
 ### Course Materials

@@ -181,17 +181,21 @@ final class AppSession {
             "start_date": Self.apiDate(Date()), "start": "0", "limit": "50"
         ])
 
-        let (activityResult, courseResult, groupResult, upcomingResult) = await (
-            activityRequest, courseRequest, groupRequest, upcomingRequest
-        )
-
-        let (activityData, activityError) = activityResult
+        // Publish the activity feed as soon as its own request completes. Profile
+        // enrichment is supplementary and must not hold the initial feed behind
+        // the other dashboard requests or a batch of user-profile lookups.
+        let (activityData, activityError) = await activityRequest
         hasLoadedHomeActivities = true
         homeActivitiesError = activityError
         if let activityData {
-            activities = SchoologyActivity.decodeList(Self.object(activityData))
-            await hydrateActivityAuthors(auth: auth)
+            let activitySnapshot = SchoologyActivity.decodeList(Self.object(activityData))
+            activities = activitySnapshot
+            Task { await hydrateActivityAuthors(auth: auth, snapshot: activitySnapshot) }
         }
+
+        let (courseResult, groupResult, upcomingResult) = await (
+            courseRequest, groupRequest, upcomingRequest
+        )
 
         let (courseData, courseError) = courseResult
         hasLoadedHomeCourses = true
@@ -965,7 +969,27 @@ final class AppSession {
     }
 
     private func hydrateActivityAuthors(auth: SchoologyAuth) async {
-        activities = await hydratedActivityAuthors(activities, auth: auth)
+        await hydrateActivityAuthors(auth: auth, snapshot: activities)
+    }
+
+    private func hydrateActivityAuthors(auth: SchoologyAuth, snapshot: [SchoologyActivity]) async {
+        let hydrated = await hydratedActivityAuthors(snapshot, auth: auth)
+        let hydratedByID = Dictionary(
+            hydrated.map { ($0.id, $0) },
+            uniquingKeysWith: { _, latest in latest }
+        )
+
+        // Merge only missing profile fields into the live feed. A refresh may
+        // have replaced the snapshot while the profile requests were in flight.
+        for index in activities.indices {
+            guard let enriched = hydratedByID[activities[index].id] else { continue }
+            if activities[index].authorName.isEmpty, !enriched.authorName.isEmpty {
+                activities[index].authorName = enriched.authorName
+            }
+            if activities[index].avatarURL == nil {
+                activities[index].avatarURL = enriched.avatarURL
+            }
+        }
     }
 
     private func hydratedActivityAuthors(_ items: [SchoologyActivity], auth: SchoologyAuth) async -> [SchoologyActivity] {
