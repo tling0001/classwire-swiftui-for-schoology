@@ -15,6 +15,7 @@ struct SchoologyAssignmentContext: Sendable {
     let ltiURL: URL?
     let currentGrade: String
     let maxPoints: String
+    let richDescription: String
     let teacherComment: String
     let attachments: [SchoologyAttachment]
 }

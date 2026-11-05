@@ -479,7 +479,7 @@ actor SchoologyAPI {
         var multipart = Data()
         multipart.append(Data("--\(boundary)\r\n".utf8))
         multipart.append(Data("Content-Disposition: form-data; name=\"file\"; filename=\"\(safeFilename)\"\r\n".utf8))
-        multipart.append(Data("Content-Type: multipart/form-data\r\n".utf8))
+        multipart.append(Data("Content-Type: \(mime)\r\n".utf8))
         multipart.append(Data("Content-Length: \(data.count)\r\n\r\n".utf8))
         multipart.append(data)
         multipart.append(Data("\r\n--\(boundary)--\r\n".utf8))

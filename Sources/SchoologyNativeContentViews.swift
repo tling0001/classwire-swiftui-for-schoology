@@ -130,65 +130,114 @@ struct SchoologyEventDetailView: View {
     let realmID: String
     let eventID: String
     let title: String
-    @State private var event: SchoologyProfileItem?
-    @State private var comments: [SchoologyProfileItem] = []
-    @State private var draft = ""
-    @State private var loading = true
-    @State private var error: String?
+
+    @State private var context: SchoologyEventContext?
+    @State private var selectedTab: SchoologyEventTab = .info
+    @State private var isLoading = true
+    @State private var errorMessage: String?
 
     var body: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 14) {
-                if loading { ProgressView("Loading event…").frame(maxWidth: .infinity) }
-                if let error { ContentUnavailableView("Unable to load event", systemImage: "exclamationmark.triangle", description: Text(error)) }
-                if let event {
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text(event.title).font(.title2.weight(.semibold))
-                        if !event.subtitle.isEmpty { Label(event.subtitle, systemImage: "calendar").font(.subheadline).foregroundStyle(.secondary) }
-                        SchoologyRichTextText(event.body.isEmpty ? "No event description." : event.body).textSelection(.enabled)
-                        if let url = event.url { Link(destination: url) { Label("Open attachment", systemImage: "paperclip") } }
-                    }.padding(16).frame(maxWidth: .infinity, alignment: .leading)
-                        .background(.background, in: RoundedRectangle(cornerRadius: 14))
-                }
-                Text("Comments").font(.headline)
-                ForEach(comments) { comment in
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(comment.title).font(.subheadline.weight(.semibold))
-                        SchoologyRichTextText(comment.body)
-                    }.padding(12).frame(maxWidth: .infinity, alignment: .leading)
-                        .background(.background, in: RoundedRectangle(cornerRadius: 12))
-                }
-                HStack(alignment: .bottom) {
-                    TextField("Add a comment…", text: $draft, axis: .vertical).lineLimit(2...5)
-                    Button("Post", systemImage: "paperplane.fill") { Task { await postComment() } }
-                        .disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                }.padding(12).background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
-            }.padding().frame(maxWidth: 900).frame(maxWidth: .infinity)
+        Group {
+            if isLoading && context == nil {
+                ProgressView("Loading event…").frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if let errorMessage, context == nil {
+                ContentUnavailableView("Unable to load event", systemImage: "exclamationmark.triangle", description: Text(errorMessage))
+            } else if let context {
+                eventTabs(context)
+                    .onChange(of: selectedTab) { _, next in
+                        if next == .comments && !context.commentsEnabled { selectedTab = .info }
+                    }
+            }
         }
-        .navigationTitle(title)
+        .navigationTitle(context?.event.title ?? title)
         .task(id: eventID) { await load() }
         .refreshable { await load() }
     }
 
-    private func load() async {
-        loading = true; error = nil
-        do {
-            async let detail = session.loadEvent(realm: realm, realmID: realmID, eventID: eventID)
-            async let replies = session.loadEventComments(realm: realm, realmID: realmID, eventID: eventID)
-            event = try await detail
-            comments = try await replies
-        } catch { self.error = error.localizedDescription }
-        loading = false
+    @ViewBuilder
+    private func eventTabs(_ context: SchoologyEventContext) -> some View {
+        #if os(macOS)
+        if #available(macOS 15.0, *) {
+            modernEventTabs(context)
+        } else {
+            legacyEventTabs(context)
+        }
+        #else
+        modernEventTabs(context)
+        #endif
     }
 
-    private func postComment() async {
-        let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty else { return }
+    @available(macOS 15.0, *)
+    private func modernEventTabs(_ context: SchoologyEventContext) -> some View {
+        TabView(selection: $selectedTab) {
+            Tab("Info", systemImage: "info.circle", value: SchoologyEventTab.info) { infoPane(context) }
+            if context.commentsEnabled {
+                Tab("Comments", systemImage: "bubble.left", value: SchoologyEventTab.comments) { commentsPane }
+            }
+        }
+    }
+
+    private func legacyEventTabs(_ context: SchoologyEventContext) -> some View {
+        TabView(selection: $selectedTab) {
+            infoPane(context).tabItem { Label("Info", systemImage: "info.circle") }.tag(SchoologyEventTab.info)
+            if context.commentsEnabled {
+                commentsPane.tabItem { Label("Comments", systemImage: "bubble.left") }.tag(SchoologyEventTab.comments)
+            }
+        }
+    }
+
+    private func infoPane(_ context: SchoologyEventContext) -> some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text(context.event.title).font(.title2.bold())
+                    if !dateLabel(context).isEmpty {
+                        Label(dateLabel(context), systemImage: "calendar").font(.subheadline).foregroundStyle(.secondary)
+                    } else if !context.event.subtitle.isEmpty {
+                        Label(context.event.subtitle, systemImage: "calendar").font(.subheadline).foregroundStyle(.secondary)
+                    }
+                    SchoologyRichTextText(context.richDescription.isEmpty ? "No event description." : context.richDescription)
+                        .textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .padding(16).frame(maxWidth: .infinity, alignment: .leading)
+                .background(.background, in: RoundedRectangle(cornerRadius: 14))
+                if !context.attachments.isEmpty {
+                    SchoologyAttachmentsButton(attachments: context.attachments)
+                        .frame(maxWidth: .infinity, alignment: .leading).padding(14)
+                        .background(.background, in: RoundedRectangle(cornerRadius: 12))
+                }
+            }.padding().frame(maxWidth: 900).frame(maxWidth: .infinity)
+        }
+    }
+
+    private var commentsPane: some View {
+        SchoologyEntityCommentsView(
+            title: "Comments",
+            entityID: eventID,
+            loadComments: { try await session.loadEventComments(realm: realm, realmID: realmID, eventID: eventID) },
+            submitComment: { body, parentID in
+                try await session.postComment(realm: realm, realmID: realmID, entity: "events", entityID: eventID, body: body, parentID: parentID)
+            }
+        )
+    }
+
+    private func dateLabel(_ context: SchoologyEventContext) -> String {
+        guard let start = SchoologyValue.date(context.start) else { return context.start }
+        let startText = start.formatted(date: context.allDay ? .complete : .abbreviated, time: context.allDay ? .omitted : .shortened)
+        guard let end = SchoologyValue.date(context.end), end != start else { return startText }
+        let endText = end.formatted(date: context.allDay ? .complete : .abbreviated, time: context.allDay ? .omitted : .shortened)
+        return "\(startText) – \(endText)"
+    }
+
+    private func load() async {
+        if context == nil { isLoading = true }
+        errorMessage = nil
         do {
-            try await session.postComment(realm: realm, realmID: realmID, entity: "events", entityID: eventID, body: text)
-            draft = ""
-            comments = try await session.loadEventComments(realm: realm, realmID: realmID, eventID: eventID)
-        } catch { self.error = error.localizedDescription }
+            let loaded = try await session.loadEventContext(realm: realm, realmID: realmID, eventID: eventID)
+            context = loaded
+            if !loaded.commentsEnabled && selectedTab == .comments { selectedTab = .info }
+        } catch { errorMessage = error.localizedDescription }
+        isLoading = false
     }
 }
 

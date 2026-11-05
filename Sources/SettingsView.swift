@@ -367,6 +367,7 @@ struct SchoologyNotificationSettingsSection: View {
     @AppStorage("schoology.notifications.sound") private var notificationSound = false
     @State private var authorizationStatus: UNAuthorizationStatus = .notDetermined
     @State private var errorMessage: String?
+    @State private var pushRegistrationError: String?
 
     var body: some View {
         #if os(macOS)
@@ -404,8 +405,15 @@ struct SchoologyNotificationSettingsSection: View {
                     .foregroundStyle(.secondary)
             }
             if let errorMessage { Text(errorMessage).font(.footnote).foregroundStyle(.red) }
+            if let pushRegistrationError { Text("Push registration failed: \(pushRegistrationError)").font(.footnote).foregroundStyle(.red) }
         }
-        .task { await refreshAuthorization() }
+        .task {
+            await refreshAuthorization()
+            pushRegistrationError = SchoologyPushNotifications.registrationError
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .schoologyPushRegistrationDidChange)) { _ in
+            pushRegistrationError = SchoologyPushNotifications.registrationError
+        }
         #endif
     }
 

@@ -147,7 +147,7 @@ struct SchoologyAssignmentDetailView: View {
                         Label("\(SchoologyGradeValueFormatter.display(context.maxPoints)) points", systemImage: "chart.bar")
                             .font(.subheadline).foregroundStyle(.secondary)
                     }
-                    SchoologyRichTextText(context.assignment.body.isEmpty ? "No assignment description." : context.assignment.body)
+                    SchoologyRichTextText(context.richDescription.isEmpty ? "No assignment description." : context.richDescription)
                         .textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
                     if !context.teacherComment.isEmpty {
                         Divider()

@@ -80,6 +80,7 @@ final class AppSession {
             let profile = try await api.currentUser(auth: credentials)
             auth = credentials
             user = profile
+            await SchoologyPushNotifications.registerIfAuthorized()
             await refreshPeopleDirectoryAvailability(auth: credentials)
             await refresh()
         } catch {
@@ -151,6 +152,7 @@ final class AppSession {
         KeychainStore.save(verifiedCredentials)
         auth = verifiedCredentials
         user = profile
+        await SchoologyPushNotifications.registerIfAuthorized()
         await refreshPeopleDirectoryAvailability(auth: verifiedCredentials)
         destination = .home
         homeSection = .recent
@@ -777,22 +779,53 @@ final class AppSession {
         return try await api.webSessionCookies(auth: auth)
     }
 
+    private func apiRealm(_ realm: String) -> String {
+        switch realm.lowercased() {
+        case "section": "sections"
+        case "group": "groups"
+        case "school": "schools"
+        case "user": "users"
+        default: realm
+        }
+    }
+
     func loadDiscussion(realm: String, realmID: String, discussionID: String) async throws -> SchoologyProfileItem {
         guard let auth else { throw SchoologyAPIError.notSignedIn }
-        let data = try await api.get("\(realm)/\(realmID)/discussions/\(discussionID)", auth: auth, params: ["with_attachments": "TRUE", "richtext": "1"])
+        let data = try await api.get("\(apiRealm(realm))/\(realmID)/discussions/\(discussionID)", auth: auth, params: ["with_attachments": "TRUE", "richtext": "1"])
         let json = Self.object(data)
         let raw = (json["discussion"] as? [String: Any]) ?? (json["data"] as? [String: Any]) ?? json
         return SchoologyProfileItem.decodeList(["discussion": raw], keys: ["discussion"]).first ??
             SchoologyProfileItem(id: discussionID, title: "Discussion", body: "", subtitle: "", url: nil, isAdmin: false, kind: "discussion", collectionID: nil)
     }
 
-    func loadEvent(realm: String, realmID: String, eventID: String) async throws -> SchoologyProfileItem {
+    func loadEventContext(realm: String, realmID: String, eventID: String) async throws -> SchoologyEventContext {
         guard let auth else { throw SchoologyAPIError.notSignedIn }
-        let data = try await api.get("\(realm)/\(realmID)/events/\(eventID)", auth: auth, params: ["with_attachments": "TRUE", "richtext": "1"])
-        let json = Self.object(data)
-        let raw = (json["event"] as? [String: Any]) ?? (json["data"] as? [String: Any]) ?? json
-        return SchoologyProfileItem.decodeList(["event": raw], keys: ["event"]).first ??
+        let data = try await api.get("\(apiRealm(realm))/\(realmID)/events/\(eventID)", auth: auth, params: ["with_attachments": "TRUE", "richtext": "1"])
+        let root = Self.object(data)
+        let nested = root["data"] as? [String: Any]
+        let raw = (root["event"] as? [String: Any]) ?? (nested?["event"] as? [String: Any]) ?? nested ?? root
+        let event = SchoologyProfileItem.decodeList(["event": raw], keys: ["event"]).first ??
             SchoologyProfileItem(id: eventID, title: "Event", body: "", subtitle: "", url: nil, isAdmin: false, kind: "event", collectionID: nil)
+        let rawDescription = raw["description"] ?? raw["body"] ?? raw["message"]
+        let descriptionObject = rawDescription as? [String: Any]
+        let description = SchoologyValue.string(descriptionObject?["description"] ?? descriptionObject?["body"] ?? descriptionObject?["text"] ?? rawDescription)
+        let attachmentRows = SchoologyValue.list(raw["attachments"] ?? raw["attachment"] ?? raw["file-attachment"], keys: ["files", "file", "attachments", "items"])
+        let attachments = attachmentRows.compactMap { item -> SchoologyAttachment? in
+            guard let url = SchoologyValue.url(item["file_download_url"] ?? item["fileDownloadURL"] ?? item["download_path"] ?? item["downloadPath"] ?? item["download_url"] ?? item["downloadUrl"] ?? item["url"] ?? item["linkURL"] ?? item["href"]) else { return nil }
+            let viewURL = SchoologyValue.url(item["file_converted_download_url"] ?? item["fileConvertedDownloadURL"] ?? item["converted_download_path"] ?? item["convertedDownloadPath"])
+            return SchoologyAttachment(title: SchoologyValue.string(item["filename"] ?? item["fileName"] ?? item["title"], fallback: url.lastPathComponent), url: url, viewURL: viewURL)
+        }
+        return SchoologyEventContext(event: event, richDescription: description,
+            start: SchoologyValue.string(raw["start"] ?? raw["start_time"] ?? raw["startTime"] ?? raw["date"]),
+            end: SchoologyValue.string(raw["end"] ?? raw["end_time"] ?? raw["endTime"]),
+            allDay: SchoologyValue.bool(raw["all_day"] ?? raw["allDay"]),
+            commentsEnabled: SchoologyValue.bool(raw["comments_enabled"] ?? raw["commentsEnabled"]),
+            attachments: attachments)
+    }
+
+    func loadEvent(realm: String, realmID: String, eventID: String) async throws -> SchoologyProfileItem {
+        let context = try await loadEventContext(realm: realm, realmID: realmID, eventID: eventID)
+        return context.event
     }
 
     func loadUpdateComments(realm: String, realmID: String, updateID: String) async throws -> [SchoologyComment] {
@@ -863,21 +896,21 @@ final class AppSession {
 
     func loadDiscussionComments(realm: String, realmID: String, discussionID: String) async throws -> [SchoologyComment] {
         guard let auth else { throw SchoologyAPIError.notSignedIn }
-        let data = try await api.get("\(realm)/\(realmID)/discussions/\(discussionID)/comments", auth: auth, params: ["start": "0", "limit": "100", "with_attachments": "TRUE", "richtext": "1"])
+        let data = try await api.get("\(apiRealm(realm))/\(realmID)/discussions/\(discussionID)/comments", auth: auth, params: ["start": "0", "limit": "100", "with_attachments": "TRUE", "richtext": "1"])
         return SchoologyComment.decodeList(Self.object(data))
     }
 
     func postDiscussionComment(realm: String, realmID: String, discussionID: String, body: String, parentID: String? = nil) async throws {
         guard let auth else { throw SchoologyAPIError.notSignedIn }
-        _ = try await api.post("\(realm)/\(realmID)/discussions/\(discussionID)/comments", auth: auth, params: [
+        _ = try await api.postJSON("\(apiRealm(realm))/\(realmID)/discussions/\(discussionID)/comments", auth: auth, body: [
             "comment": body,
-            "parent_id": parentID ?? "0"
+            "parent_id": Int(parentID ?? "0") ?? 0
         ])
     }
 
     func loadAssignmentComments(sectionID: String, assignmentID: String) async throws -> [SchoologyComment] {
         guard let auth else { throw SchoologyAPIError.notSignedIn }
-        let data = try await api.get("course/\(sectionID)/materials/assignments/\(assignmentID)/comments", auth: auth, params: ["start": "0", "limit": "100", "with_attachments": "TRUE", "richtext": "1"])
+        let data = try await api.get("sections/\(sectionID)/assignments/\(assignmentID)/comments", auth: auth, params: ["start": "0", "limit": "100", "with_attachments": "TRUE", "richtext": "1"])
         return SchoologyComment.decodeList(Self.object(data))
     }
 
@@ -885,26 +918,36 @@ final class AppSession {
     func postAssignmentComment(sectionID: String, assignmentID: String, body: String, parentID: String? = nil) async throws {
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         let replyID = Int(parentID ?? "0") ?? 0
-        let path = replyID > 0
-            ? "course/\(sectionID)/materials/assignments/\(assignmentID)/create_reply/\(replyID)"
-            : "course/\(sectionID)/materials/assignments/\(assignmentID)/create_comment"
-        _ = try await api.post(path, auth: auth, params: [
+        _ = try await api.postJSON("sections/\(sectionID)/assignments/\(assignmentID)/comments", auth: auth, body: [
             "comment": body,
-            "parent_id": String(replyID)
+            "parent_id": replyID
         ])
     }
 
-    func loadEventComments(realm: String, realmID: String, eventID: String) async throws -> [SchoologyProfileItem] {
+    func loadEventComments(realm: String, realmID: String, eventID: String) async throws -> [SchoologyComment] {
         guard let auth else { throw SchoologyAPIError.notSignedIn }
-        let data = try await api.get("\(realm)/\(realmID)/events/\(eventID)/comments", auth: auth, params: ["start": "0", "limit": "100", "with_attachments": "TRUE", "richtext": "1"])
-        return SchoologyProfileItem.decodeList(Self.object(data), keys: ["comment", "comments", "items"])
+        let data = try await api.get("\(apiRealm(realm))/\(realmID)/events/\(eventID)/comments", auth: auth, params: ["start": "0", "limit": "100", "with_attachments": "TRUE", "richtext": "1"])
+        var comments = SchoologyComment.decodeList(Self.object(data))
+        let missingIDs = Set(comments.filter { $0.authorName.isEmpty || $0.avatarURL == nil }.compactMap(\.authorID)).subtracting([auth.userID])
+        let users = await loadMessageUsers(missingIDs, auth: auth)
+        for index in comments.indices {
+            guard let authorID = comments[index].authorID else { continue }
+            if authorID == auth.userID {
+                if comments[index].authorName.isEmpty { comments[index].authorName = "You" }
+                if comments[index].avatarURL == nil { comments[index].avatarURL = user?.pictureURL }
+            } else if let profile = users[authorID] {
+                if comments[index].authorName.isEmpty { comments[index].authorName = profile.nameDisplay }
+                if comments[index].avatarURL == nil { comments[index].avatarURL = profile.pictureURL }
+            }
+        }
+        return SchoologyComment.ordered(comments)
     }
 
     func postComment(realm: String, realmID: String, entity: String, entityID: String, body: String, parentID: String? = nil) async throws {
         guard let auth else { throw SchoologyAPIError.notSignedIn }
-        _ = try await api.post("\(realm)/\(realmID)/\(entity)/\(entityID)/comments", auth: auth, params: [
+        _ = try await api.postJSON("\(apiRealm(realm))/\(realmID)/\(entity)/\(entityID)/comments", auth: auth, body: [
             "comment": body,
-            "parent_id": parentID ?? "0"
+            "parent_id": Int(parentID ?? "0") ?? 0
         ])
     }
 
@@ -986,7 +1029,10 @@ final class AppSession {
         let gradeRoot = gradeData.map(Self.object) ?? [:]
         let grade = SchoologyValue.list(gradeRoot, keys: ["grade", "grades", "items"]).first ?? [:]
         let rawComment = grade["comment"] ?? grade["teacher_comment"] ?? grade["teacherComment"]
-        let teacherComment = SchoologyValue.plainText(SchoologyValue.string((rawComment as? [String: Any])?["comment"] ?? (rawComment as? [String: Any])?["body"] ?? rawComment))
+        let teacherComment = SchoologyValue.string((rawComment as? [String: Any])?["comment"] ?? (rawComment as? [String: Any])?["body"] ?? rawComment)
+        let rawDescription = rawAssignment["description"] ?? rawAssignment["body"] ?? rawAssignment["message"]
+        let descriptionObject = rawDescription as? [String: Any]
+        let richDescription = SchoologyValue.string(descriptionObject?["description"] ?? descriptionObject?["body"] ?? descriptionObject?["text"] ?? rawDescription)
         let type = SchoologyValue.string(rawAssignment["assignment_type"] ?? rawAssignment["assignmentType"] ?? rawAssignment["type"]).lowercased()
         let ltiURL = type == "lti_submission" ? SchoologyValue.url(rawAssignment["web_url"] ?? rawAssignment["webUrl"] ?? rawAssignment["launch_url"] ?? rawAssignment["launchUrl"]) : nil
         let attachmentRows = SchoologyValue.list(rawAssignment["attachments"] ?? rawAssignment["attachment"], keys: ["files", "file", "attachments", "items", "links", "link"])
@@ -1000,7 +1046,7 @@ final class AppSession {
             gradeItemID: gradeItemID, enrollmentID: enrollmentID, ltiURL: ltiURL,
             currentGrade: SchoologyValue.string(grade["grade"] ?? grade["calculated_grade"], fallback: "—"),
             maxPoints: SchoologyValue.string(rawAssignment["max_points"] ?? rawAssignment["maxPoints"] ?? gradeItem["max_points"] ?? gradeItem["maxPoints"]),
-            teacherComment: teacherComment, attachments: attachments)
+            richDescription: richDescription, teacherComment: teacherComment, attachments: attachments)
     }
 
     func loadAssignmentSubmissions(sectionID: String, context: SchoologyAssignmentContext) async throws -> SchoologyAssignmentSubmissionSummary {
@@ -1636,6 +1682,8 @@ final class AppSession {
     }
 
     func signOut() {
+        let credentials = auth
+        Task { await SchoologyPushNotifications.unregisterForSignOut(auth: credentials) }
         KeychainStore.clear()
         auth = nil
         user = nil

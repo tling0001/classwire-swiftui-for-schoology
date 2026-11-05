@@ -1,3 +1,31 @@
+# Release notes
+
+## [2026.10.0-port.51]
+
+### Notifications
+- Match Schoology's Android registration sequence by checking APNs device-token status with POST before updating it with PUT.
+- Retain APNs tokens received before sign-in and register them after session restore or sign-in.
+- Surface APNs registration failures in notification settings instead of silently ignoring them.
+- Unregister the device token when the signed-in account signs out.
+- Keep macOS push delivery explicitly unavailable until the Developer ID target has the required APNs provisioning.
+
+### Assignments and discussions
+- Fix assignment comments loading and posting by using the section assignment comments endpoint used by Tauri.
+- Normalize singular Schoology realm names before discussion and event comment requests.
+- Send discussion and event comments using the JSON request body used by Tauri.
+
+### Events
+- Replace the combined event/comment screen with native Info and conditional Comments tabs.
+- Respect Schoology's `comments_enabled` flag, preserve the event's rich HTML description, and show event attachments and date details.
+- Reuse the shared comments thread for author details, replies, and attachments.
+
+### Rich text and messages
+- Preserve assignment descriptions and teacher comments as HTML so the shared rich-text renderer retains links, emphasis, and font styling.
+- Fix message attachment uploads by sending the selected file's actual MIME type in the multipart file part.
+
+### Build
+- Increment the iOS and macOS bundle build number to 51.
+
 ## [2026.10.0-port.50]
 
 ### Upcoming
