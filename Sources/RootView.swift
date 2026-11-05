@@ -12,6 +12,8 @@ private enum SchoologyNavigationPath: Hashable {
 
 struct RootView: View {
     @Environment(AppSession.self) private var session
+    @Environment(AppUpdateService.self) private var updates
+    @AppStorage("schoology.update.dismissedVersion") private var dismissedUpdateVersion = ""
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.scenePhase) private var scenePhase
     @State private var preferredCompactColumn: NavigationSplitViewColumn = .detail
@@ -68,6 +70,18 @@ struct RootView: View {
             }
         }
         .animation(reduceMotion ? nil : .snappy(duration: 0.24), value: session.isSignedIn)
+        .safeAreaInset(edge: .top, spacing: 0) {
+            if shouldShowUpdateBanner, let version = updates.latestVersion {
+                SchoologyUpdateBanner(
+                    version: version,
+                    isInstalling: updates.isInstallingUpdate,
+                    errorMessage: updates.installErrorMessage,
+                    installationNotice: updates.installationNotice,
+                    onInstall: { Task { try? await updates.installUpdate() } },
+                    onLater: { dismissedUpdateVersion = version }
+                )
+            }
+        }
         .onChange(of: scenePhase) { _, phase in
             #if os(iOS)
             if phase == .background, session.isSignedIn {
@@ -75,6 +89,10 @@ struct RootView: View {
             }
             #endif
         }
+    }
+
+    private var shouldShowUpdateBanner: Bool {
+        updates.hasUpdate && updates.installURL != nil && (updates.latestVersion ?? "") != dismissedUpdateVersion
     }
 
     @ViewBuilder

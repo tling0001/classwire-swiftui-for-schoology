@@ -291,11 +291,7 @@ struct SchoologyCourseResourceFolderView: View {
         Group {
             if item.kind == "folder" {
                 List(children) { child in
-                    NavigationLink {
-                        SchoologyCourseMaterialDestinationView(courseID: courseID, item: child)
-                    } label: {
-                        Label(child.title, systemImage: child.kind == "folder" ? "folder" : child.kind.contains("discussion") ? "text.bubble" : child.kind.contains("assignment") ? "doc.text" : "doc")
-                    }
+                    SchoologyInlineCourseMaterialRow(courseID: courseID, item: child)
                 }
                 .overlay {
                     if loading { ProgressView("Loading materials…") }

@@ -22,8 +22,8 @@ struct SchoologyApp: App {
                 .environment(updateService)
                 .task {
                     SchoologyPushNotifications.configure(session)
-                    await SchoologyPushNotifications.registerIfAuthorized()
                     await updateService.checkForUpdates()
+                    await SchoologyPushNotifications.registerIfAuthorized()
                 }
                 .tint(SchoologyStyle.blue)
                 .preferredColorScheme(session.appearance.colorScheme)

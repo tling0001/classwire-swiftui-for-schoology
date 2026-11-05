@@ -1,3 +1,18 @@
+## [2026.10.0-port.58]
+
+### Course Materials
+- Open file-type course materials directly into the shared View / Download attachment actions instead of pushing a blank intermediate page.
+- Apply the same direct attachment behavior inside recursively expanded course folders; keep link-type materials opening in the authenticated web view.
+
+### Software Updates
+- Surface available updates at launch with a non-blocking, adaptive in-app banner containing the same “Update available”, “Later”, and “Install update” wording as the desktop ports.
+- Remember a per-release Later choice so the same update does not repeatedly interrupt subsequent launches.
+- Route the launch banner and Settings install button through one shared platform-specific installer implementation.
+- Keep iOS Ad Hoc installation and the verified macOS DMG replacement handoff in the shared update service.
+
+### Build
+- Increment iOS and macOS bundle build number to 58.
+
 ## [2026.10.0-port.57]
 
 ### Course Materials and attachments

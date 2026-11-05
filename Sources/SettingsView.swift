@@ -3,17 +3,12 @@ import UserNotifications
 #if os(iOS)
 import UIKit
 #endif
-#if os(macOS)
-import AppKit
-import CryptoKit
-#endif
 
 struct SettingsView: View {
     @Environment(AppSession.self) private var session
     @Environment(AppUpdateService.self) private var updates
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.openURL) private var openURL
-    @State private var isInstallingUpdate = false
     @State private var isInstallingClassic = false
     @State private var showingClassicConfirmation = false
     @State private var showingIOSInstallNotice = false
@@ -96,18 +91,10 @@ struct SettingsView: View {
                         let actionTitle = "Install Update"
                         #endif
                         Button(actionTitle, systemImage: "arrow.down.to.line") {
-                            #if os(macOS)
-                            Task { await installMacOSUpdate() }
-                            #else
-                            if let url = updates.installURL {
-                                openURL(url)
-                                showingIOSInstallNotice = true
-                            }
-                            #endif
+                            installAvailableUpdate()
                         }
                         .disabled(isUpdateInstallDisabled)
-                        #if os(macOS)
-                        if isInstallingUpdate {
+                        if updates.isInstallingUpdate {
                             ProgressView("Downloading and preparing update…")
                         }
                         if let installError {
@@ -116,7 +103,6 @@ struct SettingsView: View {
                                 .foregroundStyle(.red)
                                 .textSelection(.enabled)
                         }
-                        #endif
                     } else {
                         Label("You're up to date", systemImage: "checkmark.circle")
                             .foregroundStyle(.secondary)
@@ -187,174 +173,38 @@ struct SettingsView: View {
 
     private var isUpdateInstallDisabled: Bool {
         #if os(macOS)
-        updates.macOSDownloadURL == nil || isInstallingUpdate
+        updates.macOSDownloadURL == nil || updates.isInstallingUpdate
         #else
-        updates.installURL == nil
+        updates.installURL == nil || updates.isInstallingUpdate
         #endif
+    }
+
+    @MainActor
+    private func installAvailableUpdate() {
+        Task {
+            do {
+                installError = nil
+                try await updates.installUpdate()
+                #if os(iOS)
+                showingIOSInstallNotice = true
+                #endif
+            } catch {
+                installError = "Could not install the update: \(error.localizedDescription)"
+            }
+        }
     }
 
     #if os(macOS)
     @MainActor
-    private func installMacOSUpdate() async {
-        guard let downloadURL = updates.macOSDownloadURL, !isInstallingUpdate else { return }
-        isInstallingUpdate = true
-        installError = nil
-        do {
-            try await installMacOSApp(downloadURL: downloadURL, expectedSize: nil, expectedDigest: nil, isClassic: false)
-        } catch {
-            installError = "Could not install the update: \(error.localizedDescription)"
-            isInstallingUpdate = false
-        }
-    }
-
-    @MainActor
     private func installClassicMacOS() async {
-        guard let downloadURL = updates.classicMacOSDownloadURL, !isInstallingClassic else { return }
+        guard updates.classicMacOSDownloadURL != nil, !isInstallingClassic else { return }
         isInstallingClassic = true
         classicInstallError = nil
         do {
-            try await installMacOSApp(
-                downloadURL: downloadURL,
-                expectedSize: updates.classicAssetSize,
-                expectedDigest: updates.classicAssetDigest,
-                isClassic: true
-            )
+            try await updates.installClassic()
         } catch {
             classicInstallError = "Could not switch to Schoology Classic: \(error.localizedDescription)"
             isInstallingClassic = false
-        }
-    }
-
-    @MainActor
-    private func installMacOSApp(
-        downloadURL: URL,
-        expectedSize: Int64?,
-        expectedDigest: String?,
-        isClassic: Bool
-    ) async throws {
-        guard downloadURL.scheme?.lowercased() == "https",
-              downloadURL.host?.lowercased() == "github.com" else {
-            throw URLError(.badURL)
-        }
-
-        let fileManager = FileManager.default
-        let workDirectory = fileManager.temporaryDirectory
-            .appendingPathComponent("SchoologyUpdate-\(UUID().uuidString)", isDirectory: true)
-        try fileManager.createDirectory(at: workDirectory, withIntermediateDirectories: true)
-        do {
-            let (downloadedFile, response) = try await URLSession.shared.download(from: downloadURL)
-            if let response = response as? HTTPURLResponse,
-               !(200..<300).contains(response.statusCode) {
-                throw URLError(.badServerResponse)
-            }
-
-            if let expectedSize, expectedSize > 0 {
-                let attributes = try fileManager.attributesOfItem(atPath: downloadedFile.path)
-                let actualSize = (attributes[.size] as? NSNumber)?.int64Value ?? -1
-                guard actualSize == expectedSize else {
-                    throw NSError(domain: "SchoologyUpdater", code: 2,
-                                  userInfo: [NSLocalizedDescriptionKey: "The downloaded installer size does not match the GitHub release metadata."])
-                }
-            }
-            if let expectedDigest, expectedDigest.lowercased().hasPrefix("sha256:") {
-                let fileData = try Data(contentsOf: downloadedFile)
-                let actualDigest = SHA256.hash(data: fileData).map { String(format: "%02x", $0) }.joined()
-                let expected = String(expectedDigest.dropFirst("sha256:".count)).lowercased()
-                guard actualDigest == expected else {
-                    throw NSError(domain: "SchoologyUpdater", code: 3,
-                                  userInfo: [NSLocalizedDescriptionKey: "The downloaded installer failed its SHA-256 integrity check."])
-                }
-            }
-
-            let dmgURL = workDirectory.appendingPathComponent("Schoology-update.dmg")
-            try fileManager.moveItem(at: downloadedFile, to: dmgURL)
-            let targetApp = Bundle.main.bundleURL.standardizedFileURL
-            let scriptURL = workDirectory.appendingPathComponent("install-update.zsh")
-            let appPID = ProcessInfo.processInfo.processIdentifier
-            func quote(_ value: String) -> String {
-                "'" + value.replacingOccurrences(of: "'", with: "'\\''") + "'"
-            }
-            let classicFlag = isClassic ? "1" : "0"
-            let script = """
-            #!/bin/zsh
-            set -euo pipefail
-            APP_PID=\(appPID)
-            DMG_PATH=\(quote(dmgURL.path))
-            TARGET_APP=\(quote(targetApp.path))
-            WORK_DIR=\(quote(workDirectory.path))
-            INSTALL_CLASSIC=\(classicFlag)
-            MOUNT_POINT="$WORK_DIR/mount"
-            STAGED_APP="$TARGET_APP.update-new"
-            BACKUP_APP="$TARGET_APP.update-backup"
-
-            cleanup() {
-              /usr/bin/hdiutil detach "$MOUNT_POINT" -quiet >/dev/null 2>&1 || true
-              /bin/rm -rf "$WORK_DIR"
-            }
-            trap cleanup EXIT
-
-            while /bin/kill -0 "$APP_PID" 2>/dev/null; do
-              /bin/sleep 1
-            done
-
-            /bin/mkdir -p "$MOUNT_POINT"
-            /usr/bin/hdiutil attach "$DMG_PATH" -nobrowse -readonly -mountpoint "$MOUNT_POINT" >/dev/null
-            SOURCE_APP="$(/usr/bin/find "$MOUNT_POINT" -maxdepth 4 -name '*.app' -type d -print -quit)"
-            if [[ -z "$SOURCE_APP" || ! -d "$SOURCE_APP" ]]; then
-              echo "The downloaded disk image does not contain an application bundle." >&2
-              exit 1
-            fi
-
-            if [[ "$INSTALL_CLASSIC" == "1" ]]; then
-              BUNDLE_ID=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$SOURCE_APP/Contents/Info.plist")
-              if [[ "$BUNDLE_ID" != "com.schoologytauri.app" ]]; then
-                echo "The downloaded app is not the official Schoology Classic bundle." >&2
-                exit 1
-              fi
-            else
-              /usr/bin/codesign --verify --deep --strict "$SOURCE_APP"
-            fi
-
-            /bin/rm -rf "$STAGED_APP" "$BACKUP_APP"
-            /usr/bin/ditto --rsrc --extattr --qtn "$SOURCE_APP" "$STAGED_APP"
-
-            if [[ "$INSTALL_CLASSIC" == "1" ]]; then
-              /usr/bin/xattr -dr com.apple.quarantine "$STAGED_APP" 2>/dev/null || true
-              /usr/bin/codesign --force --deep --sign - "$STAGED_APP" >/dev/null 2>&1 || true
-            fi
-
-            if [[ -d "$TARGET_APP" ]]; then
-              /bin/mv "$TARGET_APP" "$BACKUP_APP"
-            fi
-            if /bin/mv "$STAGED_APP" "$TARGET_APP"; then
-              /bin/rm -rf "$BACKUP_APP"
-            else
-              [[ ! -d "$BACKUP_APP" ]] || /bin/mv "$BACKUP_APP" "$TARGET_APP"
-              exit 1
-            fi
-
-            /usr/bin/hdiutil detach "$MOUNT_POINT" -quiet
-            /usr/bin/open "$TARGET_APP"
-            """
-
-            try script.write(to: scriptURL, atomically: true, encoding: .utf8)
-            try fileManager.setAttributes([.posixPermissions: 0o700], ofItemAtPath: scriptURL.path)
-            let helper = Process()
-            helper.executableURL = URL(fileURLWithPath: "/bin/sh")
-            helper.arguments = [
-                "-c",
-                "/usr/bin/nohup /bin/zsh '\(scriptURL.path.replacingOccurrences(of: "'", with: "'\\''"))' </dev/null >/dev/null 2>&1 &"
-            ]
-            try helper.run()
-            helper.waitUntilExit()
-            guard helper.terminationStatus == 0 else {
-                throw NSError(domain: "SchoologyUpdater", code: Int(helper.terminationStatus),
-                              userInfo: [NSLocalizedDescriptionKey: "Could not start the update installer."])
-            }
-            NSApp.terminate(nil)
-        } catch {
-            try? fileManager.removeItem(at: workDirectory)
-            throw error
         }
     }
     #endif
