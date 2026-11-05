@@ -9,7 +9,7 @@ settings:
   base:
     SWIFT_VERSION: "6.0"
     MARKETING_VERSION: "2026.10.0"
-    CURRENT_PROJECT_VERSION: "44"
+    CURRENT_PROJECT_VERSION: "47"
     PRODUCT_NAME: Schoology
     INFOPLIST_KEY_CFBundleDisplayName: Schoology
     GENERATE_INFOPLIST_FILE: YES
@@ -56,7 +56,6 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.schoologytauri.app
-        CODE_SIGN_ENTITLEMENTS: Config/Schoology.entitlements
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIconMac
         MACOSX_DEPLOYMENT_TARGET: "14.0"
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.education

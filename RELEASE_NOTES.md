@@ -1,3 +1,28 @@
+## [2026.10.0-port.47]
+
+### Build fixes
+- Fix the malformed notification-settings Swift key path that stopped the iOS Ad Hoc archive.
+- Resolve Swift 6 notification delegate isolation and conditional Settings view compilation.
+- Use Sendable string metadata overloads for APNs device registration across the Schoology API actor boundary.
+- Keep the APNs entitlement on the iOS Ad Hoc target and exclude it from the Developer ID macOS target, which has no Push Notifications provisioning profile.
+
+### Groups, courses, and school profiles
+- Move permission-aware group creation actions into the app toolbar.
+- Show the group’s school under its name and link school names from shared course/group infoboxes to the native school profile.
+- Keep course, group, and school profile headers consistent; show profile artwork in the leading pane on three-pane layouts and retain it in the infobox on compact layouts.
+
+### Rich text and attachments
+- Preserve inline HTML text colors in comments while retaining rich text rendering for posts and message threads.
+- Replace the attachment share action with the native save/export destination picker; use independent View and Download progress states and a macOS save panel with a saving-progress dialog.
+
+### Calendar
+- Use a side-by-side month and selected-day layout on wide windows.
+- Match Android `EventCalls` month queries (`start_date`, `end_date`, 20-item offset pagination) and filter events to the selected month.
+- Decode additional Schoology event field aliases so more event types appear in day details and calendar indicators.
+
+### Build
+- Increment the iOS and macOS bundle build number to 47.
+
 ## [2026.10.0-port.46]
 
 ### Push notifications

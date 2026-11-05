@@ -362,13 +362,24 @@ struct SettingsView: View {
 
 
 struct SchoologyNotificationSettingsSection: View {
-    @Environment(\\.openURL) private var openURL
+    @Environment(\.openURL) private var openURL
     @AppStorage("schoology.notifications.enabled") private var notificationsEnabled = false
     @AppStorage("schoology.notifications.sound") private var notificationSound = false
     @State private var authorizationStatus: UNAuthorizationStatus = .notDetermined
     @State private var errorMessage: String?
 
     var body: some View {
+        #if os(macOS)
+        Section("Notifications") {
+            Text("Push delivery isn't available in the current Developer ID build because the macOS target doesn't have a Push Notifications provisioning profile.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+            Button("Open Notification Settings", systemImage: "gear") {
+                openSystemNotificationSettings()
+            }
+        }
+        .task { await refreshAuthorization() }
+        #else
         Section("Notifications") {
             if isAuthorized {
                 Toggle("Schoology notifications", isOn: $notificationsEnabled)
@@ -377,13 +388,9 @@ struct SchoologyNotificationSettingsSection: View {
                     }
                 Toggle("Notification sound", isOn: $notificationSound)
                     .disabled(!notificationsEnabled)
-                #if os(iOS)
                 Text("Vibration and alert appearance follow your iPhone or iPad notification settings. Sound preference applies while Schoology is open.")
-                    .font(.footnote).foregroundStyle(.secondary)
-                #else
-                Text("Alert appearance is controlled by macOS. Sound preference applies while Schoology is open.")
-                    .font(.footnote).foregroundStyle(.secondary)
-                #endif
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
             } else {
                 Button(authorizationStatus == .denied ? "Open Notification Settings" : "Enable Schoology Notifications",
                        systemImage: authorizationStatus == .denied ? "gear" : "bell.badge") {
@@ -393,15 +400,21 @@ struct SchoologyNotificationSettingsSection: View {
                 Text(authorizationStatus == .denied
                      ? "Notifications are blocked for Schoology. Allow them in system settings to receive alerts."
                      : "Allow Schoology to send alerts for new messages, comments, and other activity.")
-                    .font(.footnote).foregroundStyle(.secondary)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
             }
             if let errorMessage { Text(errorMessage).font(.footnote).foregroundStyle(.red) }
         }
         .task { await refreshAuthorization() }
+        #endif
     }
 
     private var isAuthorized: Bool {
+        #if os(iOS)
         authorizationStatus == .authorized || authorizationStatus == .provisional || authorizationStatus == .ephemeral
+        #else
+        authorizationStatus == .authorized || authorizationStatus == .provisional
+        #endif
     }
 
     @MainActor private func refreshAuthorization() async {

@@ -24,6 +24,7 @@ struct SchoologyCourseProfileView: View {
     @State private var members: [SchoologyProfileItem] = []
     @State private var upcoming: [SchoologyUpcomingEvent] = []
     @State private var schoolName = ""
+    @State private var schoolID: String?
     @State private var permissions: SchoologyCoursePermissions?
     @State private var showingUpdateComposer = false
     @State private var showingResourceCreator = false
@@ -74,8 +75,10 @@ struct SchoologyCourseProfileView: View {
         .task(id: tab) { await loadTab(tab) }
         .task(id: course.id) {
             async let loadedName = session.loadSchoolName(for: course)
+            async let loadedSchoolID = session.loadSchoolID(for: course)
             async let loadedPermissions = session.loadCoursePermissions(courseID: course.id)
             schoolName = await loadedName
+            schoolID = await loadedSchoolID
             permissions = await loadedPermissions
         }
         .refreshable { await loadTab(tab, force: true) }
@@ -84,7 +87,8 @@ struct SchoologyCourseProfileView: View {
     private var compactLayout: some View {
         VStack(spacing: 0) {
             SchoologyProfileInfobox(title: course.title, subtitle: course.section.isEmpty ? nil : course.section,
-                imageURL: course.profileURL, fallbackSymbol: "book.closed.fill", details: [schoolName])
+                schoolName: schoolName.isEmpty ? nil : schoolName, schoolID: schoolID,
+                imageURL: course.profileURL, fallbackSymbol: "book.closed.fill")
                 .padding(.horizontal)
                 .padding(.top, 12)
             Picker("Course section", selection: $tab) {
@@ -101,6 +105,8 @@ struct SchoologyCourseProfileView: View {
         HStack(spacing: 0) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 10) {
+                    SchoologyProfileHeroImage(url: course.profileURL, fallbackSymbol: "book.closed.fill")
+                        .padding(.bottom, 4)
                     ForEach([SchoologyCourseTab.materials, .updates, .grades, .members, .courseApps]) { item in
                         courseTabButton(item)
                     }
@@ -114,7 +120,8 @@ struct SchoologyCourseProfileView: View {
             Divider()
             VStack(spacing: 0) {
                 SchoologyProfileInfobox(title: course.title, subtitle: course.section.isEmpty ? nil : course.section,
-                    imageURL: course.profileURL, fallbackSymbol: "book.closed.fill", details: [schoolName])
+                    schoolName: schoolName.isEmpty ? nil : schoolName, schoolID: schoolID,
+                    imageURL: course.profileURL, fallbackSymbol: "book.closed.fill", showsImage: false)
                     .padding(14)
                 HStack {
                     Text(tab.rawValue).font(.headline)

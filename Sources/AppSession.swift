@@ -551,19 +551,45 @@ final class AppSession {
     func loadCalendarMonth(_ month: Date, force: Bool = false) async {
         guard let auth, !isLoadingCalendar else { return }
         let calendar = Calendar.current
-        guard let interval = calendar.dateInterval(of: .month, for: month),
-              let lastDay = calendar.date(byAdding: .day, value: -1, to: interval.end) else { return }
+        guard let interval = calendar.dateInterval(of: .month, for: month) else { return }
         let key = String(Self.apiDate(interval.start).prefix(7))
         if !force && calendarLoadedMonth == key { return }
+
         isLoadingCalendar = true
         calendarError = nil
         defer { isLoadingCalendar = false }
+
         do {
-            let data = try await api.get("users/\(auth.userID)/events", auth: auth, params: [
-                "start": Self.apiDate(interval.start), "end": Self.apiDate(lastDay), "limit": "200"
-            ])
-            calendarMonthEvents = SchoologyUpcomingEvent.decodeList(Self.object(data))
-                .sorted { ($0.date ?? .distantFuture) < ($1.date ?? .distantFuture) }
+            // Match Android CalendarApiHelper/EventCalls: date bounds are
+            // start_date/end_date, while start is the result offset.
+            // Android requests 20 events per page and keeps fetching until
+            // the final short page.
+            var offset = 0
+            var seenIDs = Set<String>()
+            var monthEvents: [SchoologyUpcomingEvent] = []
+            let pageSize = 20
+
+            while true {
+                let data = try await api.get("users/\(auth.userID)/events", auth: auth, params: [
+                    "start_date": Self.apiDate(interval.start),
+                    "end_date": Self.apiDate(interval.end),
+                    "start": String(offset),
+                    "limit": String(pageSize)
+                ])
+                let page = SchoologyUpcomingEvent.decodeList(Self.object(data))
+                guard !page.isEmpty else { break }
+
+                let newEvents = page.filter { seenIDs.insert($0.id).inserted }
+                monthEvents.append(contentsOf: newEvents)
+                if page.count < pageSize || newEvents.isEmpty { break }
+                offset += pageSize
+            }
+
+            calendarMonthEvents = monthEvents.filter { event in
+                guard let date = event.date else { return false }
+                return date >= interval.start && date < interval.end
+            }
+            .sorted { ($0.date ?? .distantFuture) < ($1.date ?? .distantFuture) }
             calendarLoadedMonth = key
         } catch {
             calendarError = error.localizedDescription
@@ -588,6 +614,15 @@ final class AppSession {
             calendarError = error.localizedDescription
             hasLoadedCalendarUpcoming = true
         }
+    }
+
+    func loadSchoolID(for course: SchoologyCourse) async -> String? {
+        if let schoolID = course.schoolID, !schoolID.isEmpty { return schoolID }
+        guard let auth,
+              let data = try? await api.get("sections/\(course.id)", auth: auth) else { return nil }
+        let root = Self.object(data)
+        let section = (root["section"] as? [String: Any]) ?? root
+        return SchoologyValue.optionalString(section["school_id"] ?? section["schoolId"])
     }
 
     func loadSchoolName(for course: SchoologyCourse) async -> String {

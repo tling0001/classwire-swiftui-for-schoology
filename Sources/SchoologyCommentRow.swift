@@ -59,10 +59,15 @@ struct SchoologyCommentRow: View {
                 }
             }
 
-            SchoologyRichTextText(comment.isDeleted ? "Comment deleted" : comment.body)
-                .font(.body)
-                .foregroundStyle(comment.isDeleted ? .secondary : .primary)
-                .textSelection(.enabled)
+            if comment.isDeleted {
+                SchoologyRichTextText("Comment deleted")
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+            } else {
+                SchoologyRichTextText(comment.body)
+                    .font(.body)
+                    .textSelection(.enabled)
+            }
 
             if !comment.isDeleted {
                 ForEach(comment.attachments) { attachment in

@@ -231,16 +231,15 @@ struct SchoologyUpcomingEvent: Identifiable, Sendable {
 
     static func decodeList(_ value: Any?) -> [SchoologyUpcomingEvent] {
         SchoologyValue.list(value, keys: ["event", "events", "items", "data", "response"]).compactMap { item in
-            let rawType = SchoologyValue.string(item["type"]).lowercased()
-            guard ["assignment", "assessment", "assessment_v2", "managed_assessment", "quiz", "discussion", "external_tool", "event"].contains(rawType),
-                  let rawID = item["id"] ?? item["event_id"] ?? item["eventId"] else { return nil }
+            guard let rawID = item["id"] ?? item["event_id"] ?? item["eventId"] else { return nil }
+            let rawType = SchoologyValue.string(item["type"] ?? item["event_type"] ?? item["eventType"], fallback: "event").lowercased()
             let assignment = item["assignment_id"] ?? item["assignmentId"] ?? (item["assignment"] as? [String: Any])?["id"]
             let discussion = item["discussion_id"] ?? item["discussionId"] ?? (item["discussion"] as? [String: Any])?["id"]
             return SchoologyUpcomingEvent(
                 id: SchoologyValue.string(rawID),
-                title: SchoologyValue.string(item["title"], fallback: "Untitled"),
+                title: SchoologyValue.string(item["title"] ?? item["name"] ?? item["subject"], fallback: "Untitled"),
                 type: rawType,
-                start: SchoologyValue.string(item["start"] ?? item["start_date"] ?? item["startDate"]),
+                start: SchoologyValue.string(item["start"] ?? item["start_date"] ?? item["startDate"] ?? item["date"] ?? item["due_date"] ?? item["dueDate"]),
                 end: SchoologyValue.string(item["end"] ?? item["end_date"] ?? item["endDate"]),
                 allDay: SchoologyValue.bool(item["all_day"] ?? item["allDay"]),
                 sectionID: SchoologyValue.optionalString(item["section_id"] ?? item["sectionId"]),

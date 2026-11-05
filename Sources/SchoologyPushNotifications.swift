@@ -43,6 +43,10 @@ enum SchoologyPushNotifications {
     }
 
     static func registerIfAuthorized() async {
+        #if os(macOS)
+        // The Developer ID distribution is not provisioned for APNs.
+        return
+        #else
         let wasEnabled = UserDefaults.standard.bool(forKey: "schoology.notifications.everEnabled")
         guard notificationsEnabled || wasEnabled else { return }
         let settings = await UNUserNotificationCenter.current().notificationSettings()
@@ -51,13 +55,12 @@ enum SchoologyPushNotifications {
             settings.authorizationStatus == .ephemeral
         guard (notificationsEnabled && isAuthorized) || (!notificationsEnabled && wasEnabled) else { return }
         registerWithAPNs()
+        #endif
     }
 
     private static func registerWithAPNs() {
         #if os(iOS)
         UIApplication.shared.registerForRemoteNotifications()
-        #elseif os(macOS)
-        NSApplication.shared.registerForRemoteNotifications()
         #endif
     }
 
@@ -80,7 +83,7 @@ enum SchoologyPushNotifications {
         #endif
 
         let path = "alert/device/\(token)"
-        let body: [String: Any] = [
+        let body: [String: String] = [
             "device_os": platform,
             "device_name": deviceName,
             "device_os_version": osVersion,
@@ -111,7 +114,7 @@ enum SchoologyPushNotifications {
 
 #if os(iOS)
 @MainActor
-final class SchoologyNotificationAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
+final class SchoologyNotificationAppDelegate: NSObject, UIApplicationDelegate, @preconcurrency UNUserNotificationCenterDelegate {
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
         UNUserNotificationCenter.current().delegate = self
         return true
@@ -135,7 +138,7 @@ final class SchoologyNotificationAppDelegate: NSObject, UIApplicationDelegate, U
 }
 #elseif os(macOS)
 @MainActor
-final class SchoologyNotificationAppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
+final class SchoologyNotificationAppDelegate: NSObject, NSApplicationDelegate, @preconcurrency UNUserNotificationCenterDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) { UNUserNotificationCenter.current().delegate = self }
     func application(_ application: NSApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
         Task { @MainActor in await SchoologyPushNotifications.didRegister(deviceToken: deviceToken, platform: "macOS") }

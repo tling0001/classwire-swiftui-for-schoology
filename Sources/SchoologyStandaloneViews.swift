@@ -287,58 +287,129 @@ struct SchoologyCalendarView: View {
     }
 
     private var calendarContent: some View {
-        ScrollView {
-            VStack(spacing: 16) {
-                HStack {
-                    Button("Previous month", systemImage: "chevron.left") { changeMonth(-1) }.labelStyle(.iconOnly)
-                    Spacer()
-                    Text(displayedMonth.formatted(.dateTime.month(.wide).year())).font(.headline)
-                    Spacer()
-                    Button("Next month", systemImage: "chevron.right") { changeMonth(1) }.labelStyle(.iconOnly)
-                }.buttonStyle(.bordered)
-                HStack {
-                    ForEach(weekdays, id: \.self) { day in
-                        Text(day).font(.caption.weight(.semibold)).foregroundStyle(.secondary).frame(maxWidth: .infinity)
+        GeometryReader { proxy in
+            if proxy.size.width >= 900 {
+                HStack(spacing: 0) {
+                    ScrollView {
+                        monthCalendarContent
+                            .padding(16)
+                            .frame(maxWidth: 760)
+                            .frame(maxWidth: .infinity)
                     }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                    Divider()
+
+                    ScrollView {
+                        selectedDayContent
+                            .padding(16)
+                    }
+                    .frame(width: max(320, proxy.size.width * 0.36))
+                    .frame(maxHeight: .infinity)
                 }
-                LazyVGrid(columns: columns, spacing: 5) {
-                    ForEach(monthDays) { cell in
-                        if let day = cell.date {
-                            let events = session.calendarMonthEvents.filter { $0.date.map { Calendar.current.isDate($0, inSameDayAs: day) } ?? false }
-                            Button {
-                                withAnimation(reduceMotion ? nil : .snappy(duration: 0.18)) { selectedDate = day }
-                            } label: {
-                                VStack(spacing: 4) {
-                                    Text(day.formatted(.dateTime.day())).font(.body.monospacedDigit())
-                                    Circle().fill(events.isEmpty ? Color.clear : SchoologyStyle.blue).frame(width: 5, height: 5)
-                                }
-                                .frame(maxWidth: .infinity).frame(height: 42)
-                                .background(Calendar.current.isDate(day, inSameDayAs: selectedDate) ? SchoologyStyle.blue.opacity(0.15) : .clear,
-                                            in: RoundedRectangle(cornerRadius: 9))
-                                .contentShape(Rectangle())
+            } else {
+                ScrollView {
+                    VStack(spacing: 16) {
+                        monthCalendarContent
+                        Divider()
+                        selectedDayContent
+                    }
+                    .padding()
+                    .frame(maxWidth: 900)
+                    .frame(maxWidth: .infinity)
+                }
+            }
+        }
+    }
+
+    private var monthCalendarContent: some View {
+        VStack(spacing: 16) {
+            HStack {
+                Button("Previous month", systemImage: "chevron.left") { changeMonth(-1) }
+                    .labelStyle(.iconOnly)
+                Spacer()
+                Text(displayedMonth.formatted(.dateTime.month(.wide).year())).font(.headline)
+                Spacer()
+                Button("Next month", systemImage: "chevron.right") { changeMonth(1) }
+                    .labelStyle(.iconOnly)
+            }
+            .buttonStyle(.bordered)
+
+            HStack {
+                ForEach(weekdays, id: \.self) { day in
+                    Text(day)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity)
+                }
+            }
+
+            LazyVGrid(columns: columns, spacing: 5) {
+                ForEach(monthDays) { cell in
+                    if let day = cell.date {
+                        let dayEvents = events(on: day)
+                        Button {
+                            withAnimation(reduceMotion ? nil : .snappy(duration: 0.18)) {
+                                selectedDate = day
                             }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel(day.formatted(date: .complete, time: .omitted) + (events.isEmpty ? "" : ", \(events.count) events"))
-                            .accessibilityAddTraits(Calendar.current.isDate(day, inSameDayAs: selectedDate) ? .isSelected : [])
-                        } else {
-                            Color.clear.frame(height: 42)
+                        } label: {
+                            VStack(spacing: 4) {
+                                Text(day.formatted(.dateTime.day()))
+                                    .font(.body.monospacedDigit())
+                                Circle()
+                                    .fill(dayEvents.isEmpty ? Color.clear : SchoologyStyle.blue)
+                                    .frame(width: 6, height: 6)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 44)
+                            .background(
+                                Calendar.current.isDate(day, inSameDayAs: selectedDate)
+                                    ? SchoologyStyle.blue.opacity(0.15) : .clear,
+                                in: RoundedRectangle(cornerRadius: 9)
+                            )
+                            .contentShape(Rectangle())
                         }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(
+                            day.formatted(date: .complete, time: .omitted) +
+                            (dayEvents.isEmpty ? "" : ", \(dayEvents.count) events")
+                        )
+                        .accessibilityAddTraits(
+                            Calendar.current.isDate(day, inSameDayAs: selectedDate) ? .isSelected : []
+                        )
+                    } else {
+                        Color.clear.frame(height: 44)
                     }
                 }
-                Divider()
-                VStack(alignment: .leading, spacing: 10) {
-                    Text(selectedDate.formatted(date: .complete, time: .omitted)).font(.headline)
-                    if session.isLoadingCalendar && session.calendarMonthEvents.isEmpty {
-                        ProgressView("Loading calendar…")
-                    } else if let error = session.calendarError, session.calendarMonthEvents.isEmpty {
-                        ContentUnavailableView("Unable to load calendar", systemImage: "exclamationmark.triangle", description: Text(error))
-                    } else if selectedEvents.isEmpty {
-                        ContentUnavailableView("No events on this date", systemImage: "calendar")
-                    } else {
-                        ForEach(selectedEvents) { event in SchoologyCalendarEventRow(event: event) }
-                    }
-                }.frame(maxWidth: .infinity, alignment: .leading)
-            }.padding().frame(maxWidth: 900).frame(maxWidth: .infinity)
+            }
+        }
+    }
+
+    private var selectedDayContent: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(selectedDate.formatted(date: .complete, time: .omitted))
+                .font(.headline)
+            if session.isLoadingCalendar && session.calendarMonthEvents.isEmpty {
+                ProgressView("Loading calendar…")
+            } else if let error = session.calendarError, session.calendarMonthEvents.isEmpty {
+                ContentUnavailableView("Unable to load calendar", systemImage: "exclamationmark.triangle",
+                    description: Text(error))
+            } else if selectedEvents.isEmpty {
+                ContentUnavailableView("No events on this date", systemImage: "calendar")
+                    .frame(maxWidth: .infinity, minHeight: 160)
+            } else {
+                ForEach(selectedEvents) { event in
+                    SchoologyCalendarEventRow(event: event)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func events(on day: Date) -> [SchoologyUpcomingEvent] {
+        session.calendarMonthEvents.filter { event in
+            guard let date = event.date else { return false }
+            return Calendar.current.isDate(date, inSameDayAs: day)
         }
     }
 

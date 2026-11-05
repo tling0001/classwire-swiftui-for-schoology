@@ -39,9 +39,15 @@ struct GroupProfileView: View {
             else if let profile { groupLayout(profile) }
         }
         .navigationTitle(profile?.group.title ?? group.title)
-        .toolbar { ToolbarItem(placement: .primaryAction) {
-            Button("Refresh", systemImage: "arrow.clockwise") { Task { await loadTab(tab, force: true) } }.disabled(isLoading || loadingTabs.contains(tab))
-        }}
+        .toolbar {
+            if let permissions = profile?.permissions, hasGroupActions(permissions) {
+                ToolbarItem(placement: .primaryAction) { groupActionsMenu(permissions) }
+            }
+            ToolbarItem(placement: .secondaryAction) {
+                Button("Refresh", systemImage: "arrow.clockwise") { Task { await loadTab(tab, force: true) } }
+                    .disabled(isLoading || loadingTabs.contains(tab))
+            }
+        }
         .task { await load() }
         .onChange(of: tab) { _, selected in Task { await loadTab(selected) } }
         .sheet(item: $presentedAction) { action in
@@ -59,20 +65,17 @@ struct GroupProfileView: View {
             if proxy.size.width >= 900 {
                 HStack(spacing: 0) {
                     VStack(alignment: .leading, spacing: 12) {
+                        SchoologyProfileHeroImage(url: profile.group.pictureURL, fallbackSymbol: "person.3.fill")
+                            .padding(.bottom, 4)
                         ForEach([ProfileTab.updates,.members,.upcoming,.discussions,.albums,.resources]) { item in tabButton(item) }
                         Spacer()
-                        if !schoolName.isEmpty, let schoolID = profile.group.schoolID {
-                            NavigationLink { SchoolProfileView(schoolID: schoolID) } label: {
-                                Label(schoolName, systemImage: "building.2")
-                                    .font(.caption).foregroundStyle(SchoologyStyle.blue).padding(8)
-                            }.buttonStyle(.plain)
-                        }
                     }
                     .padding(14).frame(width: max(176, proxy.size.width * 0.19), alignment: .topLeading).background(.regularMaterial)
                     Divider()
                     VStack(spacing: 0) {
-                        SchoologyProfileInfobox(title: profile.group.title, subtitle: schoolName.isEmpty ? nil : schoolName,
-                            imageURL: profile.group.pictureURL, fallbackSymbol: "person.3.fill")
+                        SchoologyProfileInfobox(title: profile.group.title,
+                            schoolName: schoolName.isEmpty ? nil : schoolName, schoolID: profile.group.schoolID,
+                            imageURL: profile.group.pictureURL, fallbackSymbol: "person.3.fill", showsImage: false)
                             .padding(14)
                         groupContent(profile)
                     }
@@ -94,7 +97,8 @@ struct GroupProfileView: View {
                 }
             } else {
                 VStack(spacing: 0) {
-                    SchoologyProfileInfobox(title: profile.group.title, subtitle: schoolName.isEmpty ? nil : schoolName,
+                    SchoologyProfileInfobox(title: profile.group.title,
+                        schoolName: schoolName.isEmpty ? nil : schoolName, schoolID: profile.group.schoolID,
                         imageURL: profile.group.pictureURL, fallbackSymbol: "person.3.fill")
                         .padding(.horizontal)
                         .padding(.top, 12)
@@ -126,9 +130,6 @@ struct GroupProfileView: View {
     private func groupContent(_ profile: SchoologyGroupProfile) -> some View {
         VStack(spacing: 0) {
             if tab == .resources {
-                if hasGroupActions(profile.permissions) {
-                    groupActionsMenu(profile.permissions)
-                }
                 SchoologyResourcesContentView(
                     items: profile.resources,
                     source: .group(groupID: group.id),
@@ -146,9 +147,6 @@ struct GroupProfileView: View {
                 ContentUnavailableView("Unable to load \(tab.rawValue.lowercased())",
                     systemImage: "exclamationmark.triangle", description: Text(tabError))
             } else {
-                if hasGroupActions(profile.permissions) {
-                    groupActionsMenu(profile.permissions)
-                }
                 if tab == .members {
                     SchoologyPeopleDirectoryView(items: profile.members, membersMode: true, placeholder: "Search group members")
                 } else {
@@ -172,15 +170,12 @@ struct GroupProfileView: View {
 
     @ViewBuilder
     private func groupActionsMenu(_ permissions: SchoologyGroupPermissions) -> some View {
-        Menu {
+        Menu("Create", systemImage: "plus") {
             if permissions.canPostUpdates { Button("Post update", systemImage: "square.and.pencil") { presentedAction = .update } }
             if permissions.canCreateDiscussion { Button("Create discussion", systemImage: "bubble.left") { presentedAction = .discussion } }
             if permissions.canCreateEvent { Button("Create event", systemImage: "calendar.badge.plus") { presentedAction = .event } }
             if permissions.canCreateAlbum { Button("Create album", systemImage: "photo.badge.plus") { presentedAction = .album } }
             if permissions.canAddResources { Button("Add resource", systemImage: "folder.badge.plus") { presentedAction = .resource } }
-        } label: {
-            Label("Create", systemImage: "plus.circle.fill").font(.subheadline.weight(.semibold))
-                .frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 14).padding(.vertical, 10)
         }
         .accessibilityHint("Shows actions allowed by this group's permissions")
     }
@@ -241,8 +236,9 @@ struct GroupProfileView: View {
         isLoading = true
         error = nil
         do {
-            profile = try await session.loadGroupProfile(group)
-            schoolName = await session.loadSchoolName(for: group)
+            let loadedProfile = try await session.loadGroupProfile(group)
+            profile = loadedProfile
+            schoolName = await session.loadSchoolName(for: loadedProfile.group)
             isLoading = false
             await loadTab(tab)
         } catch {
@@ -323,13 +319,15 @@ struct SchoolProfileView: View {
             if proxy.size.width >= 900 {
                 HStack(spacing: 0) {
                     VStack(alignment: .leading, spacing: 12) {
+                        SchoologyProfileHeroImage(url: profile.school.pictureURL, fallbackSymbol: "building.2.crop.circle")
+                            .padding(.bottom, 4)
                         ForEach([ProfileTab.updates,.info,.upcoming,.resources,.discussions]) { item in tabButton(item) }
                         Spacer()
                     }.padding(14).frame(width: max(176, proxy.size.width * 0.19), alignment: .topLeading).background(.regularMaterial)
                     Divider()
                     VStack(spacing: 0) {
                         SchoologyProfileInfobox(title: profile.school.title, imageURL: profile.school.pictureURL,
-                            fallbackSymbol: "building.2.crop.circle", details: [profile.school.address, profile.school.phone])
+                            fallbackSymbol: "building.2.crop.circle", details: [profile.school.address, profile.school.phone], showsImage: false)
                             .padding(14)
                         schoolContent(profile)
                     }
