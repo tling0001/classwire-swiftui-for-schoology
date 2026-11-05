@@ -56,9 +56,14 @@ enum SchoologyPushNotifications {
             return
         }
         let settings = await UNUserNotificationCenter.current().notificationSettings()
+        #if os(iOS)
         let isAuthorized = settings.authorizationStatus == .authorized ||
             settings.authorizationStatus == .provisional ||
             settings.authorizationStatus == .ephemeral
+        #else
+        let isAuthorized = settings.authorizationStatus == .authorized ||
+            settings.authorizationStatus == .provisional
+        #endif
         guard isAuthorized else {
             setRegistrationError("Allow notifications for Schoology in system settings before registering this device.")
             return

@@ -1,5 +1,12 @@
 # Release notes
 
+## [2026.10.0-port.54]
+
+### macOS build fix
+- Compile the ephemeral notification authorization status check only on iOS; macOS now checks authorized and provisional states supported by its UserNotifications SDK.
+- Keep iOS ephemeral authorization support unchanged.
+- Increment the iOS and macOS build number to 54.
+
 ## [2026.10.0-port.53]
 
 ### Build fixes
