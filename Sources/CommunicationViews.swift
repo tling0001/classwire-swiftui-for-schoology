@@ -80,6 +80,19 @@ struct MessagesView: View {
         .navigationTitle("Messages")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
+                Button {
+                    Task { await loadFolder(force: true) }
+                } label: {
+                    if isLoading {
+                        ProgressView().controlSize(.small)
+                    } else {
+                        Label("Refresh", systemImage: "arrow.clockwise")
+                    }
+                }
+                .accessibilityLabel("Refresh messages")
+                .disabled(isLoading)
+            }
+            ToolbarItem(placement: .primaryAction) {
                 Button("Compose Message", systemImage: "square.and.pencil") { showingComposer = true }
             }
         }

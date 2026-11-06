@@ -1,4 +1,5 @@
 import SwiftUI
+import AVKit
 import QuickLook
 import UniformTypeIdentifiers
 #if os(macOS)
@@ -114,6 +115,8 @@ private struct SchoologyAttachmentActionRow: View {
     @Environment(\.openURL) private var openURL
     let attachment: SchoologyAttachment
     @State private var previewURL: URL?
+    @State private var mediaURL: URL?
+    @State private var isMediaPresented = false
     @State private var isLoadingView = false
     @State private var isLoadingDownload = false
     @State private var isExportPresented = false
@@ -171,6 +174,11 @@ private struct SchoologyAttachmentActionRow: View {
         }
         .padding(.vertical, 5)
         .quickLookPreview($previewURL)
+        .sheet(isPresented: $isMediaPresented) {
+            if let mediaURL {
+                SchoologyMediaAttachmentPlayer(url: mediaURL, title: attachment.title)
+            }
+        }
         #if os(iOS)
         .fileExporter(
             isPresented: $isExportPresented,
@@ -207,7 +215,9 @@ private struct SchoologyAttachmentActionRow: View {
 
     private var icon: String {
         if attachment.isLink { return "link" }
-        let ext = attachment.url.pathExtension.lowercased()
+        let ext = attachment.fileExtension
+        if attachment.isVideo { return "play.rectangle" }
+        if attachment.isAudio { return "waveform" }
         if ["jpg","jpeg","png","gif","heic","webp"].contains(ext) { return "photo" }
         if ext == "pdf" { return "doc.richtext" }
         if ["doc","docx","rtf","txt"].contains(ext) { return "doc.text" }
@@ -217,7 +227,7 @@ private struct SchoologyAttachmentActionRow: View {
     }
 
     private var exportContentType: UTType {
-        UTType(filenameExtension: attachment.url.pathExtension) ?? .data
+        UTType(filenameExtension: attachment.fileExtension) ?? .data
     }
 
     private var safeFilename: String {
@@ -243,7 +253,13 @@ private struct SchoologyAttachmentActionRow: View {
         errorMessage = nil
         defer { isLoadingView = false }
         do {
-            previewURL = try await session.downloadAttachment(attachment, forViewing: true)
+            let downloadedURL = try await session.downloadAttachment(attachment, forViewing: true)
+            if attachment.isPlayableMedia {
+                mediaURL = downloadedURL
+                isMediaPresented = true
+            } else {
+                previewURL = downloadedURL
+            }
         } catch {
             errorMessage = error.localizedDescription
         }

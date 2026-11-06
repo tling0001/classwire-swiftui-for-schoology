@@ -1,5 +1,19 @@
 # Release notes
 
+## [2026.10.0-port.66]
+
+### Messages and profiles
+- Remove the duplicate profile refresh action so the remaining app-bar control displays the loading spinner.
+- Add a spinner-aware refresh action to the Messages app bar for the selected folder.
+
+### Attachments and assignment details
+- Preserve original video and audio files when viewing or downloading attachments instead of routing them through PDF conversion.
+- Add a native AVKit media viewer for common video and audio formats, including MP4, M4A, and MP3.
+- Move the assignment attachment disclosure to the top of the Info content, before the assignment description.
+
+### Build
+- Increment the iOS and macOS bundle build number to 66.
+
 ## [2026.10.0-port.65]
 
 ### Resources and resource apps

@@ -140,6 +140,9 @@ struct SchoologyAssignmentDetailView: View {
     private func infoPane(context: SchoologyAssignmentContext) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
+                if !context.attachments.isEmpty {
+                    SchoologyAttachmentsDisclosure(attachments: context.attachments)
+                }
                 VStack(alignment: .leading, spacing: 10) {
                     Text(context.assignment.title).font(.title2.bold())
                     if !context.assignment.subtitle.isEmpty {
@@ -159,9 +162,6 @@ struct SchoologyAssignmentDetailView: View {
                 }
                 .padding(16).frame(maxWidth: .infinity, alignment: .leading)
                 .background(.background, in: RoundedRectangle(cornerRadius: 14))
-                if !context.attachments.isEmpty {
-                    SchoologyAttachmentsDisclosure(attachments: context.attachments)
-                }
             }
             .padding().frame(maxWidth: 900).frame(maxWidth: .infinity)
         }

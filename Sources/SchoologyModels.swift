@@ -38,6 +38,34 @@ struct SchoologyAttachment: Identifiable, Hashable, Sendable {
     var isLink: Bool = false
     var id: String { url.absoluteString }
 
+    init(title: String, url: URL, viewURL: URL? = nil, isLink: Bool = false) {
+        self.title = title
+        self.url = url
+        self.isLink = isLink
+        let titleExtension = URL(fileURLWithPath: title).pathExtension.lowercased()
+        let fileExtension = titleExtension.isEmpty ? url.pathExtension.lowercased() : titleExtension
+        let mediaExtensions: Set<String> = [
+            "mp4", "m4v", "mov", "webm", "avi", "mkv", "3gp", "wmv", "mpeg", "mpg",
+            "mp3", "m4a", "aac", "wav", "aiff", "aif", "flac", "ogg", "oga", "opus", "wma", "caf"
+        ]
+        self.viewURL = mediaExtensions.contains(fileExtension) ? nil : viewURL
+    }
+
+    var fileExtension: String {
+        let titleExtension = URL(fileURLWithPath: title).pathExtension.lowercased()
+        return titleExtension.isEmpty ? url.pathExtension.lowercased() : titleExtension
+    }
+
+    var isVideo: Bool {
+        ["mp4", "m4v", "mov", "webm", "avi", "mkv", "3gp", "wmv", "mpeg", "mpg"].contains(fileExtension)
+    }
+
+    var isAudio: Bool {
+        ["mp3", "m4a", "aac", "wav", "aiff", "aif", "flac", "ogg", "oga", "opus", "wma", "caf"].contains(fileExtension)
+    }
+
+    var isPlayableMedia: Bool { isVideo || isAudio }
+
     static func isLinkRecord(_ item: [String: Any]) -> Bool {
         let linkFields = ["link_url", "linkURL", "linkUrl", "link_title", "linkTitle",
                           "href", "web_url", "webUrl", "launch_url", "launchUrl"]
