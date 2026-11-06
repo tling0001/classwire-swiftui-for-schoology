@@ -59,7 +59,7 @@ struct SchoologyRichTextText: View {
     }
 
     private static func attributedHTML(_ html: String, colorScheme: ColorScheme, minimumFontSize: CGFloat?) -> AttributedString? {
-        let cacheKey = "\(colorScheme == .dark ? "dark" : "light")|\(minimumFontSize.map { String($0) } ?? "default")|\(html)" as NSString
+        let cacheKey = "\(colorScheme == .dark ? "dark" : "light")|\(minimumFontSize.map { String(describing: $0) } ?? "default")|\(html)" as NSString
         if let cached = attributedHTMLCache.object(forKey: cacheKey) {
             return AttributedString(cached)
         }

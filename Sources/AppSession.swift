@@ -1043,9 +1043,26 @@ final class AppSession {
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         let data = try await api.get("\(apiRealm(realm))/\(realmID)/discussions/\(discussionID)", auth: auth, params: ["with_attachments": "TRUE", "richtext": "1"])
         let json = Self.object(data)
-        let raw = (json["discussion"] as? [String: Any]) ?? (json["data"] as? [String: Any]) ?? json
-        return SchoologyProfileItem.decodeList(["discussion": raw], keys: ["discussion"]).first ??
-            SchoologyProfileItem(id: discussionID, title: "Discussion", body: "", subtitle: "", url: nil, isAdmin: false, kind: "discussion", collectionID: nil)
+        let nested = json["data"] as? [String: Any]
+        let raw = (json["discussion"] as? [String: Any]) ??
+            (nested?["discussion"] as? [String: Any]) ?? nested ?? json
+        let decoded = SchoologyProfileItem.decodeList(["discussion": raw], keys: ["discussion"]).first
+        let rawBody = raw["body"] ?? raw["description"] ?? raw["message"]
+        let bodyObject = rawBody as? [String: Any]
+        let richBody = SchoologyValue.string(
+            bodyObject?["description"] ?? bodyObject?["body"] ?? bodyObject?["text"] ?? rawBody
+        )
+        guard let decoded else {
+            return SchoologyProfileItem(
+                id: discussionID, title: "Discussion", body: richBody, subtitle: "",
+                url: nil, isAdmin: false, kind: "discussion", collectionID: nil
+            )
+        }
+        return SchoologyProfileItem(
+            id: decoded.id, title: decoded.title, body: richBody, subtitle: decoded.subtitle,
+            url: decoded.url, isAdmin: decoded.isAdmin, kind: "discussion", collectionID: decoded.collectionID,
+            fileViewURL: decoded.fileViewURL, fileName: decoded.fileName, fileMIME: decoded.fileMIME
+        )
     }
 
     func loadExternalToolURL(sectionID: String, documentID: String) async throws -> URL {
@@ -1799,7 +1816,7 @@ final class AppSession {
     func loadGroupDiscussions(groupID: String) async throws -> [SchoologyProfileItem] {
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         let data = try await api.get("groups/\(groupID)/discussions", auth: auth, params: ["limit": "50"])
-        return SchoologyProfileItem.decodeList(Self.object(data), keys: ["discussion", "discussions"])
+        return SchoologyProfileItem.decodeDiscussionList(Self.object(data))
     }
 
     func loadGroupAlbums(groupID: String) async throws -> [SchoologyProfileItem] {
@@ -1950,7 +1967,7 @@ final class AppSession {
     func loadSchoolDiscussions(_ id: String) async throws -> [SchoologyProfileItem] {
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         let data=try await api.get("schools/\(id)/discussions",auth:auth,params:["start":"0","limit":"50","with_attachments":"TRUE","richtext":"1"])
-        return SchoologyProfileItem.decodeList(Self.object(data),keys:["discussion","discussions"])
+        return SchoologyProfileItem.decodeDiscussionList(Self.object(data))
     }
 
     private func refreshPeopleDirectoryAvailability(auth: SchoologyAuth) async {

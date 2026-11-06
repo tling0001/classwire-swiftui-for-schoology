@@ -18,7 +18,7 @@ struct SchoologyInlineCourseMaterialRow: View {
             DisclosureGroup(isExpanded: $isExpanded) {
                 if isLoading {
                     HStack(spacing: 8) {
-                        ProgressView().controlSize(.small)
+                        ProgressView()
                         Text("Loading folder…").font(.caption).foregroundStyle(.secondary)
                     }
                     .padding(.vertical, 6)
@@ -60,7 +60,7 @@ struct SchoologyInlineCourseMaterialRow: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .frame(maxWidth: .infinity, minHeight: rowMinimumHeight, alignment: .leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .contentShape(Rectangle())
             }
             .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
@@ -77,23 +77,13 @@ struct SchoologyInlineCourseMaterialRow: View {
                 SchoologyCourseMaterialDestinationView(courseID: courseID, item: item)
             } label: {
                 Label(item.title, systemImage: symbol)
-                    .frame(maxWidth: .infinity, minHeight: rowMinimumHeight, alignment: .leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .contentShape(Rectangle())
             }
-            #if !os(macOS)
-            .controlSize(.regular)
-            #endif
             .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
         }
     }
 
-    private var rowMinimumHeight: CGFloat {
-        #if os(macOS)
-        28
-        #else
-        44
-        #endif
-    }
 
     private var isFileMaterial: Bool {
         let kind = item.kind.lowercased()
@@ -140,13 +130,6 @@ struct SchoologyCourseMaterialFileRow: View {
     let courseID: String
     let item: SchoologyProfileItem
 
-    private var rowMinimumHeight: CGFloat {
-        #if os(macOS)
-        28
-        #else
-        44
-        #endif
-    }
 
     @State private var selectedAttachment: SchoologyAttachment?
     @State private var linkedURL: URL?
@@ -160,14 +143,14 @@ struct SchoologyCourseMaterialFileRow: View {
         } label: {
             HStack(spacing: 10) {
                 if isResolving {
-                    ProgressView().controlSize(.small).frame(width: 20)
+                    ProgressView().frame(width: 20)
                 } else {
                     Image(systemName: "doc").foregroundStyle(.secondary).frame(width: 20).accessibilityHidden(true)
                 }
                 Text(item.title).lineLimit(2).frame(maxWidth: .infinity, alignment: .leading)
                 Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.tertiary).accessibilityHidden(true)
             }
-            .frame(maxWidth: .infinity, minHeight: rowMinimumHeight, alignment: .leading)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

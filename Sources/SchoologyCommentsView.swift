@@ -1,12 +1,20 @@
 import SwiftUI
 
+/// The shared comments thread used by activity posts, assignments, discussions, and events.
 struct SchoologyCommentsView: View {
     @Environment(AppSession.self) private var session
     @Environment(\.dismiss) private var dismiss
-    let realm: String
-    let realmID: String
-    let updateID: String
-    let onCommentPosted: () -> Void
+
+    let title: String
+    let entityID: String
+
+    private let updateRealm: String?
+    private let updateRealmID: String?
+    private let loadCommentsAction: (() async throws -> [SchoologyComment])?
+    private let submitCommentAction: ((String, String?) async throws -> Void)?
+    private let onCommentPosted: () -> Void
+    private let showsCloseButton: Bool
+
     @State private var comments: [SchoologyComment] = []
     @State private var draft = ""
     @State private var replyingToID: String?
@@ -16,7 +24,52 @@ struct SchoologyCommentsView: View {
     @State private var errorMessage: String?
     @FocusState private var composerFocused: Bool
 
+    init(realm: String, realmID: String, updateID: String, onCommentPosted: @escaping () -> Void) {
+        title = "Comments"
+        entityID = updateID
+        updateRealm = realm
+        updateRealmID = realmID
+        loadCommentsAction = nil
+        submitCommentAction = nil
+        self.onCommentPosted = onCommentPosted
+        showsCloseButton = true
+    }
+
+    init(
+        title: String,
+        entityID: String,
+        loadComments: @escaping () async throws -> [SchoologyComment],
+        submitComment: @escaping (String, String?) async throws -> Void
+    ) {
+        self.title = title
+        self.entityID = entityID
+        updateRealm = nil
+        updateRealmID = nil
+        loadCommentsAction = loadComments
+        submitCommentAction = submitComment
+        onCommentPosted = {}
+        showsCloseButton = false
+    }
+
     var body: some View {
+        Group {
+            if showsCloseButton {
+                commentsContent
+                    .navigationTitle(title)
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("Close", systemImage: "xmark") { dismiss() }
+                        }
+                    }
+            } else {
+                commentsContent
+            }
+        }
+        .task(id: entityID) { await load() }
+        .refreshable { await load() }
+    }
+
+    private var commentsContent: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 12) {
                 if isLoading && comments.isEmpty {
@@ -30,13 +83,13 @@ struct SchoologyCommentsView: View {
                         .frame(maxWidth: .infinity)
                         .padding(.top, 28)
                 } else {
-                    ForEach(comments) { comment in
+                    ForEach(SchoologyComment.ordered(comments)) { comment in
                         SchoologyCommentRow(
                             comment: comment,
-                            updateID: updateID,
+                            updateID: entityID,
                             onReply: beginReply,
                             onOpenProfile: { userID in
-                                dismiss()
+                                if showsCloseButton { dismiss() }
                                 session.showPersonProfile(userID: userID)
                             }
                         )
@@ -47,17 +100,7 @@ struct SchoologyCommentsView: View {
             .frame(maxWidth: 850)
             .frame(maxWidth: .infinity)
         }
-        .safeAreaInset(edge: .bottom) {
-            composer
-        }
-        .navigationTitle("Comments")
-        .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
-                Button("Close", systemImage: "xmark") { dismiss() }
-            }
-        }
-        .task(id: updateID) { await load() }
-        .refreshable { await load() }
+        .safeAreaInset(edge: .bottom) { composer }
     }
 
     private var composer: some View {
@@ -72,7 +115,7 @@ struct SchoologyCommentsView: View {
                         .foregroundStyle(.secondary)
                     Spacer()
                     Button("Cancel reply") {
-                        self.replyingToID = nil
+                        replyingToID = nil
                         replyingToName = ""
                     }
                     .font(.caption)
@@ -104,7 +147,13 @@ struct SchoologyCommentsView: View {
         if comments.isEmpty { isLoading = true }
         errorMessage = nil
         do {
-            comments = try await session.loadUpdateComments(realm: realm, realmID: realmID, updateID: updateID)
+            if let loadCommentsAction {
+                comments = try await loadCommentsAction()
+            } else if let updateRealm, let updateRealmID {
+                comments = try await session.loadUpdateComments(realm: updateRealm, realmID: updateRealmID, updateID: entityID)
+            } else {
+                throw SchoologyAPIError.invalidResponse
+            }
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -117,7 +166,13 @@ struct SchoologyCommentsView: View {
         isSubmitting = true
         errorMessage = nil
         do {
-            try await session.postUpdateComment(realm: realm, realmID: realmID, updateID: updateID, body: body, parentID: replyingToID)
+            if let submitCommentAction {
+                try await submitCommentAction(body, replyingToID)
+            } else if let updateRealm, let updateRealmID {
+                try await session.postUpdateComment(realm: updateRealm, realmID: updateRealmID, updateID: entityID, body: body, parentID: replyingToID)
+            } else {
+                throw SchoologyAPIError.invalidResponse
+            }
             draft = ""
             replyingToID = nil
             replyingToName = ""

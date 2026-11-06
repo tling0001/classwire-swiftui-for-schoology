@@ -1,5 +1,25 @@
 # Release notes
 
+## [2026.10.0-port.62]
+
+### Discussion routing
+- Normalize discussion identifiers from group and school discussion lists, preferring the actual discussion ID over generic template or row IDs.
+- Use the same native discussion detail page for group discussions, course materials, and other supported discussion entry points.
+
+### Shared comments
+- Route post, assignment, discussion, and event comment threads through one shared comments view with identical comment cards, reply composer, ordering, refresh behavior, and profile/likes navigation.
+- Give comment action controls the same adaptive Liquid Glass surface used by post actions, with a material fallback on older systems.
+
+### Rich text and sizing
+- Apply Dynamic Type-scaled minimum sizing to assignment descriptions and teacher comments, discussion descriptions, and event descriptions while retaining inline rich text and links.
+
+### Course Materials and Resources
+- Remove explicit macOS and iOS/iPadOS row minimum-height overrides and the iOS-only regular control-size override; allow native SwiftUI row sizing on both platforms.
+
+### Build
+- Fix the CGFloat string conversion that caused both iOS and macOS archive jobs to fail.
+- Increment the iOS and macOS bundle build number to 62.
+
 ## [2026.10.0-port.61]
 
 ### Course Materials and Resources

@@ -1,6 +1,7 @@
 import SwiftUI
 struct SchoologyAssignmentDetailView: View {
     @Environment(AppSession.self) private var session
+    @ScaledMetric(relativeTo: .body) private var richTextMinimumFontSize: CGFloat = 15.5
     let sectionID: String
     let assignmentID: String
     let title: String
@@ -147,12 +148,12 @@ struct SchoologyAssignmentDetailView: View {
                         Label("\(SchoologyGradeValueFormatter.display(context.maxPoints)) points", systemImage: "chart.bar")
                             .font(.subheadline).foregroundStyle(.secondary)
                     }
-                    SchoologyRichTextText(context.richDescription.isEmpty ? "No assignment description." : context.richDescription)
+                    SchoologyRichTextText(context.richDescription.isEmpty ? "No assignment description." : context.richDescription, minimumFontSize: richTextMinimumFontSize)
                         .textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
                     if !context.teacherComment.isEmpty {
                         Divider()
                         Label("Teacher Comment", systemImage: "text.bubble").font(.headline)
-                        SchoologyRichTextText(context.teacherComment).textSelection(.enabled)
+                        SchoologyRichTextText(context.teacherComment, minimumFontSize: richTextMinimumFontSize).textSelection(.enabled)
                     }
                 }
                 .padding(16).frame(maxWidth: .infinity, alignment: .leading)

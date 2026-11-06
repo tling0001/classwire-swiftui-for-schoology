@@ -96,6 +96,10 @@ struct SchoologyCommentRow: View {
             .font(.caption)
             .buttonStyle(.plain)
             .foregroundStyle(isLiked ? AnyShapeStyle(SchoologyStyle.blue) : AnyShapeStyle(.secondary))
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .schoologyGlassSurface()
+            .frame(maxWidth: .infinity, alignment: .leading)
 
             if let errorMessage {
                 Text(errorMessage)

@@ -31,6 +31,9 @@ struct SchoologyProfileItem: Identifiable, Sendable {
                 rawID = person["id"] ?? person["uid"] ?? person["user_id"] ?? item["user_id"] ?? item["userId"] ?? item["uid"] ?? item["id"]
             } else if rawKind == "folder" {
                 rawID = item["id"] ?? item["folder_id"] ?? item["folderId"]
+            } else if rawKind.contains("discussion") {
+                rawID = item["id"] ?? item["discussion_id"] ?? item["discussionId"] ??
+                    item["template_id"] ?? item["templateID"] ?? item["templateId"]
             } else if !rawKind.isEmpty {
                 rawID = item["template_id"] ?? item["templateID"] ?? item["templateId"] ?? item["assignment_id"] ?? item["assignmentId"] ?? item["discussion_id"] ?? item["discussionId"] ?? item["event_id"] ?? item["eventId"] ?? item["page_id"] ?? item["pageId"] ?? item["id"]
             } else {
@@ -77,6 +80,23 @@ struct SchoologyProfileItem: Identifiable, Sendable {
                 fileMIME: fileMIME
             )
         }
+    }
+
+    static func decodeDiscussionList(_ value: Any?) -> [Self] {
+        let rows = SchoologyValue.list(value, keys: ["discussion", "discussions", "items", "data", "response"])
+        let normalized = rows.map { row -> [String: Any] in
+            var item = row
+            let discussionID = row["id"] ?? row["discussion_id"] ?? row["discussionId"] ??
+                row["template_id"] ?? row["templateID"] ?? row["templateId"]
+            if let discussionID {
+                item["id"] = discussionID
+                item["discussion_id"] = discussionID
+            }
+            item["type"] = "discussion"
+            item["template_type"] = "discussion"
+            return item
+        }
+        return decodeList(["discussion": normalized], keys: ["discussion"])
     }
 }
 struct SchoologyUpdateDestination: Identifiable, Hashable, Sendable {

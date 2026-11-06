@@ -68,7 +68,7 @@ struct SchoologyInlineResourceItemRow: View {
                 DisclosureGroup(isExpanded: $isExpanded) {
                     if isLoading {
                         HStack(spacing: 8) {
-                            ProgressView().controlSize(.small)
+                            ProgressView()
                             Text("Loading folder…").font(.caption).foregroundStyle(.secondary)
                         }
                         .padding(.vertical, 6)
@@ -110,7 +110,7 @@ struct SchoologyInlineResourceItemRow: View {
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                    .frame(maxWidth: .infinity, minHeight: rowMinimumHeight, alignment: .leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .contentShape(Rectangle())
                 }
                 .animation(reduceMotion ? nil : .snappy(duration: 0.24), value: isExpanded)
@@ -120,13 +120,13 @@ struct SchoologyInlineResourceItemRow: View {
                 }
             } else if let attachment {
                 SchoologyAttachmentPreviewButton(attachment: attachment)
-                    .frame(maxWidth: .infinity, minHeight: rowMinimumHeight, alignment: .leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             } else if let url = item.url {
                 NavigationLink {
                     SchoologyEmbeddedWebView(url: url, title: item.title)
                 } label: {
                     Label(item.title, systemImage: resourceSymbol)
-                        .frame(maxWidth: .infinity, minHeight: rowMinimumHeight, alignment: .leading)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                         .contentShape(Rectangle())
                 }
             } else {
@@ -134,7 +134,7 @@ struct SchoologyInlineResourceItemRow: View {
                     SchoologyProfileItemDetailSheet(item: item)
                 } label: {
                     Label(item.title, systemImage: resourceSymbol)
-                        .frame(maxWidth: .infinity, minHeight: rowMinimumHeight, alignment: .leading)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                         .contentShape(Rectangle())
                 }
             }
@@ -142,13 +142,6 @@ struct SchoologyInlineResourceItemRow: View {
         .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
     }
 
-    private var rowMinimumHeight: CGFloat {
-        #if os(macOS)
-        28
-        #else
-        44
-        #endif
-    }
 
     private var attachment: SchoologyAttachment? {
         guard let url = item.url ?? item.fileViewURL else { return nil }
