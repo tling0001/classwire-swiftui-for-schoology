@@ -1,3 +1,21 @@
+# 2026.10.0-port.60
+
+### Attachments
+- Open Schoology link attachments directly in the system browser instead of treating them as downloadable files.
+- Preserve link attachments from assignment info, activity, messages, comments, events, and submission revisions.
+
+### macOS app icon
+- Add rounded-corner legacy Mac icon renditions so older macOS releases display a finished rounded icon while iOS artwork remains unmasked.
+
+### macOS updates
+- Resolve the installed app when macOS launches a quarantined or disk-image copy.
+- Stage replacement bundles beside the installed app, verify the copied signature, and roll back if replacement fails.
+- Request administrator authorization when the Applications folder is not writable, then relaunch the updated app.
+- Write persistent diagnostics to ~/Library/Logs/Schoology/update-*.log and reopen the previous app when an update cannot complete.
+
+### Build
+- Increment the iOS and macOS bundle build number to 60.
+
 ## [2026.10.0-port.59]
 
 ### Course Materials

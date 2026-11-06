@@ -1059,18 +1059,27 @@ final class AppSession {
         let rawDescription = raw["description"] ?? raw["body"] ?? raw["message"]
         let descriptionObject = rawDescription as? [String: Any]
         let description = SchoologyValue.string(descriptionObject?["description"] ?? descriptionObject?["body"] ?? descriptionObject?["text"] ?? rawDescription)
-        let attachmentRows = SchoologyValue.list(raw["attachments"] ?? raw["attachment"] ?? raw["file-attachment"], keys: ["files", "file", "attachments", "items"])
-        let attachments = attachmentRows.compactMap { item -> SchoologyAttachment? in
-            guard let url = SchoologyValue.url(item["file_download_url"] ?? item["fileDownloadURL"] ?? item["download_path"] ?? item["downloadPath"] ?? item["download_url"] ?? item["downloadUrl"] ?? item["url"] ?? item["linkURL"] ?? item["href"]) else { return nil }
+        let attachmentRoot = raw["attachments"] ?? raw["attachment"] ?? raw["file-attachment"]
+        let attachmentRows = SchoologyValue.list(attachmentRoot, keys: ["files", "file", "attachments", "items"])
+        let attachmentObject = attachmentRoot as? [String: Any] ?? [:]
+        let linkRows = SchoologyValue.list(attachmentObject["links"] ?? attachmentObject["link"], keys: ["links", "link", "items"]) +
+            SchoologyValue.list(raw["links"] ?? raw["link"], keys: ["links", "link", "items"])
+        let attachmentEntries = attachmentRows.map { ($0, false) } + linkRows.map { ($0, true) }
+        let decodedAttachments = attachmentEntries.compactMap { item, fromLinksCollection -> SchoologyAttachment? in
+            guard let url = SchoologyValue.url(item["file_download_url"] ?? item["fileDownloadURL"] ?? item["download_path"] ?? item["downloadPath"] ?? item["download_url"] ?? item["downloadUrl"] ?? item["link_url"] ?? item["linkURL"] ?? item["linkUrl"] ?? item["web_url"] ?? item["webUrl"] ?? item["url"] ?? item["href"]) else { return nil }
             let viewURL = SchoologyValue.url(item["file_converted_download_url"] ?? item["fileConvertedDownloadURL"] ?? item["converted_download_path"] ?? item["convertedDownloadPath"])
-            return SchoologyAttachment(title: SchoologyValue.string(item["filename"] ?? item["fileName"] ?? item["title"], fallback: url.lastPathComponent), url: url, viewURL: viewURL)
+            return SchoologyAttachment(
+                title: SchoologyValue.string(item["filename"] ?? item["fileName"] ?? item["title"] ?? item["linkTitle"] ?? item["link_title"], fallback: url.lastPathComponent),
+                url: url, viewURL: viewURL,
+                isLink: fromLinksCollection || SchoologyAttachment.isLinkRecord(item)
+            )
         }
         return SchoologyEventContext(event: event, richDescription: description,
             start: SchoologyValue.string(raw["start"] ?? raw["start_time"] ?? raw["startTime"] ?? raw["date"]),
             end: SchoologyValue.string(raw["end"] ?? raw["end_time"] ?? raw["endTime"]),
             allDay: SchoologyValue.bool(raw["all_day"] ?? raw["allDay"]),
             commentsEnabled: SchoologyValue.bool(raw["comments_enabled"] ?? raw["commentsEnabled"]),
-            attachments: attachments)
+            attachments: decodedAttachments)
     }
 
     func loadEvent(realm: String, realmID: String, eventID: String) async throws -> SchoologyProfileItem {
@@ -1285,10 +1294,19 @@ final class AppSession {
         let richDescription = SchoologyValue.string(descriptionObject?["description"] ?? descriptionObject?["body"] ?? descriptionObject?["text"] ?? rawDescription)
         let type = SchoologyValue.string(rawAssignment["assignment_type"] ?? rawAssignment["assignmentType"] ?? rawAssignment["type"]).lowercased()
         let ltiURL = type == "lti_submission" ? SchoologyValue.url(rawAssignment["web_url"] ?? rawAssignment["webUrl"] ?? rawAssignment["launch_url"] ?? rawAssignment["launchUrl"]) : nil
-        let attachmentRows = SchoologyValue.list(rawAssignment["attachments"] ?? rawAssignment["attachment"], keys: ["files", "file", "attachments", "items", "links", "link"])
-        let attachments = attachmentRows.compactMap { item -> SchoologyAttachment? in
-            guard let url = SchoologyValue.url(item["file_download_url"] ?? item["fileDownloadURL"] ?? item["download_path"] ?? item["downloadPath"] ?? item["url"] ?? item["linkURL"] ?? item["href"]) else { return nil }
-            return SchoologyAttachment(title: SchoologyValue.string(item["filename"] ?? item["fileName"] ?? item["title"], fallback: url.lastPathComponent), url: url)
+        let attachmentRoot = rawAssignment["attachments"] ?? rawAssignment["attachment"]
+        let attachmentRows = SchoologyValue.list(attachmentRoot, keys: ["files", "file", "attachments", "items"])
+        let attachmentObject = attachmentRoot as? [String: Any] ?? [:]
+        let linkRows = SchoologyValue.list(attachmentObject["links"] ?? attachmentObject["link"], keys: ["links", "link", "items"]) +
+            SchoologyValue.list(rawAssignment["links"] ?? rawAssignment["link"], keys: ["links", "link", "items"])
+        let attachmentEntries = attachmentRows.map { ($0, false) } + linkRows.map { ($0, true) }
+        let attachments = attachmentEntries.compactMap { item, fromLinksCollection -> SchoologyAttachment? in
+            guard let url = SchoologyValue.url(item["file_download_url"] ?? item["fileDownloadURL"] ?? item["download_path"] ?? item["downloadPath"] ?? item["link_url"] ?? item["linkURL"] ?? item["linkUrl"] ?? item["web_url"] ?? item["webUrl"] ?? item["url"] ?? item["href"]) else { return nil }
+            return SchoologyAttachment(
+                title: SchoologyValue.string(item["filename"] ?? item["fileName"] ?? item["title"] ?? item["linkTitle"] ?? item["link_title"], fallback: url.lastPathComponent),
+                url: url,
+                isLink: fromLinksCollection || SchoologyAttachment.isLinkRecord(item)
+            )
         }
         let profile = SchoologyProfileItem.decodeList(["assignment": rawAssignment], keys: ["assignment"]).first ??
             SchoologyProfileItem(id: assignmentID, title: "Assignment", body: "", subtitle: "", url: nil, isAdmin: false, kind: "assignment", collectionID: nil)
@@ -1311,7 +1329,11 @@ final class AppSession {
             return SchoologyValue.list(raw, keys: ["revision", "revisions", "items"]).map { row in
                 let attachments = SchoologyValue.list(row["attachments"] ?? row["attachment"], keys: ["files", "file", "attachments", "items"]).compactMap { file -> SchoologyAttachment? in
                     guard let url = SchoologyValue.url(file["file_download_url"] ?? file["fileDownloadURL"] ?? file["download_path"] ?? file["downloadPath"] ?? file["url"]) else { return nil }
-                    return SchoologyAttachment(title: SchoologyValue.string(file["filename"] ?? file["fileName"] ?? file["title"], fallback: url.lastPathComponent), url: url)
+                    return SchoologyAttachment(
+                        title: SchoologyValue.string(file["filename"] ?? file["fileName"] ?? file["title"], fallback: url.lastPathComponent),
+                        url: url,
+                        isLink: SchoologyAttachment.isLinkRecord(file)
+                    )
                 }
                 return SchoologyAssignmentRevision(id: SchoologyValue.string(row["revision_id"] ?? row["revisionId"] ?? row["id"], fallback: "0"),
                     created: SchoologyValue.string(row["created"] ?? row["timestamp"]),
@@ -1416,7 +1438,8 @@ final class AppSession {
                 return SchoologyAttachment(
                     title: SchoologyValue.string(file["filename"] ?? file["fileName"] ?? file["title"], fallback: url.lastPathComponent),
                     url: url,
-                    viewURL: converted
+                    viewURL: converted,
+                    isLink: SchoologyAttachment.isLinkRecord(file)
                 )
             }
             return SchoologyAssignmentRevision(

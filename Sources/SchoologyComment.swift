@@ -70,7 +70,8 @@ struct SchoologyComment: Identifiable, Sendable {
                 guard let url = SchoologyValue.url(rawURL) else { return nil }
                 return SchoologyAttachment(
                     title: SchoologyValue.string(attachment["title"] ?? attachment["filename"] ?? attachment["fileName"], fallback: url.host ?? "Attachment"),
-                    url: url
+                    url: url,
+                    isLink: SchoologyAttachment.isLinkRecord(attachment)
                 )
             }
             let parent = SchoologyValue.optionalString(item["parent_id"] ?? item["parentId"])

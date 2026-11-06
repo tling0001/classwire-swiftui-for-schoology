@@ -35,7 +35,21 @@ struct SchoologyAttachment: Identifiable, Hashable, Sendable {
     let title: String
     let url: URL
     var viewURL: URL? = nil
+    var isLink: Bool = false
     var id: String { url.absoluteString }
+
+    static func isLinkRecord(_ item: [String: Any]) -> Bool {
+        let linkFields = ["link_url", "linkURL", "linkUrl", "link_title", "linkTitle",
+                          "href", "web_url", "webUrl", "launch_url", "launchUrl"]
+        if linkFields.contains(where: { item[$0] != nil }) { return true }
+
+        let fileFields = ["file_download_url", "fileDownloadURL", "download_path",
+                          "downloadPath", "download_url", "downloadUrl", "filename", "fileName"]
+        guard !fileFields.contains(where: { item[$0] != nil }),
+              let rawURL = item["url"] as? String,
+              let url = URL(string: rawURL) else { return false }
+        return url.pathExtension.isEmpty
+    }
 }
 
 struct SchoologyCourse: Identifiable, Sendable {
@@ -144,7 +158,8 @@ struct SchoologyActivity: Identifiable, Sendable {
                 let conversion = SchoologyValue.string(attachment["converted_status"] ?? attachment["convertedStatus"] ?? attachment["file_converted_status"] ?? attachment["fileConvertedStatus"]).lowercased()
                 let converted = SchoologyValue.url(attachment["file_converted_download_url"] ?? attachment["fileConvertedDownloadURL"] ?? attachment["converted_download_path"] ?? attachment["convertedDownloadPath"])
                 let viewURL = ["success", "converted", "1"].contains(conversion) ? converted : nil
-                return SchoologyAttachment(title: title, url: url, viewURL: viewURL)
+                return SchoologyAttachment(title: title, url: url, viewURL: viewURL,
+                    isLink: SchoologyAttachment.isLinkRecord(attachment))
             }
             return SchoologyActivity(
                 id: SchoologyValue.string(item["id"] ?? item["update_id"] ?? item["updateId"], fallback: String(index)),
@@ -438,7 +453,8 @@ struct SchoologyMessage: Identifiable, Hashable, Sendable {
                 let viewURL = ["success", "converted", "1"].contains(conversion) ? converted : nil
                 return SchoologyAttachment(
                     title: SchoologyValue.string(attachment["title"] ?? attachment["filename"] ?? attachment["fileName"], fallback: url.lastPathComponent),
-                    url: url, viewURL: viewURL
+                    url: url, viewURL: viewURL,
+                    isLink: SchoologyAttachment.isLinkRecord(attachment)
                 )
             }
             let status = SchoologyValue.string(item["message_status"] ?? item["messageStatus"])

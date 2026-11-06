@@ -26,7 +26,7 @@ func svg(dark: Bool = false, tinted: Bool = false) -> String {
     """
 }
 
-func renderIcon(size: Int, dark: Bool = false, tinted: Bool = false) throws -> Data {
+func renderIcon(size: Int, dark: Bool = false, tinted: Bool = false, roundedCorners: Bool = false) throws -> Data {
     guard let image = NSImage(data: Data(svg(dark: dark, tinted: tinted).utf8)) else {
         throw NSError(domain: "SchoologyIcon", code: 1, userInfo: [NSLocalizedDescriptionKey: "Could not decode official Schoology SVG artwork."])
     }
@@ -41,6 +41,17 @@ func renderIcon(size: Int, dark: Bool = false, tinted: Bool = false) throws -> D
     NSGraphicsContext.saveGraphicsState()
     NSGraphicsContext.current = context
     context.imageInterpolation = .high
+    if roundedCorners {
+        // Older macOS releases display legacy bitmap icons without applying
+        // the modern rounded-rectangle mask. Keep this compatibility mask
+        // confined to Mac renditions; iOS assets stay unmasked.
+        let cornerRadius = dimension * 0.205
+        NSBezierPath(
+            roundedRect: NSRect(x: 0, y: 0, width: dimension, height: dimension),
+            xRadius: cornerRadius,
+            yRadius: cornerRadius
+        ).addClip()
+    }
     image.draw(in: NSRect(x: 0, y: 0, width: dimension, height: dimension),
                from: .zero, operation: .sourceOver, fraction: 1)
     NSGraphicsContext.restoreGraphicsState()
@@ -63,8 +74,8 @@ let macSizes: [(String, Int)] = [
 ]
 for (name, size) in macSizes {
     let stem = String(name.dropLast(4))
-    try write(renderIcon(size: size), to: macSet.appendingPathComponent(name))
-    try write(renderIcon(size: size, dark: true), to: macSet.appendingPathComponent("\(stem)-dark.png"))
-    try write(renderIcon(size: size, tinted: true), to: macSet.appendingPathComponent("\(stem)-tinted.png"))
+    try write(renderIcon(size: size, roundedCorners: true), to: macSet.appendingPathComponent(name))
+    try write(renderIcon(size: size, dark: true, roundedCorners: true), to: macSet.appendingPathComponent("\(stem)-dark.png"))
+    try write(renderIcon(size: size, tinted: true, roundedCorners: true), to: macSet.appendingPathComponent("\(stem)-tinted.png"))
 }
 print("Prepared Schoology light, dark, and tinted icons using the exact Tauri port.28 vector mark.")

@@ -28,7 +28,7 @@ struct SchoologyAttachmentPreviewButton: View {
     var body: some View {
         Button { isPresented = true } label: {
             HStack(spacing: 10) {
-                Label(attachment.title, systemImage: "paperclip")
+                Label(attachment.title, systemImage: attachment.isLink ? "link" : "paperclip")
                     .font(.subheadline)
                     .lineLimit(2)
                 Spacer(minLength: 8)
@@ -42,7 +42,7 @@ struct SchoologyAttachmentPreviewButton: View {
             .padding(.vertical, 4)
         }
         .buttonStyle(.plain)
-        .accessibilityHint("Opens attachment actions")
+        .accessibilityHint(attachment.isLink ? "Opens this link in your browser" : "Opens attachment actions")
         .task {
             if automaticallyPresent { isPresented = true }
         }
@@ -88,6 +88,7 @@ struct SchoologyAttachmentsView: View {
 
 private struct SchoologyAttachmentActionRow: View {
     @Environment(AppSession.self) private var session
+    @Environment(\.openURL) private var openURL
     let attachment: SchoologyAttachment
     @State private var previewURL: URL?
     @State private var isLoadingView = false
@@ -103,32 +104,41 @@ private struct SchoologyAttachmentActionRow: View {
             Label(attachment.title, systemImage: icon)
                 .font(.subheadline.weight(.medium))
                 .lineLimit(2)
-            HStack(spacing: 12) {
-                actionButtonStyle(
-                    Button {
-                        Task { await loadForViewing() }
-                    } label: {
-                        if isLoadingView {
-                            ProgressView().frame(minWidth: 72, minHeight: 40)
-                        } else {
-                            Label("View", systemImage: "eye").frame(minWidth: 72, minHeight: 40)
+            if attachment.isLink {
+                Button {
+                    openURL(attachment.url)
+                } label: {
+                    Label("Open in Browser", systemImage: "safari")
+                        .frame(minWidth: 150, minHeight: 40)
+                }
+                .buttonStyle(.bordered)
+            } else {
+                HStack(spacing: 12) {
+                    actionButtonStyle(
+                        Button {
+                            Task { await loadForViewing() }
+                        } label: {
+                            if isLoadingView {
+                                ProgressView().frame(minWidth: 72, minHeight: 40)
+                            } else {
+                                Label("View", systemImage: "eye").frame(minWidth: 72, minHeight: 40)
+                            }
                         }
-                    }
-                    .disabled(isLoadingView || isLoadingDownload)
-                )
-
-                actionButtonStyle(
-                    Button {
-                        beginDownload()
-                    } label: {
-                        if isLoadingDownload {
-                            ProgressView().frame(minWidth: 90, minHeight: 40)
-                        } else {
-                            Label("Download", systemImage: "arrow.down.to.line").frame(minWidth: 90, minHeight: 40)
+                        .disabled(isLoadingView || isLoadingDownload)
+                    )
+                    actionButtonStyle(
+                        Button {
+                            beginDownload()
+                        } label: {
+                            if isLoadingDownload {
+                                ProgressView().frame(minWidth: 90, minHeight: 40)
+                            } else {
+                                Label("Download", systemImage: "arrow.down.to.line").frame(minWidth: 90, minHeight: 40)
+                            }
                         }
-                    }
-                    .disabled(isLoadingView || isLoadingDownload)
-                )
+                        .disabled(isLoadingView || isLoadingDownload)
+                    )
+                }
             }
             if let errorMessage {
                 Text(errorMessage).font(.footnote).foregroundStyle(.red)
@@ -171,6 +181,7 @@ private struct SchoologyAttachmentActionRow: View {
     }
 
     private var icon: String {
+        if attachment.isLink { return "link" }
         let ext = attachment.url.pathExtension.lowercased()
         if ["jpg","jpeg","png","gif","heic","webp"].contains(ext) { return "photo" }
         if ext == "pdf" { return "doc.richtext" }

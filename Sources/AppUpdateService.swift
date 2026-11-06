@@ -272,9 +272,40 @@ final class AppUpdateService {
         }
 
         let fileManager = FileManager.default
+        let runningBundleURL = Bundle.main.bundleURL.resolvingSymlinksInPath().standardizedFileURL
+        let isTranslocated = runningBundleURL.path.contains("/AppTranslocation/") ||
+            runningBundleURL.path.hasPrefix("/Volumes/")
+        let installedCandidates = [
+            URL(fileURLWithPath: "/Applications/Schoology.app", isDirectory: true),
+            fileManager.homeDirectoryForCurrentUser.appendingPathComponent("Applications/Schoology.app", isDirectory: true)
+        ]
+        let targetApp: URL
+        if isTranslocated {
+            guard let installed = installedCandidates.first(where: {
+                Bundle(url: $0)?.bundleIdentifier == "com.schoologytauri.app"
+            }) else {
+                throw NSError(domain: "SchoologyUpdater", code: 16, userInfo: [
+                    NSLocalizedDescriptionKey: "Schoology is running from a disk image or a quarantined temporary location. Move Schoology into Applications, open it there, and try the update again."
+                ])
+            }
+            targetApp = installed
+        } else {
+            targetApp = runningBundleURL
+        }
+        guard Bundle(url: targetApp)?.bundleIdentifier == "com.schoologytauri.app" else {
+            throw NSError(domain: "SchoologyUpdater", code: 17, userInfo: [
+                NSLocalizedDescriptionKey: "The running app bundle could not be identified as Schoology."
+            ])
+        }
+
         let workDirectory = fileManager.temporaryDirectory
             .appendingPathComponent("SchoologyUpdate-\(UUID().uuidString)", isDirectory: true)
+        let logDirectory = fileManager.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/Logs/Schoology", isDirectory: true)
+        let logURL = logDirectory.appendingPathComponent("update-\(Int(Date().timeIntervalSince1970)).log")
+        try fileManager.createDirectory(at: logDirectory, withIntermediateDirectories: true)
         try fileManager.createDirectory(at: workDirectory, withIntermediateDirectories: true)
+
         do {
             let (downloadedFile, response) = try await URLSession.shared.download(from: downloadURL)
             if let response = response as? HTTPURLResponse,
@@ -302,24 +333,93 @@ final class AppUpdateService {
 
             let dmgURL = workDirectory.appendingPathComponent("Schoology-update.dmg")
             try fileManager.moveItem(at: downloadedFile, to: dmgURL)
-            let targetApp = Bundle.main.bundleURL.standardizedFileURL
             let scriptURL = workDirectory.appendingPathComponent("install-update.zsh")
             let appPID = ProcessInfo.processInfo.processIdentifier
             func quote(_ value: String) -> String {
                 "'" + value.replacingOccurrences(of: "'", with: "'\\''") + "'"
             }
             let classicFlag = isClassic ? "1" : "0"
-            let script = """
+            let scriptTemplate = """
             #!/bin/zsh
             set -euo pipefail
-            APP_PID=\(appPID)
-            DMG_PATH=\(quote(dmgURL.path))
-            TARGET_APP=\(quote(targetApp.path))
-            WORK_DIR=\(quote(workDirectory.path))
-            INSTALL_CLASSIC=\(classicFlag)
+
+            log() {
+              print -r -- "[$(/bin/date '+%Y-%m-%d %H:%M:%S')] $*"
+            }
+
+            perform_swap() {
+              local TARGET_PARENT
+              local STAGED_APP
+              local BACKUP_APP
+              TARGET_PARENT="$(/usr/bin/dirname "$TARGET_APP")"
+              STAGED_APP="$TARGET_PARENT/.Schoology-update-new.app"
+              BACKUP_APP="$TARGET_PARENT/.Schoology-update-backup.app"
+
+              /bin/mkdir -p "$TARGET_PARENT"
+              if [[ -d "$BACKUP_APP" && ! -d "$TARGET_APP" ]]; then
+                /bin/mv "$BACKUP_APP" "$TARGET_APP"
+              fi
+              /bin/rm -rf "$STAGED_APP" "$BACKUP_APP"
+              log "Copying the downloaded app to a staging bundle beside the installed app."
+              if ! /usr/bin/ditto --rsrc --extattr --qtn "$SOURCE_APP" "$STAGED_APP"; then
+                log "ERROR: Could not copy the downloaded app into the staging location."
+                return 1
+              fi
+
+              if [[ "$INSTALL_CLASSIC" == "1" ]]; then
+                /usr/bin/xattr -dr com.apple.quarantine "$STAGED_APP" 2>/dev/null || true
+                if ! /usr/bin/codesign --force --deep --sign - "$STAGED_APP"; then
+                  log "ERROR: Could not prepare the Classic app signature."
+                  return 1
+                fi
+              elif ! /usr/bin/codesign --verify --deep --strict "$STAGED_APP"; then
+                log "ERROR: The staged Schoology app failed signature verification."
+                return 1
+              fi
+
+              if [[ -d "$TARGET_APP" ]] && ! /bin/mv "$TARGET_APP" "$BACKUP_APP"; then
+                log "ERROR: Could not move the existing app to its rollback location."
+                return 1
+              fi
+              if ! /bin/mv "$STAGED_APP" "$TARGET_APP"; then
+                [[ ! -d "$BACKUP_APP" ]] || /bin/mv "$BACKUP_APP" "$TARGET_APP"
+                return 1
+              fi
+              if [[ "$INSTALL_CLASSIC" != "1" ]] &&
+                 ! /usr/bin/codesign --verify --deep --strict "$TARGET_APP"; then
+                log "The installed bundle failed signature verification; restoring the previous app."
+                /bin/rm -rf "$TARGET_APP"
+                [[ ! -d "$BACKUP_APP" ]] || /bin/mv "$BACKUP_APP" "$TARGET_APP"
+                return 1
+              fi
+              /bin/rm -rf "$BACKUP_APP"
+              log "The new app bundle was installed and verified."
+            }
+
+            if [[ "${1:-}" == "--elevated-swap" ]]; then
+              TARGET_APP="$2"
+              SOURCE_APP="$3"
+              LOG_FILE="$4"
+              INSTALL_CLASSIC="$5"
+              exec >> "$LOG_FILE" 2>&1
+              log "Administrator authorization granted for the app replacement."
+              if ! perform_swap; then
+                log "ERROR: The administrator-authorized app replacement failed."
+                exit 1
+              fi
+              exit 0
+            fi
+
+            APP_PID=__APP_PID__
+            DMG_PATH=__DMG_PATH__
+            TARGET_APP=__TARGET_APP__
+            WORK_DIR=__WORK_DIR__
+            LOG_FILE=__LOG_FILE__
+            INSTALL_CLASSIC=__INSTALL_CLASSIC__
             MOUNT_POINT="$WORK_DIR/mount"
-            STAGED_APP="$TARGET_APP.update-new"
-            BACKUP_APP="$TARGET_APP.update-backup"
+
+            /bin/mkdir -p "$(/usr/bin/dirname "$LOG_FILE")"
+            exec >> "$LOG_FILE" 2>&1
 
             cleanup() {
               /usr/bin/hdiutil detach "$MOUNT_POINT" -quiet >/dev/null 2>&1 || true
@@ -327,64 +427,87 @@ final class AppUpdateService {
             }
             trap cleanup EXIT
 
-            while /bin/kill -0 "$APP_PID" 2>/dev/null; do
+            log "Starting Schoology macOS update."
+            log "Target app: $TARGET_APP"
+            log "Installer image: $DMG_PATH"
+
+            for ((attempt = 0; attempt < 120; attempt++)); do
+              if ! /bin/kill -0 "$APP_PID" 2>/dev/null; then break; fi
               /bin/sleep 1
             done
+            if /bin/kill -0 "$APP_PID" 2>/dev/null; then
+              log "ERROR: Schoology did not finish quitting within 120 seconds."
+              exit 1
+            fi
 
             /bin/mkdir -p "$MOUNT_POINT"
-            /usr/bin/hdiutil attach "$DMG_PATH" -nobrowse -readonly -mountpoint "$MOUNT_POINT" >/dev/null
+            if ! /usr/bin/hdiutil attach "$DMG_PATH" -nobrowse -readonly -mountpoint "$MOUNT_POINT"; then
+              log "ERROR: Could not mount the downloaded disk image."
+              /usr/bin/open -n "$TARGET_APP" || true
+              exit 1
+            fi
             SOURCE_APP="$(/usr/bin/find "$MOUNT_POINT" -maxdepth 4 -name '*.app' -type d -print -quit)"
             if [[ -z "$SOURCE_APP" || ! -d "$SOURCE_APP" ]]; then
-              echo "The downloaded disk image does not contain an application bundle." >&2
+              log "ERROR: The downloaded disk image does not contain an application bundle."
+              /usr/bin/open -n "$TARGET_APP" || true
               exit 1
             fi
 
             if [[ "$INSTALL_CLASSIC" == "1" ]]; then
               BUNDLE_ID=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$SOURCE_APP/Contents/Info.plist")
               if [[ "$BUNDLE_ID" != "com.schoologytauri.app" ]]; then
-                echo "The downloaded app is not the official Schoology Classic bundle." >&2
+                log "ERROR: The downloaded app does not have the expected Schoology bundle identifier."
+                /usr/bin/open -n "$TARGET_APP" || true
                 exit 1
               fi
-            else
-              /usr/bin/codesign --verify --deep --strict "$SOURCE_APP"
-            fi
-
-            /bin/rm -rf "$STAGED_APP" "$BACKUP_APP"
-            /usr/bin/ditto --rsrc --extattr --qtn "$SOURCE_APP" "$STAGED_APP"
-
-            if [[ "$INSTALL_CLASSIC" == "1" ]]; then
-              /usr/bin/xattr -dr com.apple.quarantine "$STAGED_APP" 2>/dev/null || true
-              /usr/bin/codesign --force --deep --sign - "$STAGED_APP" >/dev/null 2>&1 || true
-            fi
-
-            if [[ -d "$TARGET_APP" ]]; then
-              /bin/mv "$TARGET_APP" "$BACKUP_APP"
-            fi
-            if /bin/mv "$STAGED_APP" "$TARGET_APP"; then
-              /bin/rm -rf "$BACKUP_APP"
-            else
-              [[ ! -d "$BACKUP_APP" ]] || /bin/mv "$BACKUP_APP" "$TARGET_APP"
+            elif ! /usr/bin/codesign --verify --deep --strict "$SOURCE_APP"; then
+              log "ERROR: The downloaded Schoology app failed signature verification."
+              /usr/bin/open -n "$TARGET_APP" || true
               exit 1
             fi
 
-            /usr/bin/hdiutil detach "$MOUNT_POINT" -quiet
-            /usr/bin/open "$TARGET_APP"
-            """
+            TARGET_PARENT="$(/usr/bin/dirname "$TARGET_APP")"
+            if [[ -w "$TARGET_PARENT" ]]; then
+              if ! perform_swap; then
+                log "ERROR: App replacement failed; attempting to reopen the previous app."
+                /usr/bin/open -n "$TARGET_APP" || true
+                exit 1
+              fi
+            else
+              log "The Applications folder requires administrator authorization. Requesting it before replacing Schoology."
+              ELEVATED_COMMAND="/bin/zsh $(printf '%q' "$0") --elevated-swap $(printf '%q' "$TARGET_APP") $(printf '%q' "$SOURCE_APP") $(printf '%q' "$LOG_FILE") $(printf '%q' "$INSTALL_CLASSIC")"
+              if ! /usr/bin/osascript -e 'on run argv' -e 'do shell script (item 1 of argv) with administrator privileges' -e 'end run' "$ELEVATED_COMMAND"; then
+                log "ERROR: Administrator authorization was cancelled or app replacement failed."
+                /usr/bin/open -n "$TARGET_APP" || true
+                exit 1
+              fi
+            fi
 
+            /usr/bin/hdiutil detach "$MOUNT_POINT" -quiet
+            log "Launching the updated Schoology app."
+            if ! /usr/bin/open -n "$TARGET_APP"; then
+              log "ERROR: The updated app was installed but Launch Services could not open it."
+              exit 1
+            fi
+            log "Update completed successfully."
+            """
+            let script = scriptTemplate
+                .replacingOccurrences(of: "__APP_PID__", with: String(appPID))
+                .replacingOccurrences(of: "__DMG_PATH__", with: quote(dmgURL.path))
+                .replacingOccurrences(of: "__TARGET_APP__", with: quote(targetApp.path))
+                .replacingOccurrences(of: "__WORK_DIR__", with: quote(workDirectory.path))
+                .replacingOccurrences(of: "__LOG_FILE__", with: quote(logURL.path))
+                .replacingOccurrences(of: "__INSTALL_CLASSIC__", with: classicFlag)
             try script.write(to: scriptURL, atomically: true, encoding: .utf8)
             try fileManager.setAttributes([.posixPermissions: 0o700], ofItemAtPath: scriptURL.path)
+
             let helper = Process()
-            helper.executableURL = URL(fileURLWithPath: "/bin/sh")
-            helper.arguments = [
-                "-c",
-                "/usr/bin/nohup /bin/zsh '\(scriptURL.path.replacingOccurrences(of: "'", with: "'\\''"))' </dev/null >/dev/null 2>&1 &"
-            ]
+            helper.executableURL = URL(fileURLWithPath: "/usr/bin/nohup")
+            helper.arguments = ["/bin/zsh", scriptURL.path]
+            helper.standardInput = FileHandle.nullDevice
+            helper.standardOutput = FileHandle.nullDevice
+            helper.standardError = FileHandle.nullDevice
             try helper.run()
-            helper.waitUntilExit()
-            guard helper.terminationStatus == 0 else {
-                throw NSError(domain: "SchoologyUpdater", code: Int(helper.terminationStatus),
-                              userInfo: [NSLocalizedDescriptionKey: "Could not start the update installer."])
-            }
             NSApp.terminate(nil)
         } catch {
             try? fileManager.removeItem(at: workDirectory)
