@@ -24,9 +24,16 @@ private struct SchoologyAttachmentDocument: FileDocument {
 struct SchoologyAttachmentPreviewButton: View {
     let attachment: SchoologyAttachment
     var automaticallyPresent = false
+    @Environment(\.openURL) private var openURL
     @State private var isPresented = false
     var body: some View {
-        Button { isPresented = true } label: {
+        Button {
+            if attachment.isLink {
+                openURL(attachment.url)
+            } else {
+                isPresented = true
+            }
+        } label: {
             HStack(spacing: 10) {
                 Label(attachment.title, systemImage: attachment.isLink ? "link" : "paperclip")
                     .font(.subheadline)
@@ -44,7 +51,7 @@ struct SchoologyAttachmentPreviewButton: View {
         .buttonStyle(.plain)
         .accessibilityHint(attachment.isLink ? "Opens this link in your browser" : "Opens attachment actions")
         .task {
-            if automaticallyPresent { isPresented = true }
+            if automaticallyPresent && !attachment.isLink { isPresented = true }
         }
         .sheet(isPresented: $isPresented) { SchoologyAttachmentsView(attachments: [attachment]) }
     }
@@ -60,8 +67,24 @@ struct SchoologyAttachmentsButton: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(10)
+        .background(.quaternary, in: RoundedRectangle(cornerRadius: 10))
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Attachments")
+    }
+}
+
+struct SchoologyAttachmentsDisclosure: View {
+    let attachments: [SchoologyAttachment]
+
+    var body: some View {
+        DisclosureGroup("View Attachments (\(attachments.count))") {
+            SchoologyAttachmentsButton(attachments: attachments)
+                .padding(.top, 8)
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.background, in: RoundedRectangle(cornerRadius: 12))
     }
 }
 
@@ -101,18 +124,20 @@ private struct SchoologyAttachmentActionRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Label(attachment.title, systemImage: icon)
-                .font(.subheadline.weight(.medium))
-                .lineLimit(2)
             if attachment.isLink {
                 Button {
                     openURL(attachment.url)
                 } label: {
-                    Label("Open in Browser", systemImage: "safari")
-                        .frame(minWidth: 150, minHeight: 40)
+                    Label(attachment.title, systemImage: icon)
+                        .font(.subheadline.weight(.medium))
+                        .frame(maxWidth: .infinity, minHeight: 40, alignment: .leading)
+                        .contentShape(Rectangle())
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(.plain)
             } else {
+                Label(attachment.title, systemImage: icon)
+                    .font(.subheadline.weight(.medium))
+                    .lineLimit(2)
                 HStack(spacing: 12) {
                     actionButtonStyle(
                         Button {

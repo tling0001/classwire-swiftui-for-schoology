@@ -296,7 +296,7 @@ struct SchoologyCalendarView: View {
                             .padding(16)
                             .frame(maxWidth: .infinity, alignment: .topLeading)
                     }
-                    .frame(width: splitWidth * 0.4, maxHeight: .infinity)
+                    .frame(width: splitWidth * 0.4).frame(maxHeight: .infinity)
 
                     Divider()
 
@@ -305,7 +305,7 @@ struct SchoologyCalendarView: View {
                             .padding(16)
                             .frame(maxWidth: .infinity, alignment: .topLeading)
                     }
-                    .frame(width: splitWidth * 0.6, maxHeight: .infinity)
+                    .frame(width: splitWidth * 0.6).frame(maxHeight: .infinity)
                 }
             } else {
                 ScrollView {

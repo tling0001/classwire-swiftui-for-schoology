@@ -7,6 +7,10 @@ struct DestinationView: View {
     let destination: AppDestination
     @Environment(AppSession.self) private var session
 
+    private var isRefreshingDestination: Bool {
+        session.isRefreshing || session.isLoadingResources || session.isLoadingUserGrades || session.isLoadingCalendar
+    }
+
     var body: some View {
         Group {
             switch destination {
@@ -38,7 +42,7 @@ struct DestinationView: View {
         .toolbar {
             if destination != .messages {
                 ToolbarItem(placement: .primaryAction) {
-                    Button("Refresh", systemImage: "arrow.clockwise") {
+                    Button {
                         Task {
                             switch destination {
                             case .resources: await session.loadResources(force: true)
@@ -49,8 +53,15 @@ struct DestinationView: View {
                             default: await session.refresh()
                             }
                         }
+                    } label: {
+                        if isRefreshingDestination {
+                            ProgressView().controlSize(.small)
+                        } else {
+                            Label("Refresh", systemImage: "arrow.clockwise")
+                        }
                     }
-                    .disabled(session.isRefreshing || session.isLoadingResources || session.isLoadingUserGrades || session.isLoadingCalendar)
+                    .accessibilityLabel("Refresh")
+                    .disabled(isRefreshingDestination)
                 }
             }
         }
@@ -326,8 +337,6 @@ private struct SchoologyActivityCard: View {
             if !activity.attachments.isEmpty {
                 SchoologyAttachmentsButton(attachments: activity.attachments)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(10)
-                    .background(.quaternary, in: RoundedRectangle(cornerRadius: 10))
             }
 
             Divider()

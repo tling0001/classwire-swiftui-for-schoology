@@ -1,5 +1,20 @@
 # Release notes
 
+## [2026.10.0-port.64]
+
+### Refresh controls
+- Show an in-toolbar progress indicator while homepage, course, and group refresh requests are running.
+- Keep course and group refresh actions directly accessible in the toolbar beside their create actions.
+
+### Attachments
+- Open link attachments directly in the system browser when selected.
+- Give the shared post attachment list a consistent rounded, contrasting background wherever it is reused.
+- Replace the assignment, discussion, and event attachment blocks with expandable inline “View Attachments (N)” sections.
+
+### Build
+- Fix the invalid SwiftUI frame modifier that caused both iOS and macOS archive jobs to fail.
+- Increment the iOS and macOS bundle build number to 64.
+
 ## [2026.10.0-port.63]
 
 ### Assignment submissions

@@ -27,10 +27,10 @@ struct SchoologyAssignmentDetailView: View {
                         let splitWidth = max(0, geometry.size.width - 1)
                         HStack(spacing: 0) {
                             assignmentTabs(context: context, includeSubmission: false)
-                                .frame(width: splitWidth * (17.0 / 24.0), maxHeight: .infinity)
+                                .frame(width: splitWidth * (17.0 / 24.0)).frame(maxHeight: .infinity)
                             Divider()
                             submissionPane(context: context)
-                                .frame(width: splitWidth * (7.0 / 24.0), maxHeight: .infinity)
+                                .frame(width: splitWidth * (7.0 / 24.0)).frame(maxHeight: .infinity)
                         }
                         .onAppear {
                             if selectedTab == .submissions { selectedTab = .info }
@@ -160,10 +160,7 @@ struct SchoologyAssignmentDetailView: View {
                 .padding(16).frame(maxWidth: .infinity, alignment: .leading)
                 .background(.background, in: RoundedRectangle(cornerRadius: 14))
                 if !context.attachments.isEmpty {
-                    SchoologyAttachmentsButton(attachments: context.attachments)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(14)
-                        .background(.background, in: RoundedRectangle(cornerRadius: 12))
+                    SchoologyAttachmentsDisclosure(attachments: context.attachments)
                 }
             }
             .padding().frame(maxWidth: 900).frame(maxWidth: .infinity)

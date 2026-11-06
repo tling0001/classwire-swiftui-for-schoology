@@ -56,8 +56,18 @@ struct SchoologyCourseProfileView: View {
                     }
                 }
             }
-            ToolbarItem(placement: .secondaryAction) {
-                Button("Refresh", systemImage: "arrow.clockwise") { Task { await loadTab(tab, force: true) } }.disabled(loadingTabs.contains(tab))
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    Task { await loadTab(tab, force: true) }
+                } label: {
+                    if loadingTabs.contains(tab) {
+                        ProgressView().controlSize(.small)
+                    } else {
+                        Label("Refresh", systemImage: "arrow.clockwise")
+                    }
+                }
+                .accessibilityLabel("Refresh")
+                .disabled(loadingTabs.contains(tab))
             }
         }
         .sheet(isPresented: $showingUpdateComposer) {

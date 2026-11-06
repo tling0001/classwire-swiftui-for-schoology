@@ -91,7 +91,7 @@ struct SchoologyDiscussionDetailView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                     if let url = discussion.url {
                         if !discussion.fileName.isEmpty || !discussion.fileMIME.isEmpty || !url.pathExtension.isEmpty {
-                            SchoologyAttachmentsButton(attachments: [
+                            SchoologyAttachmentsDisclosure(attachments: [
                                 SchoologyAttachment(
                                     title: discussion.fileName.isEmpty ? discussion.title : discussion.fileName,
                                     url: url,
@@ -204,9 +204,7 @@ struct SchoologyEventDetailView: View {
                 .padding(16).frame(maxWidth: .infinity, alignment: .leading)
                 .background(.background, in: RoundedRectangle(cornerRadius: 14))
                 if !context.attachments.isEmpty {
-                    SchoologyAttachmentsButton(attachments: context.attachments)
-                        .frame(maxWidth: .infinity, alignment: .leading).padding(14)
-                        .background(.background, in: RoundedRectangle(cornerRadius: 12))
+                    SchoologyAttachmentsDisclosure(attachments: context.attachments)
                 }
             }.padding().frame(maxWidth: 900).frame(maxWidth: .infinity)
         }

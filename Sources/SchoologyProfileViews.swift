@@ -43,9 +43,18 @@ struct GroupProfileView: View {
             if let permissions = profile?.permissions, hasGroupActions(permissions) {
                 ToolbarItem(placement: .primaryAction) { groupActionsMenu(permissions) }
             }
-            ToolbarItem(placement: .secondaryAction) {
-                Button("Refresh", systemImage: "arrow.clockwise") { Task { await loadTab(tab, force: true) } }
-                    .disabled(isLoading || loadingTabs.contains(tab))
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    Task { await loadTab(tab, force: true) }
+                } label: {
+                    if isLoading || loadingTabs.contains(tab) {
+                        ProgressView().controlSize(.small)
+                    } else {
+                        Label("Refresh", systemImage: "arrow.clockwise")
+                    }
+                }
+                .accessibilityLabel("Refresh")
+                .disabled(isLoading || loadingTabs.contains(tab))
             }
         }
         .task { await load() }
