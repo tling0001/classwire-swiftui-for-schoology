@@ -112,7 +112,7 @@ struct SchoologyPeopleDirectoryView: View {
                                     HStack(spacing: 12) {
                                         if let pictureURL = person.pictureURL {
                                             AuthenticatedSchoologyImage(url: pictureURL)
-                                                .frame(width: 38, height: 38).clipShape(Circle())
+                                                .frame(width: 38, height: 38).clipShape(RoundedRectangle(cornerRadius: 9))
                                         } else {
                                             Image(systemName: "person.crop.circle.fill")
                                                 .font(.system(size: 36)).foregroundStyle(.secondary)

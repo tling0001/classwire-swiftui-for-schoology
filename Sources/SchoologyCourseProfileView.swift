@@ -112,10 +112,11 @@ struct SchoologyCourseProfileView: View {
     }
 
     private func wideLayout(width: CGFloat) -> some View {
-        NavigationSplitView {
+        let sidebarWidth = min(max(width * 0.19, 190), 280)
+        let upcomingWidth = min(max(width * 0.2743, 250), 420)
+        return HStack(spacing: 0) {
             VStack(spacing: 0) {
-                SchoologyProfileHeroImage(url: course.profileURL, fallbackSymbol: "book.closed.fill")
-                    .padding(12)
+                SchoologyProfileHeroImage(url: course.profileURL, fallbackSymbol: "book.closed.fill").padding(12)
                 List(selection: Binding<SchoologyCourseTab?>(get: { tab }, set: { if let selected = $0 { tab = selected } })) {
                     ForEach([SchoologyCourseTab.materials, .updates, .grades, .members, .courseApps]) { item in
                         Label(item.rawValue, systemImage: courseTabSymbol(item)).tag(item)
@@ -124,9 +125,9 @@ struct SchoologyCourseProfileView: View {
                 .listStyle(.sidebar)
                 .scrollContentBackground(.hidden)
             }
+            .frame(width: sidebarWidth)
             .background(.regularMaterial)
-            .navigationSplitViewColumnWidth(min: 190, ideal: max(190, width * 0.19), max: 280)
-        } content: {
+            Divider()
             VStack(spacing: 0) {
                 SchoologyProfileInfobox(title: course.title, subtitle: course.section.isEmpty ? nil : course.section,
                     schoolName: schoolName.isEmpty ? nil : schoolName, schoolID: schoolID,
@@ -141,8 +142,8 @@ struct SchoologyCourseProfileView: View {
                 Divider()
                 currentContent
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-        } detail: {
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            Divider()
             VStack(alignment: .leading, spacing: 0) {
                 Text("Upcoming").font(.headline).padding(14)
                 Divider()
@@ -151,14 +152,15 @@ struct SchoologyCourseProfileView: View {
                         isLoading: loadingTabs.contains(.upcoming) && !loadedTabs.contains(.upcoming),
                         errorMessage: tabErrors[.upcoming], fallbackRealm: "sections", fallbackRealmID: course.id)
                         .padding(10)
+                        .frame(maxWidth: .infinity, alignment: .topLeading)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
+            .frame(width: upcomingWidth)
             .background(.thinMaterial)
-            .navigationSplitViewColumnWidth(min: 250, ideal: max(250, width * 0.2743), max: 420)
             .task { await loadTab(.upcoming) }
         }
-        .navigationSplitViewStyle(.balanced)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private var currentContent: some View {

@@ -33,7 +33,7 @@ struct SchoologyCommentRow: View {
                 if let avatarURL = comment.avatarURL ?? (comment.authorID == session.auth?.userID ? session.user?.pictureURL : nil) {
                     AuthenticatedSchoologyImage(url: avatarURL)
                         .frame(width: 34, height: 34)
-                        .clipShape(Circle())
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
                 } else {
                     Image(systemName: "person.crop.circle.fill")
                         .font(.system(size: 32))

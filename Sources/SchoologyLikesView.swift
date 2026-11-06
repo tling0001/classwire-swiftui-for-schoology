@@ -31,7 +31,7 @@ struct SchoologyLikesView: View {
                                     if let pictureURL = user.pictureURL {
                                         AuthenticatedSchoologyImage(url: pictureURL)
                                             .frame(width: 36, height: 36)
-                                            .clipShape(Circle())
+                                            .clipShape(RoundedRectangle(cornerRadius: 9))
                                     } else {
                                         Image(systemName: "person.crop.circle.fill")
                                             .font(.system(size: 34))

@@ -112,7 +112,7 @@ struct MessagesView: View {
             if let url = message.personPictureURL {
                 AuthenticatedSchoologyImage(url: url)
                     .frame(width: 42, height: 42)
-                    .clipShape(Circle())
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
             } else {
                 Image(systemName: "person.crop.circle.fill")
                     .font(.system(size: 38))
@@ -184,7 +184,7 @@ private struct MessageThreadView: View {
                                     if let avatar = item.personPictureURL {
                                         AuthenticatedSchoologyImage(url: avatar)
                                             .frame(width: 38, height: 38)
-                                            .clipShape(Circle())
+                                            .clipShape(RoundedRectangle(cornerRadius: 9))
                                     } else {
                                         Image(systemName: "person.crop.circle.fill")
                                             .font(.system(size: 36))

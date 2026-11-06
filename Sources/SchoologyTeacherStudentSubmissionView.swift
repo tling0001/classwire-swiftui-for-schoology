@@ -110,7 +110,7 @@ struct SchoologyTeacherStudentSubmissionView: View {
             if let picture = profile?.pictureURL {
                 AuthenticatedSchoologyImage(url: picture)
                     .frame(width: 54, height: 54)
-                    .clipShape(Circle())
+                    .clipShape(RoundedRectangle(cornerRadius: 13))
             } else {
                 Image(systemName: "person.crop.circle.fill")
                     .font(.system(size: 48))

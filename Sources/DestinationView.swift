@@ -224,7 +224,7 @@ struct HomeView: View {
         HStack(spacing: 12) {
             if let user = session.user {
                 if let avatar = user.pictureURL {
-                    AuthenticatedSchoologyImage(url: avatar).frame(width: 48, height: 48).clipShape(Circle())
+                    AuthenticatedSchoologyImage(url: avatar).frame(width: 48, height: 48).clipShape(RoundedRectangle(cornerRadius: 12))
                 } else {
                     Image(systemName: "person.crop.circle.fill").font(.system(size: 42)).foregroundStyle(SchoologyStyle.blue)
                 }
@@ -300,7 +300,7 @@ private struct SchoologyActivityCard: View {
                 if let avatar = activity.avatarURL ?? (activity.authorID == session.auth?.userID ? session.user?.pictureURL : nil) {
                     AuthenticatedSchoologyImage(url: avatar)
                         .frame(width: 42, height: 42)
-                        .clipShape(Circle())
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
                 } else {
                     avatarPlaceholder
                 }

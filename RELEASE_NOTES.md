@@ -1,5 +1,18 @@
 # Release notes
 
+## [2026.10.0-port.68]
+
+### macOS three-pane layouts
+- Replace nested three-column NavigationSplitViews in course, group, and school profiles with a bounded sidebar, flexible full-width content pane, and bounded Upcoming pane.
+- Keep the middle pane flexible as the window grows instead of allowing nested split-view balancing to compress its content.
+
+### Profile images
+- Use rounded-square clipping for profile avatars in the homepage welcome area, activity posts, messages, comments, likes, people directory, and student submission header.
+
+### Build
+- Increment the iOS and macOS bundle build number to 68.
+
+
 ## [2026.10.0-port.67]
 
 ### Attachment downloads and media playback
