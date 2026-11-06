@@ -1,5 +1,16 @@
 # Release notes
 
+## [2026.10.0-port.69]
+
+### Post comments and OAuth reliability
+- Send shared activity-post comments and replies as JSON with a numeric `parent_id`, matching the Tauri implementation.
+- Retry once with a newly generated OAuth nonce and signature only when Schoology explicitly rejects a request for a duplicate timestamp/nonce replay.
+- Use the full unsigned 64-bit hexadecimal nonce range, matching the Tauri signer.
+
+### Build
+- Increment the iOS and macOS bundle build number to 69.
+
+
 ## [2026.10.0-port.68]
 
 ### macOS three-pane layouts

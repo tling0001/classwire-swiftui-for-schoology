@@ -549,7 +549,7 @@ actor SchoologyAPI {
         // Retain recent values so a collision cannot replay a nonce in-session.
         var nonce: String
         repeat {
-            nonce = String(UInt64.random(in: 0...UInt64(Int64.max)), radix: 16)
+            nonce = String(UInt64.random(in: UInt64.min...UInt64.max), radix: 16)
         } while recentOAuthNonces.contains(nonce)
 
         recentOAuthNonces.insert(nonce)
@@ -682,8 +682,12 @@ actor SchoologyAPI {
         var currentURL = url
         var currentMethod = method.uppercased()
         var currentBody = body
+        var redirectCount = 0
+        var replayRetryCount = 0
 
-        for redirectCount in 0...5 {
+        // Allow up to five same-host redirects plus one fresh-signature retry
+        // when Schoology explicitly rejects a timestamp/nonce pair as a replay.
+        for _ in 0...6 {
             var request = URLRequest(url: currentURL)
             request.httpMethod = currentMethod
             request.timeoutInterval = 45
@@ -718,11 +722,12 @@ actor SchoologyAPI {
             }
 
             if (300...399).contains(http.statusCode),
-               redirectCount < 5,
                let location = http.value(forHTTPHeaderField: "Location"),
                let nextURL = URL(string: location, relativeTo: currentURL)?.absoluteURL,
                nextURL.scheme?.lowercased() == "https",
-               nextURL.host?.caseInsensitiveCompare(apiHost) == .orderedSame {
+               nextURL.host?.caseInsensitiveCompare(apiHost) == .orderedSame,
+               redirectCount < 5 {
+                redirectCount += 1
                 if http.statusCode == 303 ||
                     ([301, 302, 307].contains(http.statusCode) && currentMethod != "GET" && currentMethod != "HEAD") {
                     if http.statusCode != 307 {
@@ -732,6 +737,21 @@ actor SchoologyAPI {
                 }
                 currentURL = nextURL
                 continue
+            }
+
+            if signed, replayRetryCount == 0, http.statusCode == 401 {
+                let responseText = String(decoding: data.prefix(1_200), as: UTF8.self)
+                    .lowercased()
+                let isReplayRejection =
+                    responseText.contains("duplicate timestamp/nonce combination") ||
+                    responseText.contains("possible replay attack")
+                if isReplayRejection {
+                    // The server rejected this request before processing it.
+                    // Rebuild the Authorization header on the next pass so both
+                    // oauth_nonce and oauth_signature are fresh.
+                    replayRetryCount += 1
+                    continue
+                }
             }
 
             try validate(response, data: data)
