@@ -1,5 +1,20 @@
 # Release notes
 
+## [2026.10.0-port.67]
+
+### Attachment downloads and media playback
+- Establish the authenticated Schoology web session before downloading attachments, forwarding its session cookies only to matching Schoology hosts during redirects.
+- Avoid forwarding Schoology account cookies to unrelated redirected file hosts.
+- Surface attachment HTTP failures and HTML sign-in responses with useful details instead of collapsing them into a generic invalid-response error.
+- Increase the attachment download ceiling to accommodate larger media files.
+
+### Documentation
+- Rewrite the README to reflect the implemented native SwiftUI features, platform targets, reference sources, accessibility approach, and current CI release process.
+
+### Build
+- Increment the iOS and macOS bundle build number to 67.
+
+
 ## [2026.10.0-port.66]
 
 ### Messages and profiles

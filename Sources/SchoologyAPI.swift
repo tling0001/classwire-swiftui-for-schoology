@@ -16,6 +16,7 @@ private final class NoRedirectDelegate: NSObject, URLSessionTaskDelegate, @unche
 enum SchoologyAPIError: LocalizedError {
     case invalidResponse
     case http(Int, String)
+    case attachment(String)
     case invalidToken
     case notSignedIn
 
@@ -23,6 +24,7 @@ enum SchoologyAPIError: LocalizedError {
         switch self {
         case .invalidResponse: "Schoology returned an invalid response."
         case .http(let code, let detail): "Schoology request failed (HTTP \(code)): \(detail)"
+        case .attachment(let detail): detail
         case .invalidToken: "Schoology did not return a valid access token."
         case .notSignedIn: "Please sign in to Schoology."
         }
@@ -450,7 +452,7 @@ actor SchoologyAPI {
     }
 
 
-    func attachmentData(_ url: URL, auth: SchoologyAuth) async throws -> (Data, String) {
+    func attachmentData(_ url: URL, auth: SchoologyAuth, cookies: [SchoologyWebCookie]) async throws -> (Data, String) {
         guard url.scheme?.lowercased() == "https", url.host != nil else { throw SchoologyAPIError.invalidResponse }
         let session = URLSession(configuration: .ephemeral)
         let redirectDelegate = NoRedirectDelegate()
@@ -463,7 +465,21 @@ actor SchoologyAPI {
             request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
             request.setValue("*/*", forHTTPHeaderField: "Accept")
             request.setValue("https://\(webHost)/", forHTTPHeaderField: "Referer")
-            request.setValue(mobileCookie, forHTTPHeaderField: "Cookie")
+            // Only forward Schoology session cookies to Schoology-owned hosts.
+            if let host = currentURL.host?.lowercased() {
+                let suffix = useCanadianServer ? "schoologyca.com" : "schoology.com"
+                let matchingCookies = cookies.filter { cookie in
+                    let domain = cookie.domain.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "."))
+                    let pathMatches = currentURL.path.hasPrefix(cookie.path.isEmpty ? "/" : cookie.path)
+                    return pathMatches && (host == domain || host.hasSuffix("." + domain)) &&
+                        (domain == suffix || domain.hasSuffix("." + suffix))
+                }
+                if host == suffix || host.hasSuffix("." + suffix) {
+                    let mobileValue = mobileCookie.split(separator: "=", maxSplits: 1).last.map(String.init) ?? ""
+                    let pairs = (["s_mobile=\(mobileValue)"] + matchingCookies.map { "\($0.name)=\($0.value)" })
+                    request.setValue(pairs.joined(separator: "; "), forHTTPHeaderField: "Cookie")
+                }
+            }
             if currentURL.host?.caseInsensitiveCompare(apiHost) == .orderedSame {
                 request.setValue("Android", forHTTPHeaderField: "X-Schoology-Client")
                 request.setValue("2026.10.0", forHTTPHeaderField: "X-Schoology-App-Version")
@@ -478,10 +494,19 @@ actor SchoologyAPI {
                 currentURL = nextURL
                 continue
             }
-            guard (200..<300).contains(http.statusCode), !data.isEmpty, data.count <= 50 * 1024 * 1024 else {
+            guard (200..<300).contains(http.statusCode) else {
+                let detail = String(decoding: data.prefix(600), as: UTF8.self)
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                throw SchoologyAPIError.http(http.statusCode, detail)
+            }
+            guard !data.isEmpty, data.count <= 100 * 1024 * 1024 else {
                 throw SchoologyAPIError.invalidResponse
             }
-            return (data, http.value(forHTTPHeaderField: "Content-Type") ?? "application/octet-stream")
+            let mimeType = http.value(forHTTPHeaderField: "Content-Type") ?? "application/octet-stream"
+            if mimeType.lowercased().contains("text/html") {
+                throw SchoologyAPIError.attachment("Schoology returned an HTML page instead of the attachment. The file session may have expired. Try signing in again.")
+            }
+            return (data, mimeType)
         }
         throw SchoologyAPIError.invalidResponse
     }

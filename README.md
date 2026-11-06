@@ -1,47 +1,103 @@
 # Schoology — Native SwiftUI
 
-A native SwiftUI port of Schoology for macOS, iOS and iPadOS.
+A native Schoology client for **macOS, iPhone, and iPad**, implemented with SwiftUI.
 
-## Reference sources
+## Reference implementations
 
-- Schoology Desktop Port `2026.10.0-port.28` for established desktop behavior, app navigation, and Tauri-host functionality.
-- Official Schoology Android `2026.10.0` source for API contracts, OAuth signing, Canadian environment configuration, and native login behavior.
+Schoology-specific behavior is grounded in the supplied source projects:
 
-Schoology-specific implementation is grounded in those supplied sources rather than unofficial web descriptions.
+- **Schoology Desktop Port `2026.10.0-port.28`** — desktop interaction patterns, navigation, attachment behavior, and established Tauri-host workflows.
+- **Official Schoology Android `2026.10.0` source** — API models and endpoints, OAuth request signing, cookie/session forwarding, resource-app imports, and native Schoology behavior.
+
+The app is a native SwiftUI implementation. It does not embed the Tauri renderer or use Electron.
 
 ## Platforms and identity
 
-- iOS / iPadOS deployment target: iOS 18+
-- macOS deployment target: macOS 15+
-- App display name: **Schoology**
-- Bundle identifier on both targets: `com.schoologytauri.app`
-- SwiftUI is the primary UI framework. Schoology content is requested through the native API client.
+| Platform | Minimum deployment target |
+| --- | --- |
+| iPhone and iPad | iOS 18 |
+| Mac | macOS 14 |
 
-## Current implementation
+- App name: **Schoology**
+- Bundle identifier: `com.schoologytauri.app` on iOS and macOS
+- Swift language mode: Swift 6
+- Native UI: SwiftUI, with platform frameworks such as WebKit and AVKit where appropriate
+- Credentials: stored in the platform Keychain
 
-- Native SwiftUI app targets for macOS and iOS/iPadOS.
-- Native sidebar navigation that collapses to the standard iPhone navigation stack; regular-width iPad and macOS retain a split sidebar/detail layout.
-- School search, username/email credential login, school SSO browser handoff, and QR-code login.
-- OAuth 1.0 HMAC-SHA1 signing and redirect handling aligned with the official Tauri implementation and Android request-signing behavior.
-- Canadian Schoology host and OAuth credentials, with the server choice persisted across launches.
-- OAuth credentials stored in the platform Keychain.
-- Home recent activity posts, course dashboard, upcoming events, Courses, and Groups.
-- Native appearance settings, system/light/dark theme support, and reduced-motion-aware shell transitions.
-- iOS and macOS app icons compiled from the app icon asset catalogs, with an iOS CI check for the exported primary-icon metadata generated from the asset catalog.
+## Implemented functionality
 
-This is an incremental native port. Messages, notifications, requests, resources, grades, calendar, course/group detail pages, assignment submission, PDF annotation, and push notifications remain to be ported.
+The project is an incremental native port. The following areas have native implementations in the current source:
 
-## Builds and releases
+### Sign-in and account
 
-GitHub Actions builds the native macOS app as a universal Apple Silicon/Intel Developer ID package, notarizes the app and DMG, and exports a signed iOS Ad Hoc IPA for registered devices. A versioned GitHub Release is published whenever at least one platform package succeeds.
+- School search and school selection.
+- Username/email and password sign-in.
+- School single-sign-on browser handoff and callback.
+- QR-code sign-in.
+- OAuth 1.0 HMAC-SHA1 request signing and token exchange.
+- Canadian Schoology environment selection.
+- Session restoration and authenticated Schoology web-session cookie retrieval.
 
-The release version is stored in `VERSION` as `2026.10.0-port.7`. Increment the `-port.N` value for each new port release and add a matching `## [version]` section to `RELEASE_NOTES.md`. The workflow uses the numeric marketing version and port number as the Apple bundle version/build number, while GitHub release tags retain the complete `-port.N` suffix.
+### Home and navigation
 
-The iOS update action opens Apple's `itms-services` installation flow for the Ad Hoc manifest. iOS requires a registered device and user confirmation; the app cannot silently replace itself. On macOS, Download Update opens the signed DMG for the user to install.
+- Adaptive native navigation: compact navigation on iPhone and split/sidebar layouts on regular-width iPad and macOS.
+- Home recent activity, course dashboard, and Upcoming.
+- Courses, groups, and school/person profile destinations.
+- System, light, and dark appearance settings.
+- Reduced-motion-aware app-shell transitions and native platform presentation behavior.
 
-## Apple signing configuration
+### Schoology content
 
-Required GitHub secrets/variables are:
+- Recent activity posts with author information, attachments, likes, and comments.
+- Native comment threads, replies, and like actions.
+- Course, group, school, and person profile views.
+- Course materials, nested folders, pages, and course applications.
+- Schoology Resources browsing, shared/group collections, and Resource Apps.
+- Resource App importing, including files and links returned through the Schoology mobile import flow.
+- Assignments, assignment details, submissions, teacher/student submission views, and grading.
+- Gradebook and overall-grade summaries, including supported teacher overrides.
+- Calendar, Upcoming events, discussions, and event details.
+- Messages with Inbox, Unread, and Sent folders, message details, attachments, and composing.
+- Notifications, notification preferences, and native push-notification registration support.
+
+### Attachments and media
+
+- Shared attachment actions for viewing and downloading.
+- Native document/image preview and export flows.
+- Schoology-converted PDF previews when conversion is available and appropriate for the file type.
+- Original-file downloads that retain the attachment's filename and extension.
+- Native AVKit playback UI for common audio and video formats supported by the operating system.
+- Authenticated attachment requests with Schoology session cookies and redirect handling.
+
+Actual playback depends on the file's encoding and the media codecs supported by the installed version of iOS or macOS. A listed container or extension does not guarantee that every codec will play.
+
+### Appearance and accessibility
+
+- System-aware light and dark appearance.
+- Native SwiftUI controls, navigation, sheets, and platform conventions.
+- Dynamic Type-friendly layouts and accessibility labels on interactive controls.
+- Reduced-motion-aware shell transitions.
+
+Some Schoology capabilities and specialized content types are not yet implemented. The presence of an area in this list does not imply that every Schoology endpoint, file format, or edge case is supported.
+
+## Build and release process
+
+GitHub Actions is responsible for building, signing, and packaging the app. Do not rely on local build output as a release artifact.
+
+- **macOS:** universal Apple Silicon/Intel app, Developer ID signing, notarization, and DMG packaging.
+- **iOS/iPadOS:** signed Ad Hoc IPA for registered devices.
+- A versioned GitHub Release is published when at least one platform package succeeds.
+
+The current release version is stored in `VERSION`. Increment the `-port.N` suffix for each release and add a matching section at the top of `RELEASE_NOTES.md`. The Xcode project configuration maps the numeric port value to the Apple build number while keeping the complete version in GitHub release tags.
+
+### Updating the app
+
+- **iOS/iPadOS:** the update action opens Apple's Ad Hoc installation flow using the release manifest. The device must be registered and the user must confirm installation; iOS does not permit an app to silently replace itself.
+- **macOS:** the update action opens the signed DMG for installation.
+
+## GitHub Actions signing configuration
+
+The release workflow expects the following repository secrets/variables:
 
 - `APPLE_TEAM_ID`
 - `APPSTORE_API_KEY_ID`
@@ -55,4 +111,13 @@ Required GitHub secrets/variables are:
 - `APPLE_ID`
 - `APPLE_APP_SPECIFIC_PASSWORD`
 
-Do not commit signing credentials, provisioning profiles, or private keys to the repository.
+Never commit signing credentials, private keys, provisioning profiles, or generated certificates to the repository.
+
+## Repository layout
+
+- `Sources/` — SwiftUI screens, Schoology models/API, session management, and platform integrations.
+- `Resources/Assets.xcassets/` — app icons and bundled image assets.
+- `Config/` — platform entitlements and generated Info.plist configuration.
+- `.github/workflows/build.yml` — signed CI build and release workflow.
+- `VERSION` — current port release version.
+- `RELEASE_NOTES.md` — user-facing release history.

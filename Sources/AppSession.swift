@@ -717,7 +717,9 @@ final class AppSession {
     func downloadAttachment(_ attachment: SchoologyAttachment, forViewing: Bool = false) async throws -> URL {
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         let sourceURL = forViewing ? (attachment.viewURL ?? attachment.url) : attachment.url
-        let (data, mimeType) = try await api.attachmentData(sourceURL, auth: auth)
+        // File downloads may require the authenticated web session from /v1/sessionstart.
+        let cookies = try await api.webSessionCookies(auth: auth)
+        let (data, mimeType) = try await api.attachmentData(sourceURL, auth: auth, cookies: cookies)
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("SchoologyAttachments", isDirectory: true)
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
