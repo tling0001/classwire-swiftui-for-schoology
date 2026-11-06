@@ -67,9 +67,11 @@ struct SchoologyUpdateComposerView: View {
             }
             .fileImporter(isPresented: $showingFileImporter, allowedContentTypes: [.item], allowsMultipleSelection: true, onCompletion: importFiles)
             .sheet(isPresented: $showingResourcePicker) {
-                SchoologyResourcePickerView { resourceID, title in
-                    resourceIDs.append(resourceID)
-                    attachmentNames.append(title)
+                SchoologyResourcePickerView { resources in
+                    for resource in resources where !resourceIDs.contains(resource.id) {
+                        resourceIDs.append(resource.id)
+                        attachmentNames.append(resource.title)
+                    }
                 }
             }
             .task {

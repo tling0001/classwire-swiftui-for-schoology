@@ -117,9 +117,10 @@ struct SchoologyAssignmentSubmissionComposerView: View {
             }
         }
         .sheet(isPresented: $showingResourcePicker) {
-            SchoologyResourcePickerView { resourceID, title in
-                guard selectedResources[resourceID] == nil else { return }
-                selectedResources[resourceID] = title
+            SchoologyResourcePickerView { resources in
+                for resource in resources where selectedResources[resource.id] == nil {
+                    selectedResources[resource.id] = resource.title
+                }
             }
         }
         .interactiveDismissDisabled(isSubmitting)

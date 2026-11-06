@@ -40,7 +40,7 @@ struct DestinationView: View {
             }
         }
         .toolbar {
-            if destination != .messages {
+            if destination != .messages && destination != .notifications {
                 ToolbarItem(placement: .primaryAction) {
                     Button {
                         Task {

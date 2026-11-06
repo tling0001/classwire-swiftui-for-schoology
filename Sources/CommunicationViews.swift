@@ -263,9 +263,16 @@ struct NotificationsView: View {
         .refreshable { await session.loadNotifications(force: true) }
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                Button("Refresh", systemImage: "arrow.clockwise") {
+                Button {
                     Task { await session.loadNotifications(force: true) }
+                } label: {
+                    if session.isLoadingNotifications {
+                        ProgressView().controlSize(.small)
+                    } else {
+                        Label("Refresh", systemImage: "arrow.clockwise")
+                    }
                 }
+                .accessibilityLabel("Refresh")
                 .disabled(session.isLoadingNotifications)
             }
         }

@@ -21,23 +21,33 @@ struct SchoologyProfileItem: Identifiable, Sendable {
     var fileName: String = ""
     var fileMIME: String = ""
     var documentType: String = ""
+    var folderColor: String = "blue"
+
+    var isFolder: Bool { kind.lowercased() == "folder" || documentType.lowercased() == "folder" }
 
     static func decodeList(_ value: Any?, keys: [String]) -> [Self] {
         SchoologyValue.list(value, keys: keys).enumerated().compactMap { index, item in
             let nestedPerson = (item["user"] as? [String: Any]) ?? (item["member"] as? [String: Any]) ?? (item["profile"] as? [String: Any])
             let person = nestedPerson ?? item
             let rawKind = SchoologyValue.string(item["template_type"] ?? item["templateType"] ?? item["type"] ?? item["assignment_type"] ?? item["assignmentType"] ?? item["document_type"] ?? item["documentType"] ?? (item["template"] as? [String: Any])?["template_document_type"] ?? (item["template_fields"] as? [String: Any])?["document_type"]).lowercased()
+            let templateFields = item["template_fields"] as? [String: Any] ?? item["templateFields"] as? [String: Any] ?? [:]
             let documentType = SchoologyValue.string(
                 item["document_type"] ?? item["documentType"] ??
                 item["template_document_type"] ?? item["templateDocumentType"] ??
                 (item["template"] as? [String: Any])?["template_document_type"] ??
-                (item["template_fields"] as? [String: Any])?["document_type"] ??
-                (item["template_fields"] as? [String: Any])?["documentType"]
+                templateFields["document_type"] ?? templateFields["documentType"] ??
+                templateFields["template_document_type"] ?? templateFields["templateDocumentType"]
+            ).lowercased()
+            let normalizedKind = documentType == "folder" ? "folder" : rawKind
+            let folderColor = SchoologyValue.string(
+                item["color"] ?? item["folder_color"] ?? item["folderColor"] ??
+                templateFields["color"] ?? templateFields["folder_color"] ?? templateFields["folderColor"],
+                fallback: "blue"
             ).lowercased()
             let rawID: Any?
             if nestedPerson != nil {
                 rawID = person["id"] ?? person["uid"] ?? person["user_id"] ?? item["user_id"] ?? item["userId"] ?? item["uid"] ?? item["id"]
-            } else if rawKind == "folder" {
+            } else if normalizedKind == "folder" {
                 rawID = item["id"] ?? item["folder_id"] ?? item["folderId"]
             } else if rawKind.contains("discussion") {
                 rawID = item["id"] ?? item["discussion_id"] ?? item["discussionId"] ??
@@ -75,7 +85,7 @@ struct SchoologyProfileItem: Identifiable, Sendable {
                 subtitle: SchoologyValue.string(roleText.isEmpty ? (item["due"] ?? item["due_date"] ?? item["dueDate"] ?? item["created"] ?? item["timestamp"] ?? item["photo_count"]) : roleText),
                 url: SchoologyValue.url(person["profile_url"] ?? person["profileUrl"] ?? item["link"] ?? item["url"] ?? item["web_url"] ?? item["webUrl"] ?? file["file_download_url"] ?? file["fileDownloadURL"] ?? file["download_path"] ?? file["downloadPath"] ?? item["file_download_url"] ?? item["download_path"] ?? item["photo_url"] ?? item["photoUrl"] ?? item["original_url"] ?? item["originalUrl"]),
                 isAdmin: isAdmin,
-                kind: rawKind,
+                kind: normalizedKind,
                 collectionID: SchoologyValue.optionalString(item["collection_id"] ?? item["collectionID"] ?? item["collectionId"]),
                 firstName: firstName, lastName: lastName, preferredName: preferredName,
                 pictureURL: SchoologyValue.url(person["picture_url"] ?? person["pictureUrl"] ?? person["picture"] ?? person["photo_url"] ?? person["photoUrl"]),
@@ -86,7 +96,8 @@ struct SchoologyProfileItem: Identifiable, Sendable {
                 fileViewURL: fileViewURL,
                 fileName: fileName,
                 fileMIME: fileMIME,
-                documentType: documentType
+                documentType: documentType,
+                folderColor: folderColor
             )
         }
     }

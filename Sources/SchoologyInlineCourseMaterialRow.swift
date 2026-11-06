@@ -14,7 +14,7 @@ struct SchoologyInlineCourseMaterialRow: View {
     @State private var loadError: String?
 
     var body: some View {
-        if item.kind.lowercased() == "folder" {
+        if item.isFolder {
             DisclosureGroup(isExpanded: $isExpanded) {
                 if isLoading {
                     HStack(spacing: 8) {
@@ -45,7 +45,7 @@ struct SchoologyInlineCourseMaterialRow: View {
             } label: {
                 HStack(alignment: .center, spacing: 9) {
                     Image(systemName: "folder.fill")
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(folderTint)
                         .frame(width: 20)
                         .accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: 3) {
@@ -88,6 +88,20 @@ struct SchoologyInlineCourseMaterialRow: View {
         }
     }
 
+
+    private var folderTint: Color {
+        switch item.folderColor {
+        case "black": .primary
+        case "gray": .gray
+        case "green": .green
+        case "orange": .orange
+        case "pink": .pink
+        case "purple": .purple
+        case "red": .red
+        case "yellow": .yellow
+        default: .blue
+        }
+    }
 
     private var isLinkMaterial: Bool {
         item.documentType == "link" || item.kind.lowercased().contains("link")

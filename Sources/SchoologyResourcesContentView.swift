@@ -64,7 +64,7 @@ struct SchoologyInlineResourceItemRow: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            if item.kind.lowercased() == "folder" {
+            if item.isFolder {
                 DisclosureGroup(isExpanded: $isExpanded) {
                     if isLoading {
                         HStack(spacing: 8) {
@@ -95,7 +95,7 @@ struct SchoologyInlineResourceItemRow: View {
                 } label: {
                     HStack(alignment: .center, spacing: 9) {
                         Image(systemName: "folder.fill")
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(folderTint)
                             .frame(width: 20)
                             .accessibilityHidden(true)
                         VStack(alignment: .leading, spacing: 3) {
@@ -150,6 +150,20 @@ struct SchoologyInlineResourceItemRow: View {
         .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
     }
 
+
+    private var folderTint: Color {
+        switch item.folderColor {
+        case "black": .primary
+        case "gray": .gray
+        case "green": .green
+        case "orange": .orange
+        case "pink": .pink
+        case "purple": .purple
+        case "red": .red
+        case "yellow": .yellow
+        default: .blue
+        }
+    }
 
     private var attachment: SchoologyAttachment? {
         guard let url = item.url ?? item.fileViewURL else { return nil }

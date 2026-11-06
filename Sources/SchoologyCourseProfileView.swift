@@ -112,22 +112,21 @@ struct SchoologyCourseProfileView: View {
     }
 
     private func wideLayout(width: CGFloat) -> some View {
-        HStack(spacing: 0) {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 10) {
-                    SchoologyProfileHeroImage(url: course.profileURL, fallbackSymbol: "book.closed.fill")
-                        .padding(.bottom, 4)
+        NavigationSplitView {
+            VStack(spacing: 0) {
+                SchoologyProfileHeroImage(url: course.profileURL, fallbackSymbol: "book.closed.fill")
+                    .padding(12)
+                List(selection: $tab) {
                     ForEach([SchoologyCourseTab.materials, .updates, .grades, .members, .courseApps]) { item in
-                        courseTabButton(item)
+                        Label(item.rawValue, systemImage: courseTabSymbol(item)).tag(item)
                     }
                 }
-                .padding(12)
-                .frame(maxWidth: .infinity, alignment: .topLeading)
+                .listStyle(.sidebar)
+                .scrollContentBackground(.hidden)
             }
-            .frame(width: max(190, width * 0.19))
             .background(.regularMaterial)
-
-            Divider()
+            .navigationSplitViewColumnWidth(min: 190, ideal: max(190, width * 0.19), max: 280)
+        } content: {
             VStack(spacing: 0) {
                 SchoologyProfileInfobox(title: course.title, subtitle: course.section.isEmpty ? nil : course.section,
                     schoolName: schoolName.isEmpty ? nil : schoolName, schoolID: schoolID,
@@ -143,8 +142,7 @@ struct SchoologyCourseProfileView: View {
                 currentContent
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-
-            Divider()
+        } detail: {
             VStack(alignment: .leading, spacing: 0) {
                 Text("Upcoming").font(.headline).padding(14)
                 Divider()
@@ -154,11 +152,13 @@ struct SchoologyCourseProfileView: View {
                         errorMessage: tabErrors[.upcoming], fallbackRealm: "sections", fallbackRealmID: course.id)
                         .padding(10)
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-            .frame(width: max(250, width * 0.2743))
             .background(.thinMaterial)
+            .navigationSplitViewColumnWidth(min: 250, ideal: max(250, width * 0.2743), max: 420)
             .task { await loadTab(.upcoming) }
         }
+        .navigationSplitViewStyle(.balanced)
     }
 
     private var currentContent: some View {
@@ -299,7 +299,7 @@ struct SchoologyCourseResourceFolderView: View {
 
     var body: some View {
         Group {
-            if item.kind == "folder" {
+            if item.isFolder {
                 List(children) { child in
                     SchoologyInlineCourseMaterialRow(courseID: courseID, item: child)
                 }
@@ -333,7 +333,7 @@ struct SchoologyCourseMaterialDestinationView: View {
 
     @ViewBuilder
     var body: some View {
-        if item.kind == "folder" {
+        if item.isFolder {
             SchoologyCourseResourceFolderView(courseID: courseID, item: item)
         } else if item.kind.lowercased() == "document" {
             Group {

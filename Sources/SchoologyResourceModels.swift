@@ -21,6 +21,11 @@ enum SchoologyResourceCategory: String, CaseIterable, Identifiable {
     }
 }
 
+struct SchoologyPickedResource: Identifiable, Hashable, Sendable {
+    let id: String
+    let title: String
+}
+
 struct SchoologyResourceCollection: Identifiable, Sendable {
     let id: String
     let title: String

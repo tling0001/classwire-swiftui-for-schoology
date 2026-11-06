@@ -28,8 +28,14 @@ struct SchoologyResourcesView: View {
                                             }
                                         } label: {
                                             HStack(spacing: 12) {
-                                                Image(systemName: item.category == .apps ? "square.grid.2x2" : item.typeID == "3" ? "book.closed" : "folder")
-                                                    .font(.title3).foregroundStyle(SchoologyStyle.blue).frame(width: 30)
+                                                if item.category == .apps, let imageURL = item.imageURL {
+                                                    AuthenticatedSchoologyImage(url: imageURL)
+                                                        .frame(width: 32, height: 32)
+                                                        .clipShape(RoundedRectangle(cornerRadius: 7))
+                                                } else {
+                                                    Image(systemName: item.category == .apps ? "app.fill" : item.typeID == "3" ? "book.closed" : "folder")
+                                                        .font(.title3).foregroundStyle(SchoologyStyle.blue).frame(width: 32)
+                                                }
                                                 VStack(alignment: .leading, spacing: 3) {
                                                     Text(item.title).foregroundStyle(.primary)
                                                     if item.sharedCount > 0 {
@@ -80,7 +86,7 @@ private struct SchoologyResourceAppLaunchView: View {
     var body: some View {
         Group {
             if let launchURL {
-                SchoologyEmbeddedWebView(url: launchURL, title: app.title, requiresWebSession: false)
+                SchoologyEmbeddedWebView(url: launchURL, title: app.title)
             } else if loading {
                 ProgressView("Opening \\(app.title)…").frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if let error {

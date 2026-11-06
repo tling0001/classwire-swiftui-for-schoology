@@ -290,6 +290,54 @@ actor SchoologyAPI {
         return destination
     }
 
+    func importResourceApp(url: URL, auth: SchoologyAuth, cookies: [SchoologyWebCookie]) async throws -> [SchoologyPickedResource] {
+        guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+              components.scheme?.lowercased() == "https",
+              components.host?.caseInsensitiveCompare(webHost) == .orderedSame,
+              components.path.contains("/content_app/import"),
+              components.user == nil, components.password == nil else {
+            throw SchoologyAPIError.invalidResponse
+        }
+        if !(components.queryItems ?? []).contains(where: { $0.name == "mobile" }) {
+            components.queryItems = (components.queryItems ?? []) + [URLQueryItem(name: "mobile", value: "1")]
+        }
+        guard let importURL = components.url else { throw SchoologyAPIError.invalidResponse }
+        await syncServerTime()
+        let validCookies = cookies.filter { cookie in
+            let domain = cookie.domain.trimmingCharacters(in: CharacterSet(charactersIn: ".")).lowercased()
+            return webHost.lowercased() == domain || webHost.lowercased().hasSuffix("." + domain)
+        }
+        let cookieHeader = ([mobileCookie] + validCookies.map { "\($0.name)=\($0.value)" }).joined(separator: "; ")
+        let data = try await send(
+            url: importURL, method: "GET", body: nil, auth: auth, signed: true, extra: [],
+            clientIdentity: false, cookieHeader: cookieHeader
+        )
+        let root = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] ?? [:]
+        let payload = (root["data"] as? [String: Any]) ?? (root["response"] as? [String: Any]) ?? root
+        let imports = payload["imports"] as? [[String: Any]] ?? []
+        var result: [SchoologyPickedResource] = []
+        for imported in imports {
+            let attachment = imported["attachment"] as? [String: Any] ?? [:]
+            let files = attachment["files"] as? [String: Any] ?? [:]
+            for file in (files["file"] as? [[String: Any]] ?? []) {
+                let id = SchoologyValue.string(file["id"])
+                guard !id.isEmpty else { continue }
+                result.append(SchoologyPickedResource(
+                    id: id, title: SchoologyValue.string(file["title"] ?? file["filename"], fallback: "Imported file")
+                ))
+            }
+            let links = attachment["links"] as? [String: Any] ?? [:]
+            for link in (links["link"] as? [[String: Any]] ?? []) {
+                let id = SchoologyValue.string(link["id"])
+                guard !id.isEmpty else { continue }
+                result.append(SchoologyPickedResource(
+                    id: id, title: SchoologyValue.string(link["title"], fallback: "Imported link")
+                ))
+            }
+        }
+        return result
+    }
+
     func post(_ path: String, auth: SchoologyAuth) async throws -> Data {
         try await post(path, auth: auth, params: [:])
     }
@@ -596,7 +644,8 @@ actor SchoologyAPI {
         signed: Bool,
         extra: [(String, String)],
         clientIdentity: Bool = true,
-        contentType: String = "application/x-www-form-urlencoded"
+        contentType: String = "application/x-www-form-urlencoded",
+        cookieHeader: String? = nil
     ) async throws -> Data {
         // Schoology can redirect API requests. Match the Tauri host's behavior:
         // disable automatic redirect replay and create a fresh OAuth signature for
@@ -623,6 +672,9 @@ actor SchoologyAPI {
             }
             if auth != nil && isAPIHost {
                 request.setValue(mobileCookie, forHTTPHeaderField: "Cookie")
+            }
+            if let cookieHeader, !cookieHeader.isEmpty {
+                request.setValue(cookieHeader, forHTTPHeaderField: "Cookie")
             }
             if let currentBody {
                 request.httpBody = currentBody.data(using: .utf8)

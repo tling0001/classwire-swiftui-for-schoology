@@ -89,7 +89,12 @@ struct SchoologyHomeCreateComposerView: View {
             }
             .fileImporter(isPresented: $showingFileImporter, allowedContentTypes: [.item], allowsMultipleSelection: true, onCompletion: importFiles)
             .sheet(isPresented: $showingResourcePicker) {
-                SchoologyResourcePickerView { id, name in resourceIDs.append(id); attachmentNames.append(name) }
+                SchoologyResourcePickerView { resources in
+                    for resource in resources where !resourceIDs.contains(resource.id) {
+                        resourceIDs.append(resource.id)
+                        attachmentNames.append(resource.title)
+                    }
+                }
             }
             .task { if selectedDestinationID.isEmpty { selectedDestinationID = eligible.first?.id ?? "" } }
             .interactiveDismissDisabled(isSubmitting || isUploading)

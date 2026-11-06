@@ -393,6 +393,12 @@ final class AppSession {
         return try await api.launchResourceApp(appID: app.id, auth: auth)
     }
 
+    func importResourceAppItems(from url: URL) async throws -> [SchoologyPickedResource] {
+        guard let auth else { throw SchoologyAPIError.notSignedIn }
+        let cookies = try await loadWebSessionCookies()
+        return try await api.importResourceApp(url: url, auth: auth, cookies: cookies)
+    }
+
     func loadPeopleDirectory() async throws -> [SchoologyProfileItem] {
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         do {

@@ -524,6 +524,7 @@ struct SchoologyEmbeddedWebView: View {
     let url: URL
     let title: String
     var requiresWebSession = true
+    var onResourceImport: ((URL) -> Void)? = nil
     @State private var cookies: [SchoologyWebCookie] = []
     @State private var loading = true
     @State private var error: String?
@@ -533,7 +534,7 @@ struct SchoologyEmbeddedWebView: View {
             if loading { ProgressView("Preparing secure Schoology session…").frame(maxWidth: .infinity, maxHeight: .infinity) }
             else if let error { ContentUnavailableView("Unable to open Schoology", systemImage: "exclamationmark.triangle", description: Text(error)) }
             else {
-                SchoologyCookieWebView(url: url, cookies: cookies)
+                SchoologyCookieWebView(url: url, cookies: cookies, onResourceImport: onResourceImport)
             }
         }
         .navigationTitle(title)
@@ -552,11 +553,13 @@ import UIKit
 struct SchoologyCookieWebView: UIViewRepresentable {
     let url: URL
     let cookies: [SchoologyWebCookie]
+    var onResourceImport: ((URL) -> Void)? = nil
     func makeCoordinator() -> Coordinator { Coordinator() }
     func makeUIView(context: Context) -> WKWebView {
         let configuration = WKWebViewConfiguration()
         configuration.preferences.javaScriptCanOpenWindowsAutomatically = true
         let view = WKWebView(frame: .zero, configuration: configuration)
+        context.coordinator.onResourceImport = onResourceImport
         view.navigationDelegate = context.coordinator
         view.uiDelegate = context.coordinator
         view.allowsBackForwardNavigationGestures = true
@@ -569,8 +572,20 @@ struct SchoologyCookieWebView: UIViewRepresentable {
         }
         return view
     }
-    func updateUIView(_ view: WKWebView, context: Context) {}
+    func updateUIView(_ view: WKWebView, context: Context) {
+        context.coordinator.onResourceImport = onResourceImport
+    }
     final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
+        var onResourceImport: ((URL) -> Void)?
+        func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+            if let url = navigationAction.request.url, url.path.contains("/content_app/import"),
+               let onResourceImport {
+                onResourceImport(url)
+                decisionHandler(.cancel)
+            } else {
+                decisionHandler(.allow)
+            }
+        }
         func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration, for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
             guard navigationAction.targetFrame == nil else { return nil }
             webView.load(navigationAction.request)
@@ -583,11 +598,13 @@ import AppKit
 struct SchoologyCookieWebView: NSViewRepresentable {
     let url: URL
     let cookies: [SchoologyWebCookie]
+    var onResourceImport: ((URL) -> Void)? = nil
     func makeCoordinator() -> Coordinator { Coordinator() }
     func makeNSView(context: Context) -> WKWebView {
         let configuration = WKWebViewConfiguration()
         configuration.preferences.javaScriptCanOpenWindowsAutomatically = true
         let view = WKWebView(frame: .zero, configuration: configuration)
+        context.coordinator.onResourceImport = onResourceImport
         view.navigationDelegate = context.coordinator
         view.uiDelegate = context.coordinator
         view.allowsBackForwardNavigationGestures = true
@@ -600,8 +617,20 @@ struct SchoologyCookieWebView: NSViewRepresentable {
         }
         return view
     }
-    func updateNSView(_ view: WKWebView, context: Context) {}
+    func updateNSView(_ view: WKWebView, context: Context) {
+        context.coordinator.onResourceImport = onResourceImport
+    }
     final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
+        var onResourceImport: ((URL) -> Void)?
+        func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+            if let url = navigationAction.request.url, url.path.contains("/content_app/import"),
+               let onResourceImport {
+                onResourceImport(url)
+                decisionHandler(.cancel)
+            } else {
+                decisionHandler(.allow)
+            }
+        }
         func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration, for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
             guard navigationAction.targetFrame == nil else { return nil }
             webView.load(navigationAction.request)

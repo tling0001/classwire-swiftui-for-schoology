@@ -72,15 +72,21 @@ struct GroupProfileView: View {
     private func groupLayout(_ profile: SchoologyGroupProfile) -> some View {
         GeometryReader { proxy in
             if proxy.size.width >= 900 {
-                HStack(spacing: 0) {
-                    VStack(alignment: .leading, spacing: 12) {
+                NavigationSplitView {
+                    VStack(spacing: 0) {
                         SchoologyProfileHeroImage(url: profile.group.pictureURL, fallbackSymbol: "person.3.fill")
-                            .padding(.bottom, 4)
-                        ForEach([ProfileTab.updates,.members,.upcoming,.discussions,.albums,.resources]) { item in tabButton(item) }
-                        Spacer()
+                            .padding(12)
+                        List(selection: $tab) {
+                            ForEach([ProfileTab.updates, .members, .upcoming, .discussions, .albums, .resources]) { item in
+                                Label(item.rawValue, systemImage: item.symbol).tag(item)
+                            }
+                        }
+                        .listStyle(.sidebar)
+                        .scrollContentBackground(.hidden)
                     }
-                    .padding(14).frame(width: max(176, proxy.size.width * 0.19), alignment: .topLeading).background(.regularMaterial)
-                    Divider()
+                    .background(.regularMaterial)
+                    .navigationSplitViewColumnWidth(min: 176, ideal: max(176, proxy.size.width * 0.19), max: 280)
+                } content: {
                     VStack(spacing: 0) {
                         SchoologyProfileInfobox(title: profile.group.title,
                             schoolName: schoolName.isEmpty ? nil : schoolName, schoolID: profile.group.schoolID,
@@ -88,8 +94,8 @@ struct GroupProfileView: View {
                             .padding(14)
                         groupContent(profile)
                     }
-                    .frame(maxWidth: .infinity)
-                    Divider()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } detail: {
                     VStack(alignment: .leading, spacing: 0) {
                         Text("Upcoming").font(.headline).padding(14)
                         Divider()
@@ -99,11 +105,13 @@ struct GroupProfileView: View {
                                 errorMessage: tabErrors[.upcoming], fallbackRealm: "groups", fallbackRealmID: group.id)
                                 .padding(10)
                         }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
-                    .frame(width: max(250, proxy.size.width * 0.2743))
                     .background(.thinMaterial)
+                    .navigationSplitViewColumnWidth(min: 250, ideal: max(250, proxy.size.width * 0.2743), max: 420)
                     .task(id: isLoading) { if !isLoading { await loadTab(.upcoming) } }
                 }
+                .navigationSplitViewStyle(.balanced)
             } else {
                 VStack(spacing: 0) {
                     SchoologyProfileInfobox(title: profile.group.title,
@@ -112,7 +120,7 @@ struct GroupProfileView: View {
                         .padding(.horizontal)
                         .padding(.top, 12)
                     Picker("Group section", selection: $tab) {
-                        ForEach([ProfileTab.updates,.members,.upcoming,.discussions,.albums,.resources]) { Text($0.rawValue).tag($0) }
+                        ForEach([ProfileTab.updates, .members, .upcoming, .discussions, .albums, .resources]) { Text($0.rawValue).tag($0) }
                     }.schoologyNavigationTabPickerStyle().padding()
                     groupContent(profile)
                 }
@@ -307,12 +315,19 @@ struct SchoolProfileView: View {
         .navigationTitle(profile?.school.title ?? "School")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                Button("Refresh", systemImage: "arrow.clockwise") {
+                Button {
                     Task {
                         if profile == nil { await load() }
                         else { await loadTab(tab, force: true) }
                     }
+                } label: {
+                    if isLoading || loadingTabs.contains(tab) {
+                        ProgressView().controlSize(.small)
+                    } else {
+                        Label("Refresh", systemImage: "arrow.clockwise")
+                    }
                 }
+                .accessibilityLabel("Refresh")
                 .disabled(isLoading || loadingTabs.contains(tab))
             }
         }
@@ -326,21 +341,21 @@ struct SchoolProfileView: View {
     private func schoolLayout(_ profile: SchoologySchoolProfile) -> some View {
         GeometryReader { proxy in
             if proxy.size.width >= 900 {
-                HStack(spacing: 0) {
-                    VStack(alignment: .leading, spacing: 12) {
+                NavigationSplitView {
+                    VStack(spacing: 0) {
                         SchoologyProfileHeroImage(url: profile.school.pictureURL, fallbackSymbol: "building.2.crop.circle")
-                            .padding(.bottom, 4)
-                        ForEach([ProfileTab.updates, .info, .upcoming, .resources, .discussions]) { item in
-                            tabButton(item)
+                            .padding(12)
+                        List(selection: $tab) {
+                            ForEach([ProfileTab.updates, .info, .upcoming, .resources, .discussions]) { item in
+                                Label(item.rawValue, systemImage: item.symbol).tag(item)
+                            }
                         }
-                        Spacer()
+                        .listStyle(.sidebar)
+                        .scrollContentBackground(.hidden)
                     }
-                    .padding(14)
-                    .frame(width: max(176, proxy.size.width * 0.19), alignment: .topLeading)
                     .background(.regularMaterial)
-
-                    Divider()
-
+                    .navigationSplitViewColumnWidth(min: 176, ideal: max(176, proxy.size.width * 0.19), max: 280)
+                } content: {
                     VStack(spacing: 0) {
                         SchoologyProfileInfobox(
                             title: profile.school.title,
@@ -353,9 +368,7 @@ struct SchoolProfileView: View {
                         schoolContent(profile)
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-
-                    Divider()
-
+                } detail: {
                     VStack(alignment: .leading, spacing: 0) {
                         Text("Upcoming").font(.headline).padding(14)
                         Divider()
@@ -372,13 +385,14 @@ struct SchoolProfileView: View {
                         }
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
-                    .frame(width: max(250, proxy.size.width * 0.2743))
                     .background(.thinMaterial)
+                    .navigationSplitViewColumnWidth(min: 250, ideal: max(250, proxy.size.width * 0.2743), max: 420)
                     .task(id: initialTabLoaded) {
                         guard initialTabLoaded else { return }
                         await loadTab(.upcoming)
                     }
                 }
+                .navigationSplitViewStyle(.balanced)
             } else {
                 VStack(spacing: 0) {
                     SchoologyProfileInfobox(

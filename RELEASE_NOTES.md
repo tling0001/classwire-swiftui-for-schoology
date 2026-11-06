@@ -1,5 +1,22 @@
 # Release notes
 
+## [2026.10.0-port.65]
+
+### Resources and resource apps
+- Correctly recognize root-level parent folders from Schoology document metadata so folders expand recursively inline.
+- Keep native SwiftUI folder symbols while applying the folder colors returned by Schoology.
+- Display resource-app logos from the Schoology app-logo field.
+- Reorganize the resource attachment picker into the same My Resources, Shared, Groups, and Resource Apps categories as the standalone Resources page.
+- Support importing files and links from inside resource apps using the Android app's `/content_app/import?mobile=1` flow, authenticated with the current Schoology session.
+
+### Navigation and refresh
+- Use native SwiftUI sidebar-style Lists with selection for wide course, group, and school profile layouts.
+- Show the school profile reload spinner while its selected tab is refreshing.
+- Remove the duplicate notifications toolbar reload action and keep the spinner-aware refresh control.
+
+### Build
+- Increment the iOS and macOS bundle build number to 65.
+
 ## [2026.10.0-port.64]
 
 ### Refresh controls
