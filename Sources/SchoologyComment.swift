@@ -26,6 +26,13 @@ struct SchoologyComment: Identifiable, Sendable {
                 (item["creator"] as? [String: Any]) ??
                 (item["created_by"] as? [String: Any]) ??
                 (item["createdBy"] as? [String: Any]) ??
+                (item["commenter"] as? [String: Any]) ??
+                (item["user_info"] as? [String: Any]) ??
+                (item["userInfo"] as? [String: Any]) ??
+                (item["author_info"] as? [String: Any]) ??
+                (item["authorInfo"] as? [String: Any]) ??
+                (item["creator_profile"] as? [String: Any]) ??
+                (item["creatorProfile"] as? [String: Any]) ??
                 (item["user_profile"] as? [String: Any]) ??
                 (item["userProfile"] as? [String: Any]) ?? [:]
             let links = item["links"] as? [String: Any] ?? [:]
@@ -41,6 +48,8 @@ struct SchoologyComment: Identifiable, Sendable {
                 item["commenter_id"] ?? item["commenterId"] ??
                 item["creater_id"] ?? item["creator_id"] ?? item["creatorId"] ??
                 (item["created_by"] as? String) ?? (item["createdBy"] as? String) ??
+                (item["created_by"] as? [String: Any])?["id"] ??
+                (item["createdBy"] as? [String: Any])?["id"] ??
                 item["author_id"] ?? item["authorId"] ?? linkedAuthorID
             )
             let first = SchoologyValue.string(person["name_first"] ?? person["first_name"] ?? item["name_first"] ?? item["first_name"])
@@ -59,6 +68,16 @@ struct SchoologyComment: Identifiable, Sendable {
                 ? [first, last].filter { !$0.isEmpty }.joined(separator: " ")
                 : rawAuthorName
             let rawAttachments = item["attachments"] ?? item["attachment"] ?? item["files"]
+            let rawBody = item["body"] ?? item["comment"] ?? item["message"]
+            let bodyObject = rawBody as? [String: Any]
+            let body = SchoologyValue.string(
+                bodyObject?["description"] ?? bodyObject?["body"] ?? bodyObject?["text"] ?? rawBody
+            )
+            let status = item["status"]
+            let statusString = (status as? String)?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            let statusIsDeleted = (status as? NSNumber).map { $0.intValue == 0 } ??
+                ["0", "deleted", "removed"].contains(statusString ?? "")
+            let isDeleted = SchoologyValue.bool(item["deleted"] ?? item["is_deleted"] ?? item["isDeleted"]) || statusIsDeleted
             let attachments = SchoologyValue.list(
                 rawAttachments,
                 keys: ["files", "file", "links", "link", "attachment", "attachments", "items", "data"]
@@ -90,11 +109,11 @@ struct SchoologyComment: Identifiable, Sendable {
                     item["picture_url"] ?? item["pictureUrl"] ?? item["user_photo"] ??
                     item["avatar_url"] ?? item["avatarUrl"] ?? item["photo_url"] ?? item["photoUrl"]
                 ),
-                body: SchoologyValue.string(item["body"] ?? item["comment"] ?? item["message"]),
+                body: body,
                 created: SchoologyValue.string(item["created"] ?? item["timestamp"] ?? item["last_updated"] ?? item["lastUpdated"]),
                 likes: SchoologyValue.integer(item["likes"] ?? item["like_count"] ?? item["likeCount"]),
                 isLiked: liked,
-                isDeleted: SchoologyValue.integer(item["status"] ?? 1) == 0,
+                isDeleted: isDeleted,
                 attachments: attachments
             )
         }

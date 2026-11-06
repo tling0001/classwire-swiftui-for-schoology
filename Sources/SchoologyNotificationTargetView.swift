@@ -15,6 +15,12 @@ struct SchoologyNotificationTargetView: View {
                 SchoologyDiscussionDetailView(realm: realm, realmID: realmID, itemID: targetID, title: argument.title)
             } else if type == "event", !realm.isEmpty, !realmID.isEmpty {
                 SchoologyEventDetailView(realm: realm, realmID: realmID, eventID: targetID, title: argument.title)
+            } else if type == "document", !realm.isEmpty, !realmID.isEmpty {
+                SchoologyNotificationDocumentView(
+                    realmID: realmID, documentID: targetID,
+                    title: argument.title, documentType: argument.documentType,
+                    fallbackURL: argument.url
+                )
             } else if type == "user" {
                 if notification.type == "badge_award", let currentUserID = session.auth?.userID {
                     SchoologyPersonProfileView(userID: currentUserID)

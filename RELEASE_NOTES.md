@@ -1,5 +1,36 @@
 # Release notes
 
+## [2026.10.0-port.63]
+
+### Assignment submissions
+- Match the Upload Submission toolbar action's Submit label and paper-plane icon to the Create Text Submission dialog.
+
+### Course Materials and Resources
+- Restore comfortable vertical padding around folder titles and multiline descriptions.
+- Give link materials a link icon and open their destinations through the system browser.
+
+### Calendar and assignment layouts
+- Match the port.28 assignment information/submissions split at 17:7.
+- Match the port.28 calendar month/events split at 40:60 on wide screens.
+- Keep the calendar at the top on narrow layouts and anchor selected-day content to the top; make the wide events pane independently scrollable.
+
+### Shared comments
+- Preserve rich text and Dynamic Type sizing in comment bodies.
+- Keep the Liquid Glass action bar content-sized instead of stretching it across the comment card.
+- Hydrate missing author names and avatars for assignment and discussion comments using the same user-profile lookup as post comments.
+- Correct deleted-comment status parsing so ordinary string statuses do not hide Reply actions.
+
+### School profiles
+- Load school details first, then fetch updates and upcoming content separately.
+- Load resources and discussions only when their tabs are opened, retain loaded tab data when switching, and support per-tab refresh/error/loading states.
+
+### Notifications
+- Resolve related document items through their owning Schoology realm and show the native attachment view/download actions or open link destinations in the browser.
+- Handle file, link, and external-tool document attachment URLs instead of routing document IDs to an invalid webview URL.
+
+### Build
+- Increment the iOS and macOS bundle build number to 63.
+
 ## [2026.10.0-port.62]
 
 ### Discussion routing

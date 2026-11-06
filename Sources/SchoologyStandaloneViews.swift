@@ -288,35 +288,36 @@ struct SchoologyCalendarView: View {
 
     private var calendarContent: some View {
         GeometryReader { proxy in
-            if proxy.size.width >= 900 {
+            if proxy.size.width >= 801 {
+                let splitWidth = max(0, proxy.size.width - 1)
                 HStack(spacing: 0) {
                     ScrollView {
                         monthCalendarContent
                             .padding(16)
-                            .frame(maxWidth: 760)
-                            .frame(maxWidth: .infinity)
+                            .frame(maxWidth: .infinity, alignment: .topLeading)
                     }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .frame(width: splitWidth * 0.4, maxHeight: .infinity)
 
                     Divider()
 
                     ScrollView {
                         selectedDayContent
                             .padding(16)
+                            .frame(maxWidth: .infinity, alignment: .topLeading)
                     }
-                    .frame(width: max(320, proxy.size.width * 0.36))
-                    .frame(maxHeight: .infinity)
+                    .frame(width: splitWidth * 0.6, maxHeight: .infinity)
                 }
             } else {
                 ScrollView {
-                    VStack(spacing: 16) {
+                    VStack(alignment: .leading, spacing: 16) {
                         monthCalendarContent
+                            .frame(maxWidth: .infinity, alignment: .topLeading)
                         Divider()
                         selectedDayContent
+                            .frame(maxWidth: .infinity, alignment: .topLeading)
                     }
                     .padding()
-                    .frame(maxWidth: 900)
-                    .frame(maxWidth: .infinity)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 }
             }
         }
@@ -391,7 +392,7 @@ struct SchoologyCalendarView: View {
             isLoading: session.isLoadingCalendar && session.calendarMonthEvents.isEmpty,
             errorMessage: session.calendarError
         )
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
     private func events(on day: Date) -> [SchoologyUpcomingEvent] {

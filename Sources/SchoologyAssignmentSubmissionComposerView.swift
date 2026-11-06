@@ -102,7 +102,7 @@ struct SchoologyAssignmentSubmissionComposerView: View {
                     if submissionCreated {
                         Button("Done") { dismiss() }
                     } else {
-                        Button("Submit") { Task { await submit() } }.disabled(!hasAttachments || isSubmitting)
+                        Button("Submit", systemImage: "paperplane.fill") { Task { await submit() } }.disabled(!hasAttachments || isSubmitting)
                     }
                 }
             }

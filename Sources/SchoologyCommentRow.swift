@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SchoologyCommentRow: View {
     @Environment(AppSession.self) private var session
+    @ScaledMetric(relativeTo: .body) private var richTextMinimumFontSize: CGFloat = 15.5
     let comment: SchoologyComment
     let updateID: String
     let onReply: (String) -> Void
@@ -64,7 +65,7 @@ struct SchoologyCommentRow: View {
                     .font(.body)
                     .foregroundStyle(.secondary)
             } else {
-                SchoologyRichTextText(comment.body)
+                SchoologyRichTextText(comment.body, minimumFontSize: richTextMinimumFontSize)
                     .font(.body)
                     .textSelection(.enabled)
             }
@@ -91,7 +92,6 @@ struct SchoologyCommentRow: View {
                         Label("\(likeCount)", systemImage: "hand.thumbsup")
                     }
                 }
-                Spacer()
             }
             .font(.caption)
             .buttonStyle(.plain)
@@ -99,6 +99,7 @@ struct SchoologyCommentRow: View {
             .padding(.horizontal, 10)
             .padding(.vertical, 7)
             .schoologyGlassSurface()
+            .fixedSize(horizontal: true, vertical: false)
             .frame(maxWidth: .infinity, alignment: .leading)
 
             if let errorMessage {

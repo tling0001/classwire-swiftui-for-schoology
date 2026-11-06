@@ -111,12 +111,20 @@ struct SchoologyInlineResourceItemRow: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.vertical, 8)
                     .contentShape(Rectangle())
                 }
                 .animation(reduceMotion ? nil : .snappy(duration: 0.24), value: isExpanded)
                 .onChange(of: isExpanded) { _, expanded in
                     guard expanded, children == nil, !isLoading else { return }
                     Task { await loadChildren() }
+                }
+            } else if (item.documentType == "link" || item.kind.lowercased().contains("link")),
+                      let url = item.url ?? item.fileViewURL {
+                Link(destination: url) {
+                    Label(item.title, systemImage: "link")
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .contentShape(Rectangle())
                 }
             } else if let attachment {
                 SchoologyAttachmentPreviewButton(attachment: attachment)
@@ -159,7 +167,7 @@ struct SchoologyInlineResourceItemRow: View {
 
     private var resourceSymbol: String {
         let kind = item.kind.lowercased()
-        if kind.contains("link") || item.url?.host != nil { return "link" }
+        if item.documentType == "link" || kind.contains("link") { return "link" }
         if kind.contains("page") { return "doc.text" }
         if kind.contains("assessment") || kind.contains("quiz") { return "checklist" }
         if kind.contains("discussion") { return "text.bubble" }

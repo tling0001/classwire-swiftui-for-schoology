@@ -15,7 +15,12 @@ struct SchoologyNotificationArgument: Identifiable, Hashable, Sendable {
         case "assessment", "assessment_v2", "managed_assessment": "doc.text.magnifyingglass"
         case "discussion": "text.bubble"
         case "event": "calendar"
-        case "document": "doc"
+        case "document":
+            switch documentType {
+            case "link", "embed": "link"
+            case "external_tool": "app"
+            default: "doc"
+            }
         case "page": "doc.richtext"
         case "user": "person"
         case "group": "person.3"

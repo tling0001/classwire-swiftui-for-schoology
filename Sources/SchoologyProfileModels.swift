@@ -20,12 +20,20 @@ struct SchoologyProfileItem: Identifiable, Sendable {
     var fileViewURL: URL? = nil
     var fileName: String = ""
     var fileMIME: String = ""
+    var documentType: String = ""
 
     static func decodeList(_ value: Any?, keys: [String]) -> [Self] {
         SchoologyValue.list(value, keys: keys).enumerated().compactMap { index, item in
             let nestedPerson = (item["user"] as? [String: Any]) ?? (item["member"] as? [String: Any]) ?? (item["profile"] as? [String: Any])
             let person = nestedPerson ?? item
             let rawKind = SchoologyValue.string(item["template_type"] ?? item["templateType"] ?? item["type"] ?? item["assignment_type"] ?? item["assignmentType"] ?? item["document_type"] ?? item["documentType"] ?? (item["template"] as? [String: Any])?["template_document_type"] ?? (item["template_fields"] as? [String: Any])?["document_type"]).lowercased()
+            let documentType = SchoologyValue.string(
+                item["document_type"] ?? item["documentType"] ??
+                item["template_document_type"] ?? item["templateDocumentType"] ??
+                (item["template"] as? [String: Any])?["template_document_type"] ??
+                (item["template_fields"] as? [String: Any])?["document_type"] ??
+                (item["template_fields"] as? [String: Any])?["documentType"]
+            ).lowercased()
             let rawID: Any?
             if nestedPerson != nil {
                 rawID = person["id"] ?? person["uid"] ?? person["user_id"] ?? item["user_id"] ?? item["userId"] ?? item["uid"] ?? item["id"]
@@ -77,7 +85,8 @@ struct SchoologyProfileItem: Identifiable, Sendable {
                 schoolName: SchoologyValue.string(person["school_name"] ?? person["schoolName"] ?? school["school_name"] ?? school["name"] ?? school["title"]),
                 fileViewURL: fileViewURL,
                 fileName: fileName,
-                fileMIME: fileMIME
+                fileMIME: fileMIME,
+                documentType: documentType
             )
         }
     }

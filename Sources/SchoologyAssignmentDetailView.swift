@@ -24,12 +24,13 @@ struct SchoologyAssignmentDetailView: View {
             } else if let context {
                 GeometryReader { geometry in
                     if geometry.size.width >= 801 && context.canSubmit {
+                        let splitWidth = max(0, geometry.size.width - 1)
                         HStack(spacing: 0) {
                             assignmentTabs(context: context, includeSubmission: false)
-                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                .frame(width: splitWidth * (17.0 / 24.0), maxHeight: .infinity)
                             Divider()
                             submissionPane(context: context)
-                                .frame(minWidth: 300, idealWidth: 390, maxWidth: .infinity, maxHeight: .infinity)
+                                .frame(width: splitWidth * (7.0 / 24.0), maxHeight: .infinity)
                         }
                         .onAppear {
                             if selectedTab == .submissions { selectedTab = .info }

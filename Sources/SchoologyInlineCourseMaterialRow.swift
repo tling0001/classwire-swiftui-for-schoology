@@ -61,6 +61,7 @@ struct SchoologyInlineCourseMaterialRow: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.vertical, 8)
                 .contentShape(Rectangle())
             }
             .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
@@ -69,6 +70,9 @@ struct SchoologyInlineCourseMaterialRow: View {
                 guard expanded, children == nil, !isLoading else { return }
                 Task { await loadChildren() }
             }
+        } else if isLinkMaterial {
+            SchoologyCourseMaterialLinkRow(courseID: courseID, item: item)
+                .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
         } else if isFileMaterial {
             SchoologyCourseMaterialFileRow(courseID: courseID, item: item)
                 .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
@@ -85,6 +89,10 @@ struct SchoologyInlineCourseMaterialRow: View {
     }
 
 
+    private var isLinkMaterial: Bool {
+        item.documentType == "link" || item.kind.lowercased().contains("link")
+    }
+
     private var isFileMaterial: Bool {
         let kind = item.kind.lowercased()
         if ["document", "file", "attachment", "file_attachment"].contains(kind) { return true }
@@ -95,6 +103,7 @@ struct SchoologyInlineCourseMaterialRow: View {
 
     private var symbol: String {
         let kind = item.kind.lowercased()
+        if kind.contains("link") { return "link" }
         if kind.contains("discussion") { return "text.bubble" }
         if kind == "page" { return "doc.text" }
         if kind.contains("assignment") { return "doc.text" }
@@ -125,6 +134,71 @@ struct SchoologyInlineCourseMaterialRow: View {
 
 /// File materials open their action sheet directly from the Materials list instead of
 /// pushing a placeholder destination page into the navigation stack.
+struct SchoologyCourseMaterialLinkRow: View {
+    @Environment(AppSession.self) private var session
+    @Environment(\.openURL) private var openURL
+    let courseID: String
+    let item: SchoologyProfileItem
+    @State private var selectedAttachment: SchoologyAttachment?
+    @State private var isResolving = false
+    @State private var errorMessage: String?
+    @State private var showingError = false
+
+    var body: some View {
+        Button {
+            Task { await openMaterial() }
+        } label: {
+            HStack(spacing: 10) {
+                if isResolving {
+                    ProgressView().frame(width: 20)
+                } else {
+                    Image(systemName: "link").foregroundStyle(.secondary).frame(width: 20).accessibilityHidden(true)
+                }
+                Text(item.title).lineLimit(2).frame(maxWidth: .infinity, alignment: .leading)
+                Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.tertiary).accessibilityHidden(true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(isResolving)
+        .sheet(item: $selectedAttachment) { attachment in
+            SchoologyAttachmentsView(attachments: [attachment])
+        }
+        .alert("Unable to open link", isPresented: $showingError) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(errorMessage ?? "Schoology did not provide a destination for this link.")
+        }
+    }
+
+    @MainActor
+    private func openMaterial() async {
+        guard !isResolving else { return }
+        isResolving = true
+        errorMessage = nil
+        defer { isResolving = false }
+        do {
+            let detail = try await session.loadCourseMaterialDetail(courseID: courseID, item: item)
+            if let attachment = detail.attachment {
+                selectedAttachment = attachment
+            } else if let url = detail.linkURL ?? item.url ?? item.fileViewURL {
+                openURL(url)
+            } else {
+                errorMessage = "Schoology did not provide a destination for this link."
+                showingError = true
+            }
+        } catch {
+            if let url = item.url ?? item.fileViewURL {
+                openURL(url)
+            } else {
+                errorMessage = error.localizedDescription
+                showingError = true
+            }
+        }
+    }
+}
+
 struct SchoologyCourseMaterialFileRow: View {
     @Environment(AppSession.self) private var session
     let courseID: String

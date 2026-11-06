@@ -269,28 +269,46 @@ struct GroupProfileView: View {
 struct SchoolProfileView: View {
     @Environment(AppSession.self) private var session
     let schoolID: String
+
     @State private var profile: SchoologySchoolProfile?
-    @State private var discussions: [SchoologyProfileItem] = []
     @State private var tab: ProfileTab = .updates
     @State private var isLoading = true
     @State private var error: String?
-    @State private var discussionForbidden = false
-    @State private var selectedDetail: SchoologyProfileItem?
+    @State private var updates: [SchoologyActivity] = []
+    @State private var upcoming: [SchoologyUpcomingEvent] = []
+    @State private var discussions: [SchoologyProfileItem] = []
     @State private var schoolResources: [SchoologyProfileItem] = []
-    @State private var isRefreshingResources = false
-    @State private var resourcesError: String?
+    @State private var loadedTabs: Set<ProfileTab> = []
+    @State private var loadingTabs: Set<ProfileTab> = []
+    @State private var tabErrors: [ProfileTab: String] = [:]
+    @State private var discussionForbidden = false
+    @State private var initialTabLoaded = false
+    @State private var selectedDetail: SchoologyProfileItem?
 
     var body: some View {
         Group {
-            if isLoading { ProgressView("Loading school…").frame(maxWidth: .infinity, maxHeight: .infinity) }
-            else if let error { ContentUnavailableView("Unable to load school", systemImage: "exclamationmark.triangle", description: Text(error)) }
-            else if let profile { schoolLayout(profile) }
+            if isLoading && profile == nil {
+                ProgressView("Loading school…").frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if let error, profile == nil {
+                ContentUnavailableView("Unable to load school", systemImage: "exclamationmark.triangle", description: Text(error))
+            } else if let profile {
+                schoolLayout(profile)
+            }
         }
         .navigationTitle(profile?.school.title ?? "School")
-        .toolbar { ToolbarItem(placement: .primaryAction) {
-            Button("Refresh", systemImage: "arrow.clockwise") { Task { await load() } }.disabled(isLoading)
-        }}
-        .task { await load() }
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button("Refresh", systemImage: "arrow.clockwise") {
+                    Task {
+                        if profile == nil { await load() }
+                        else { await loadTab(tab, force: true) }
+                    }
+                }
+                .disabled(isLoading || loadingTabs.contains(tab))
+            }
+        }
+        .task(id: schoolID) { await load() }
+        .onChange(of: tab) { _, selected in Task { await loadTab(selected) } }
         .sheet(item: $selectedDetail) { item in
             SchoologyProfileItemDetailSheet(item: item)
         }
@@ -303,38 +321,74 @@ struct SchoolProfileView: View {
                     VStack(alignment: .leading, spacing: 12) {
                         SchoologyProfileHeroImage(url: profile.school.pictureURL, fallbackSymbol: "building.2.crop.circle")
                             .padding(.bottom, 4)
-                        ForEach([ProfileTab.updates,.info,.upcoming,.resources,.discussions]) { item in tabButton(item) }
+                        ForEach([ProfileTab.updates, .info, .upcoming, .resources, .discussions]) { item in
+                            tabButton(item)
+                        }
                         Spacer()
-                    }.padding(14).frame(width: max(176, proxy.size.width * 0.19), alignment: .topLeading).background(.regularMaterial)
+                    }
+                    .padding(14)
+                    .frame(width: max(176, proxy.size.width * 0.19), alignment: .topLeading)
+                    .background(.regularMaterial)
+
                     Divider()
+
                     VStack(spacing: 0) {
-                        SchoologyProfileInfobox(title: profile.school.title, imageURL: profile.school.pictureURL,
-                            fallbackSymbol: "building.2.crop.circle", details: [profile.school.address, profile.school.phone], showsImage: false)
-                            .padding(14)
+                        SchoologyProfileInfobox(
+                            title: profile.school.title,
+                            imageURL: profile.school.pictureURL,
+                            fallbackSymbol: "building.2.crop.circle",
+                            details: [profile.school.address, profile.school.phone],
+                            showsImage: false
+                        )
+                        .padding(14)
                         schoolContent(profile)
                     }
-                    .frame(maxWidth: .infinity)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+
                     Divider()
+
                     VStack(alignment: .leading, spacing: 0) {
                         Text("Upcoming").font(.headline).padding(14)
                         Divider()
                         ScrollView {
-                            UpcomingEventList(events: profile.upcoming, fallbackRealm: "schools", fallbackRealmID: schoolID)
-                                .padding(10)
+                            UpcomingEventList(
+                                events: upcoming,
+                                isLoading: loadingTabs.contains(.upcoming) && !loadedTabs.contains(.upcoming),
+                                errorMessage: tabErrors[.upcoming],
+                                fallbackRealm: "schools",
+                                fallbackRealmID: schoolID
+                            )
+                            .padding(10)
+                            .frame(maxWidth: .infinity, alignment: .topLeading)
                         }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
                     .frame(width: max(250, proxy.size.width * 0.2743))
                     .background(.thinMaterial)
+                    .task(id: initialTabLoaded) {
+                        guard initialTabLoaded else { return }
+                        await loadTab(.upcoming)
+                    }
                 }
             } else {
                 VStack(spacing: 0) {
-                    SchoologyProfileInfobox(title: profile.school.title, imageURL: profile.school.pictureURL,
-                        fallbackSymbol: "building.2.crop.circle", details: [profile.school.address, profile.school.phone])
-                        .padding(.horizontal)
-                        .padding(.top, 12)
+                    SchoologyProfileInfobox(
+                        title: profile.school.title,
+                        imageURL: profile.school.pictureURL,
+                        fallbackSymbol: "building.2.crop.circle",
+                        details: [profile.school.address, profile.school.phone]
+                    )
+                    .padding(.horizontal)
+                    .padding(.top, 12)
+
                     Picker("School section", selection: $tab) {
-                        ForEach([ProfileTab.updates,.info,.upcoming,.resources,.discussions]) { Text($0.rawValue).tag($0) }
-                    }.schoologyNavigationTabPickerStyle().padding()
+                        ForEach([ProfileTab.updates, .info, .upcoming, .resources, .discussions]) {
+                            Text($0.rawValue).tag($0)
+                        }
+                    }
+                    .schoologyNavigationTabPickerStyle()
+                    .padding()
+
                     schoolContent(profile)
                 }
             }
@@ -342,13 +396,14 @@ struct SchoolProfileView: View {
     }
 
     private func tabButton(_ item: ProfileTab) -> some View {
-        Button {
-            tab = item
-            if item == .discussions { Task { await loadDiscussions() } }
-        } label: {
-            Label(item.rawValue, systemImage: item.symbol).frame(maxWidth: .infinity, alignment: .leading)
-                .padding(10).background(tab == item ? SchoologyStyle.blue.opacity(0.14) : .clear, in: RoundedRectangle(cornerRadius: 9))
-        }.buttonStyle(.plain).foregroundStyle(tab == item ? SchoologyStyle.blue : .primary)
+        Button { tab = item } label: {
+            Label(item.rawValue, systemImage: item.symbol)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(10)
+                .background(tab == item ? SchoologyStyle.blue.opacity(0.14) : .clear, in: RoundedRectangle(cornerRadius: 9))
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(tab == item ? SchoologyStyle.blue : .primary)
     }
 
     @ViewBuilder
@@ -357,106 +412,161 @@ struct SchoolProfileView: View {
             SchoologyResourcesContentView(
                 items: schoolResources,
                 source: .school(schoolID: schoolID),
-                isLoading: isRefreshingResources,
-                error: resourcesError,
+                isLoading: loadingTabs.contains(.resources) && !loadedTabs.contains(.resources),
+                error: tabErrors[.resources],
                 emptyTitle: "No resources",
                 emptyDescription: "Resources shared with this school will appear here."
             ) {
-                await refreshSchoolResources()
+                await loadTab(.resources, force: true)
             }
         } else {
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 12) {
-                    switch tab {
-                    case .updates: RecentActivityView(activities: profile.updates)
-                    case .info:
-                        if profile.school.address.isEmpty && profile.school.phone.isEmpty {
-                            ContentUnavailableView("No school information", systemImage: "info.circle")
-                        }
-                        if !profile.school.address.isEmpty { LabeledContent("Address", value: profile.school.address) }
-                        if !profile.school.phone.isEmpty { LabeledContent("Phone", value: profile.school.phone) }
-                    case .upcoming:
-                        UpcomingEventList(events: profile.upcoming, fallbackRealm: "schools", fallbackRealmID: schoolID)
-                    case .resources: EmptyView()
-                    case .discussions:
-                        if discussionForbidden {
-                            VStack(spacing: 10) {
-                                ContentUnavailableView("School discussions unavailable", systemImage: "lock",
-                                    description: Text("Schoology does not allow this account to list school discussions through the API."))
-                                if let url = URL(string: "https://app.schoology.com/school/\(schoolID)/discussions") {
-                                    Link("Open School Discussions", destination: url)
+            Group {
+                if loadingTabs.contains(tab) && currentIsEmpty {
+                    ProgressView("Loading \(tab.rawValue.lowercased())…")
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else if let tabError = tabErrors[tab], currentIsEmpty {
+                    ContentUnavailableView(
+                        "Unable to load \(tab.rawValue.lowercased())",
+                        systemImage: "exclamationmark.triangle",
+                        description: Text(tabError)
+                    )
+                } else {
+                    ScrollView {
+                        LazyVStack(alignment: .leading, spacing: 12) {
+                            switch tab {
+                            case .updates:
+                                if updates.isEmpty {
+                                    ContentUnavailableView("No updates", systemImage: "text.bubble")
+                                } else {
+                                    RecentActivityView(activities: updates)
                                 }
-                            }
-                        } else {
-                            if discussions.isEmpty { ContentUnavailableView("No discussions", systemImage: "bubble.left.and.bubble.right") }
-                            ForEach(discussions) { item in
-                                NavigationLink {
-                                    SchoologyDiscussionDetailView(realm: "schools", realmID: schoolID, itemID: item.id, title: item.title)
-                                } label: {
-                                    VStack(alignment: .leading, spacing: 6) {
-                                        Text(item.title).font(.headline)
-                                        if !item.body.isEmpty { Text(item.body).font(.subheadline).foregroundStyle(.secondary).lineLimit(3) }
+                            case .info:
+                                if profile.school.address.isEmpty && profile.school.phone.isEmpty {
+                                    ContentUnavailableView("No school information", systemImage: "info.circle")
+                                }
+                                if !profile.school.address.isEmpty {
+                                    LabeledContent("Address", value: profile.school.address)
+                                }
+                                if !profile.school.phone.isEmpty {
+                                    LabeledContent("Phone", value: profile.school.phone)
+                                }
+                            case .upcoming:
+                                UpcomingEventList(
+                                    events: upcoming,
+                                    fallbackRealm: "schools",
+                                    fallbackRealmID: schoolID
+                                )
+                            case .resources:
+                                EmptyView()
+                            case .discussions:
+                                if discussionForbidden {
+                                    VStack(spacing: 10) {
+                                        ContentUnavailableView(
+                                            "School discussions unavailable",
+                                            systemImage: "lock",
+                                            description: Text("Schoology does not allow this account to list school discussions through the API.")
+                                        )
+                                        if let url = URL(string: "https://app.schoology.com/school/\(schoolID)/discussions") {
+                                            Link("Open School Discussions", destination: url)
+                                        }
                                     }
-                                    .padding(14)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .background(.background, in: RoundedRectangle(cornerRadius: 12))
+                                } else if discussions.isEmpty {
+                                    ContentUnavailableView("No discussions", systemImage: "bubble.left.and.bubble.right")
+                                } else {
+                                    ForEach(discussions) { item in
+                                        NavigationLink {
+                                            SchoologyDiscussionDetailView(
+                                                realm: "schools", realmID: schoolID,
+                                                itemID: item.id, title: item.title
+                                            )
+                                        } label: {
+                                            VStack(alignment: .leading, spacing: 6) {
+                                                Text(item.title).font(.headline)
+                                                if !item.body.isEmpty {
+                                                    SchoologyRichTextText(item.body)
+                                                        .font(.subheadline)
+                                                        .foregroundStyle(.secondary)
+                                                        .lineLimit(3)
+                                                }
+                                            }
+                                            .padding(14)
+                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                            .background(.background, in: RoundedRectangle(cornerRadius: 12))
+                                        }
+                                        .buttonStyle(.plain)
+                                    }
                                 }
-                                .buttonStyle(.plain)
+                            default:
+                                EmptyView()
                             }
                         }
-                    default: EmptyView()
+                        .padding()
+                        .frame(maxWidth: .infinity, alignment: .topLeading)
                     }
                 }
-                .padding()
             }
-            .onChange(of: tab) { _, value in
-                if value == .discussions { Task { await loadDiscussions() } }
-            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 
-    private func refreshSchoolResources() async {
-        isRefreshingResources = true
-        resourcesError = nil
-        defer { isRefreshingResources = false }
-        do {
-            schoolResources = try await session.loadSchoolResources(schoolID: schoolID)
-        } catch {
-            resourcesError = error.localizedDescription
+    private var currentIsEmpty: Bool {
+        switch tab {
+        case .updates: updates.isEmpty
+        case .info: profile?.school.address.isEmpty != false && profile?.school.phone.isEmpty != false
+        case .upcoming: upcoming.isEmpty
+        case .resources: schoolResources.isEmpty
+        case .discussions: discussions.isEmpty && !discussionForbidden
+        default: true
         }
-    }
-
-    @ViewBuilder private func rows(_ items: [SchoologyProfileItem], empty: String) -> some View {
-        if items.isEmpty { ContentUnavailableView(empty, systemImage: "tray") }
-        else { ForEach(items) { item in
-            VStack(alignment: .leading, spacing: 6) {
-                Button { selectedDetail = item } label: { Text(item.title).font(.headline).frame(maxWidth: .infinity, alignment: .leading) }.buttonStyle(.plain)
-                if !item.body.isEmpty { SchoologyRichTextText(item.body).foregroundStyle(.secondary).textSelection(.enabled) }
-                if let url = item.url { Link(destination: url) { Label("Open", systemImage: "arrow.up.right") } }
-            }.padding(14).frame(maxWidth: .infinity, alignment: .leading)
-                .background(.background, in: RoundedRectangle(cornerRadius: 12))
-                .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(.quaternary))
-        }}
     }
 
     private func load() async {
-        isLoading = true; error = nil
+        isLoading = true
+        error = nil
+        defer { isLoading = false }
         do {
-            let loaded = try await session.loadSchoolProfile(schoolID)
-            profile = loaded
-            schoolResources = loaded.resources
-        } catch let loadError {
-            error = loadError.localizedDescription
+            profile = try await session.loadSchoolProfile(schoolID)
+            await loadTab(tab)
+            initialTabLoaded = true
+        } catch {
+            self.error = error.localizedDescription
         }
-        isLoading = false
     }
 
-    private func loadDiscussions() async {
-        discussionForbidden = false
-        do { discussions = try await session.loadSchoolDiscussions(schoolID) }
-        catch {
-            if let apiError = error as? SchoologyAPIError, case .http(403, _) = apiError { discussionForbidden = true }
-            else { self.error = error.localizedDescription }
+    private func loadTab(_ selected: ProfileTab, force: Bool = false) async {
+        guard profile != nil, selected != .members, selected != .albums else { return }
+        guard force || !loadedTabs.contains(selected) else { return }
+        guard !loadingTabs.contains(selected) else { return }
+        loadingTabs.insert(selected)
+        tabErrors[selected] = nil
+        defer { loadingTabs.remove(selected) }
+        do {
+            switch selected {
+            case .updates:
+                updates = try await session.loadSchoolUpdates(schoolID: schoolID)
+            case .info:
+                profile = try await session.loadSchoolProfile(schoolID)
+            case .upcoming:
+                upcoming = try await session.loadSchoolUpcoming(schoolID: schoolID)
+            case .resources:
+                schoolResources = try await session.loadSchoolResources(schoolID: schoolID)
+            case .discussions:
+                discussionForbidden = false
+                do {
+                    discussions = try await session.loadSchoolDiscussions(schoolID)
+                } catch let apiError as SchoologyAPIError {
+                    if case .http(403, _) = apiError {
+                        discussionForbidden = true
+                    } else {
+                        throw apiError
+                    }
+                }
+            default:
+                break
+            }
+            loadedTabs.insert(selected)
+        } catch {
+            tabErrors[selected] = error.localizedDescription
         }
     }
 }
