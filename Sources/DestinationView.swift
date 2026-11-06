@@ -610,38 +610,38 @@ struct UpcomingEventDetailView: View {
     var body: some View {
         switch event.type.lowercased() {
         case "assignment":
-            if let sectionID = event.sectionID ?? (fallbackRealm == "sections" ? fallbackRealmID : nil), let assignmentID = event.assignmentID {
+            if let sectionID = event.sectionID ?? (eventRealmTarget?.realm == "sections" ? eventRealmTarget?.realmID : nil),
+               let assignmentID = event.assignmentID {
                 SchoologyAssignmentDetailView(sectionID: sectionID, assignmentID: assignmentID, title: event.title)
             } else {
                 unavailableTarget("This assignment is missing its section or assignment identifier.")
             }
         case "discussion":
-            if let sectionID = event.sectionID, let discussionID = event.discussionID {
-                SchoologyDiscussionDetailView(realm: "sections", realmID: sectionID, itemID: discussionID, title: event.title)
-            } else if let realm = fallbackRealm, let realmID = fallbackRealmID, let discussionID = event.discussionID {
-                SchoologyDiscussionDetailView(realm: realm, realmID: realmID, itemID: discussionID, title: event.title)
+            if let target = eventRealmTarget,
+               ["sections", "groups"].contains(target.realm),
+               let discussionID = event.discussionID {
+                SchoologyDiscussionDetailView(realm: target.realm, realmID: target.realmID, itemID: discussionID, title: event.title)
             } else if let url = event.webURL {
                 SchoologyEmbeddedWebView(url: url, title: event.title)
             } else {
                 unavailableTarget("Schoology did not provide a discussion destination.")
             }
         case "event":
-            if let sectionID = event.sectionID {
-                SchoologyEventDetailView(realm: "sections", realmID: sectionID, eventID: event.id, title: event.title)
-            } else if let realm = fallbackRealm, let realmID = fallbackRealmID {
-                SchoologyEventDetailView(realm: realm, realmID: realmID, eventID: event.id, title: event.title)
+            if let target = eventRealmTarget {
+                SchoologyEventDetailView(realm: target.realm, realmID: target.realmID, eventID: event.id, title: event.title)
             } else if let url = event.webURL {
                 SchoologyEmbeddedWebView(url: url, title: event.title)
             } else {
                 unavailableTarget("Schoology did not provide an event destination.")
             }
         case "external_tool", "lti", "lti_assignment":
-            if let sectionID = event.sectionID ?? (fallbackRealm == "sections" ? fallbackRealmID : nil), let assignmentID = event.assignmentID {
-                SchoologyAssignmentDetailView(sectionID: sectionID, assignmentID: assignmentID, title: event.title)
+            if let sectionID = event.sectionID ?? (eventRealmTarget?.realm == "sections" ? eventRealmTarget?.realmID : nil),
+               let externalToolID = event.externalToolID {
+                SchoologyExternalToolEventView(sectionID: sectionID, documentID: externalToolID, title: event.title)
             } else if let url = event.webURL {
                 SchoologyEmbeddedWebView(url: url, title: event.title)
             } else {
-                unavailableTarget("Schoology did not provide an external-tool assignment destination.")
+                unavailableTarget("Schoology did not provide an external-tool destination.")
             }
         case "assessment", "assessment_v2", "managed_assessment", "quiz":
             if let url = event.webURL {
@@ -661,6 +661,43 @@ struct UpcomingEventDetailView: View {
                 unavailableTarget("This upcoming item has no supported destination.")
             }
         }
+    }
+
+    private var eventRealmTarget: (realm: String, realmID: String)? {
+        if let normalizedRealm = event.realm?.lowercased() {
+            switch normalizedRealm {
+            case "section", "sections":
+                if let id = event.sectionID ?? event.realmID ?? (fallbackRealm == "sections" ? fallbackRealmID : nil) {
+                    return ("sections", id)
+                }
+            case "group", "groups":
+                if let id = event.groupID ?? event.realmID ?? (fallbackRealm == "groups" ? fallbackRealmID : nil) {
+                    return ("groups", id)
+                }
+            case "school", "schools":
+                if let id = event.schoolID ?? event.realmID ?? (fallbackRealm == "schools" ? fallbackRealmID : nil) {
+                    return ("schools", id)
+                }
+            case "user", "users":
+                if let id = event.userID ?? event.realmID ?? session.auth?.userID {
+                    return ("users", id)
+                }
+            default:
+                break
+            }
+        }
+
+        if let sectionID = event.sectionID { return ("sections", sectionID) }
+        if let fallbackRealm, let fallbackRealmID {
+            switch fallbackRealm.lowercased() {
+            case "section", "sections": return ("sections", fallbackRealmID)
+            case "group", "groups": return ("groups", fallbackRealmID)
+            case "school", "schools": return ("schools", fallbackRealmID)
+            case "user", "users": return ("users", fallbackRealmID)
+            default: break
+            }
+        }
+        return nil
     }
 
     private func unavailableTarget(_ message: String) -> some View {

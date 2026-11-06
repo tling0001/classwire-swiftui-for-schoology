@@ -15,72 +15,56 @@ struct SchoologyInlineCourseMaterialRow: View {
 
     var body: some View {
         if item.kind.lowercased() == "folder" {
-            VStack(alignment: .leading, spacing: 0) {
-                Button {
-                    withAnimation(reduceMotion ? nil : .snappy(duration: 0.24)) {
-                        isExpanded.toggle()
+            DisclosureGroup(isExpanded: $isExpanded) {
+                if isLoading {
+                    HStack(spacing: 8) {
+                        ProgressView().controlSize(.small)
+                        Text("Loading folder…").font(.caption).foregroundStyle(.secondary)
                     }
-                } label: {
-                    HStack(alignment: .center, spacing: 9) {
-                        Image(systemName: "folder.fill")
-                            .foregroundStyle(.secondary)
-                            .frame(width: 20, height: 20)
-                            .accessibilityHidden(true)
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(item.title).font(.body)
-                            if !item.body.isEmpty {
-                                Text(item.body)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                    .lineLimit(nil)
-                                    .fixedSize(horizontal: false, vertical: true)
-                            }
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.tertiary)
-                            .frame(width: 20, height: 20)
-                            .accessibilityHidden(true)
-                    }
-                    .frame(maxWidth: .infinity, minHeight: rowMinimumHeight, alignment: .leading)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityValue(isExpanded ? "Expanded" : "Collapsed")
-                .accessibilityHint("Shows or hides the contents of this folder")
-
-                if isExpanded {
-                    VStack(alignment: .leading, spacing: 0) {
-                        if isLoading {
-                            HStack(spacing: 8) {
-                                ProgressView().controlSize(.small)
-                                Text("Loading folder…").font(.caption).foregroundStyle(.secondary)
-                            }
-                            .padding(.vertical, 6)
-                            .accessibilityElement(children: .combine)
-                        } else if let loadError {
-                            Label(loadError, systemImage: "exclamationmark.triangle")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .padding(.vertical, 6)
-                        } else if let children, children.isEmpty {
-                            Text("This folder is empty")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .padding(.vertical, 6)
-                        } else if let children {
-                            ForEach(children) { child in
-                                SchoologyInlineCourseMaterialRow(courseID: courseID, item: child)
-                            }
-                        }
-                    }
-                    .padding(.leading, 29)
-                    .padding(.vertical, 4)
+                    .padding(.vertical, 6)
+                    .accessibilityElement(children: .combine)
                     .transition(.opacity)
+                } else if let loadError {
+                    Label(loadError, systemImage: "exclamationmark.triangle")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .padding(.vertical, 6)
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                } else if let children, children.isEmpty {
+                    Text("This folder is empty")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .padding(.vertical, 6)
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                } else if let children {
+                    ForEach(children) { child in
+                        SchoologyInlineCourseMaterialRow(courseID: courseID, item: child)
+                            .transition(.opacity.combined(with: .move(edge: .top)))
+                    }
                 }
+            } label: {
+                HStack(alignment: .center, spacing: 9) {
+                    Image(systemName: "folder.fill")
+                        .foregroundStyle(.secondary)
+                        .frame(width: 20)
+                        .accessibilityHidden(true)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(item.title).font(.body)
+                        if !item.body.isEmpty {
+                            Text(item.body)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(nil)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .frame(maxWidth: .infinity, minHeight: rowMinimumHeight, alignment: .leading)
+                .contentShape(Rectangle())
             }
             .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
+            .animation(reduceMotion ? nil : .snappy(duration: 0.24), value: isExpanded)
             .onChange(of: isExpanded) { _, expanded in
                 guard expanded, children == nil, !isLoading else { return }
                 Task { await loadChildren() }

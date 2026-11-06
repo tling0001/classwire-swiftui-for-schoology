@@ -39,6 +39,12 @@ actor SchoologyAPI {
     private var recentOAuthNonces = Set<String>()
     private var oauthNonceOrder: [String] = []
     private var useCanadianServer = false
+    private let imageDataCache: NSCache<NSString, NSData> = {
+        let cache = NSCache<NSString, NSData>()
+        cache.countLimit = 120
+        cache.totalCostLimit = 48 * 1024 * 1024
+        return cache
+    }()
     func setCanadianServer(_ enabled: Bool) { useCanadianServer = enabled }
 
     private var apiHost: String { useCanadianServer ? "api.schoologyca.com" : "api.schoology.com" }
@@ -350,6 +356,10 @@ actor SchoologyAPI {
 
     func imageData(_ url: URL, auth: SchoologyAuth) async throws -> Data? {
         guard url.scheme?.lowercased() == "https" || url.scheme?.lowercased() == "http" else { return nil }
+        let cacheKey = "\(auth.userID)|\(apiHost)|\(url.absoluteString)" as NSString
+        if let cached = imageDataCache.object(forKey: cacheKey) {
+            return cached as Data
+        }
         let session = URLSession(configuration: .ephemeral)
         let redirectDelegate = NoRedirectDelegate()
         defer { session.invalidateAndCancel() }
@@ -384,7 +394,9 @@ actor SchoologyAPI {
             }
             guard (200..<300).contains(http.statusCode), data.count <= 12 * 1024 * 1024 else { return nil }
             let mime = http.value(forHTTPHeaderField: "Content-Type")?.lowercased() ?? ""
-            return mime.hasPrefix("image/") ? data : nil
+            guard mime.hasPrefix("image/") else { return nil }
+            imageDataCache.setObject(data as NSData, forKey: cacheKey, cost: data.count)
+            return data
         }
         return nil
     }

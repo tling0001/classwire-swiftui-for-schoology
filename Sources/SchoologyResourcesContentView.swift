@@ -93,29 +93,61 @@ struct SchoologyInlineResourceItemRow: View {
                         }
                     }
                 } label: {
-                    Label(item.title, systemImage: "folder")
-                        .contentShape(Rectangle())
+                    HStack(alignment: .center, spacing: 9) {
+                        Image(systemName: "folder.fill")
+                            .foregroundStyle(.secondary)
+                            .frame(width: 20)
+                            .accessibilityHidden(true)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(item.title).font(.body)
+                            if !item.body.isEmpty {
+                                Text(item.body)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(nil)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .frame(maxWidth: .infinity, minHeight: rowMinimumHeight, alignment: .leading)
+                    .contentShape(Rectangle())
                 }
+                .animation(reduceMotion ? nil : .snappy(duration: 0.24), value: isExpanded)
                 .onChange(of: isExpanded) { _, expanded in
                     guard expanded, children == nil, !isLoading else { return }
                     Task { await loadChildren() }
                 }
             } else if let attachment {
                 SchoologyAttachmentPreviewButton(attachment: attachment)
+                    .frame(maxWidth: .infinity, minHeight: rowMinimumHeight, alignment: .leading)
             } else if let url = item.url {
                 NavigationLink {
                     SchoologyEmbeddedWebView(url: url, title: item.title)
                 } label: {
                     Label(item.title, systemImage: resourceSymbol)
+                        .frame(maxWidth: .infinity, minHeight: rowMinimumHeight, alignment: .leading)
+                        .contentShape(Rectangle())
                 }
             } else {
                 NavigationLink {
                     SchoologyProfileItemDetailSheet(item: item)
                 } label: {
                     Label(item.title, systemImage: resourceSymbol)
+                        .frame(maxWidth: .infinity, minHeight: rowMinimumHeight, alignment: .leading)
+                        .contentShape(Rectangle())
                 }
             }
         }
+        .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
+    }
+
+    private var rowMinimumHeight: CGFloat {
+        #if os(macOS)
+        28
+        #else
+        44
+        #endif
     }
 
     private var attachment: SchoologyAttachment? {

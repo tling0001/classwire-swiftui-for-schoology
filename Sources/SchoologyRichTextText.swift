@@ -13,6 +13,13 @@ struct SchoologyRichTextText: View {
     let value: String
     let minimumFontSize: CGFloat?
 
+    private static let attributedHTMLCache: NSCache<NSString, NSAttributedString> = {
+        let cache = NSCache<NSString, NSAttributedString>()
+        cache.countLimit = 160
+        cache.totalCostLimit = 16 * 1024 * 1024
+        return cache
+    }()
+
     init(_ value: String, minimumFontSize: CGFloat? = nil) {
         self.value = value
         self.minimumFontSize = minimumFontSize
@@ -52,6 +59,11 @@ struct SchoologyRichTextText: View {
     }
 
     private static func attributedHTML(_ html: String, colorScheme: ColorScheme, minimumFontSize: CGFloat?) -> AttributedString? {
+        let cacheKey = "\(colorScheme == .dark ? "dark" : "light")|\(minimumFontSize.map { String($0) } ?? "default")|\(html)" as NSString
+        if let cached = attributedHTMLCache.object(forKey: cacheKey) {
+            return AttributedString(cached)
+        }
+
         let document = """
         <!doctype html><html><head><meta charset="utf-8">
         <meta name="color-scheme" content="light dark">
@@ -106,6 +118,7 @@ struct SchoologyRichTextText: View {
                 mutable.addAttribute(.font, value: font, range: range)
             }
         }
+        attributedHTMLCache.setObject(mutable, forKey: cacheKey, cost: max(mutable.length * 2, 1))
         return AttributedString(mutable)
     }
 

@@ -1048,6 +1048,30 @@ final class AppSession {
             SchoologyProfileItem(id: discussionID, title: "Discussion", body: "", subtitle: "", url: nil, isAdmin: false, kind: "discussion", collectionID: nil)
     }
 
+    func loadExternalToolURL(sectionID: String, documentID: String) async throws -> URL {
+        guard let auth else { throw SchoologyAPIError.notSignedIn }
+        let data = try await api.get("sections/\(sectionID)/documents/\(documentID)", auth: auth, params: [
+            "with_attachments": "TRUE",
+            "richtext": "1"
+        ])
+        let root = Self.object(data)
+        let nested = root["data"] as? [String: Any]
+        let document = (root["document"] as? [String: Any]) ??
+            (nested?["document"] as? [String: Any]) ?? nested ?? root
+        let attachments = document["attachments"] as? [String: Any] ?? [:]
+        let tools = SchoologyValue.list(
+            attachments["external_tools"] ?? attachments["external_tool"] ??
+                document["external_tools"] ?? document["external_tool"],
+            keys: ["external_tool", "external_tools", "items", "data"]
+        )
+        let rawURL = tools.first?["url"] ?? tools.first?["launch_url"] ??
+            tools.first?["launchUrl"] ?? document["launch_url"] ?? document["launchUrl"]
+        guard let url = SchoologyValue.url(rawURL), url.scheme?.lowercased() == "https" else {
+            throw SchoologyAPIError.invalidResponse
+        }
+        return url
+    }
+
     func loadEventContext(realm: String, realmID: String, eventID: String) async throws -> SchoologyEventContext {
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         let data = try await api.get("\(apiRealm(realm))/\(realmID)/events/\(eventID)", auth: auth, params: ["with_attachments": "TRUE", "richtext": "1"])

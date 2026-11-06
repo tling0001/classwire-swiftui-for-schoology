@@ -1,4 +1,26 @@
-# 2026.10.0-port.60
+# Release notes
+
+## [2026.10.0-port.61]
+
+### Course Materials and Resources
+- Restore the familiar inline DisclosureGroup folder layout from port.48, with folder descriptions aligned beneath their titles and nested items using native disclosure indentation.
+- Keep compact, platform-appropriate row sizing instead of reintroducing the old oversized macOS control-size override.
+- Apply the same inline folder and item hierarchy to the Resources page.
+
+### Upcoming and Calendar
+- Decode Schoology event realm and realm-specific IDs for sections, groups, schools, and users so calendar and global Upcoming items open their actual event destination.
+- Route group discussions and section external tools using their Android-compatible identifiers.
+- Resolve external-tool launch URLs from the section document endpoint before opening the authenticated embedded web view.
+
+### Scrolling Performance
+- Add a bounded, per-account in-memory cache for authenticated post images to avoid re-downloading them while scrolling back through Recent Activity.
+- Cache parsed rich HTML attributed text by content, appearance, and minimum font size so row updates do not repeatedly re-import the same HTML.
+
+### Build and Release
+- Fix the release-note heading for port.60 and use the workflow's expected versioned heading for this release.
+- Increment the iOS and macOS bundle build number to 61.
+
+## [2026.10.0-port.60]
 
 ### Attachments
 - Open Schoology link attachments directly in the system browser instead of treating them as downloadable files.

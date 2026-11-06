@@ -221,9 +221,15 @@ struct SchoologyUpcomingEvent: Identifiable, Sendable {
     let start: String
     let end: String
     let allDay: Bool
+    let realm: String?
+    let realmID: String?
     let sectionID: String?
+    let groupID: String?
+    let schoolID: String?
+    let userID: String?
     let assignmentID: String?
     let discussionID: String?
+    let externalToolID: String?
     let webURL: URL?
 
     var date: Date? { SchoologyValue.date(start) }
@@ -248,18 +254,43 @@ struct SchoologyUpcomingEvent: Identifiable, Sendable {
         SchoologyValue.list(value, keys: ["event", "events", "items", "data", "response"]).compactMap { item in
             guard let rawID = item["id"] ?? item["event_id"] ?? item["eventId"] else { return nil }
             let rawType = SchoologyValue.string(item["type"] ?? item["event_type"] ?? item["eventType"], fallback: "event").lowercased()
+            let rawRealm = SchoologyValue.optionalString(item["realm"] ?? item["realm_name"] ?? item["realmName"])?.lowercased()
+            let sectionID = SchoologyValue.optionalString(item["section_id"] ?? item["sectionId"] ?? (item["section"] as? [String: Any])?["id"])
+            let groupID = SchoologyValue.optionalString(item["group_id"] ?? item["groupId"] ?? (item["group"] as? [String: Any])?["id"])
+            let schoolID = SchoologyValue.optionalString(item["school_id"] ?? item["schoolId"] ?? (item["school"] as? [String: Any])?["id"])
+            let userID = SchoologyValue.optionalString(item["user_id"] ?? item["userId"] ?? (item["user"] as? [String: Any])?["id"])
+            let genericRealmID = SchoologyValue.optionalString(item["realm_id"] ?? item["realmId"])
+            let realmID = genericRealmID ?? {
+                guard let rawRealm else { return nil }
+                switch rawRealm {
+                case "section", "sections": return sectionID
+                case "group", "groups": return groupID
+                case "school", "schools": return schoolID
+                case "user", "users": return userID
+                default: return nil
+                }
+            }()
             let assignment = item["assignment_id"] ?? item["assignmentId"] ?? (item["assignment"] as? [String: Any])?["id"]
-            let discussion = item["discussion_id"] ?? item["discussionId"] ?? (item["discussion"] as? [String: Any])?["id"]
+            let discussion = item["discussion_id"] ?? item["discussionId"] ?? (item["discussion"] as? [String: Any])?["discussion_id"] ?? (item["discussion"] as? [String: Any])?["discussionId"] ?? (item["discussion"] as? [String: Any])?["id"]
+            let externalTool = item["external_tool_id"] ?? item["externalToolId"] ??
+                (item["external_tool"] as? [String: Any])?["id"] ??
+                (item["externalTool"] as? [String: Any])?["id"]
             return SchoologyUpcomingEvent(
                 id: SchoologyValue.string(rawID),
                 title: SchoologyValue.string(item["title"] ?? item["name"] ?? item["subject"], fallback: "Untitled"),
                 type: rawType,
-                start: SchoologyValue.string(item["start"] ?? item["start_date"] ?? item["startDate"] ?? item["date"] ?? item["due_date"] ?? item["dueDate"]),
-                end: SchoologyValue.string(item["end"] ?? item["end_date"] ?? item["endDate"]),
+                start: SchoologyValue.string(item["start"] ?? item["start_date"] ?? item["startDate"] ?? item["start_time"] ?? item["startTime"] ?? item["date"] ?? item["due_date"] ?? item["dueDate"]),
+                end: SchoologyValue.string(item["end"] ?? item["end_date"] ?? item["endDate"] ?? item["end_time"] ?? item["endTime"]),
                 allDay: SchoologyValue.bool(item["all_day"] ?? item["allDay"]),
-                sectionID: SchoologyValue.optionalString(item["section_id"] ?? item["sectionId"]),
+                realm: rawRealm,
+                realmID: realmID,
+                sectionID: sectionID,
+                groupID: groupID,
+                schoolID: schoolID,
+                userID: userID,
                 assignmentID: SchoologyValue.optionalString(assignment),
                 discussionID: SchoologyValue.optionalString(discussion),
+                externalToolID: SchoologyValue.optionalString(externalTool),
                 webURL: SchoologyValue.url(item["web_url"] ?? item["webUrl"] ?? item["url"])
             )
         }
