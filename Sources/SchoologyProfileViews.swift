@@ -76,7 +76,7 @@ struct GroupProfileView: View {
                     VStack(spacing: 0) {
                         SchoologyProfileHeroImage(url: profile.group.pictureURL, fallbackSymbol: "person.3.fill")
                             .padding(12)
-                        List(selection: $tab) {
+                        List(selection: Binding<ProfileTab?>(get: { tab }, set: { if let selected = $0 { tab = selected } })) {
                             ForEach([ProfileTab.updates, .members, .upcoming, .discussions, .albums, .resources]) { item in
                                 Label(item.rawValue, systemImage: item.symbol).tag(item)
                             }
@@ -345,7 +345,7 @@ struct SchoolProfileView: View {
                     VStack(spacing: 0) {
                         SchoologyProfileHeroImage(url: profile.school.pictureURL, fallbackSymbol: "building.2.crop.circle")
                             .padding(12)
-                        List(selection: $tab) {
+                        List(selection: Binding<ProfileTab?>(get: { tab }, set: { if let selected = $0 { tab = selected } })) {
                             ForEach([ProfileTab.updates, .info, .upcoming, .resources, .discussions]) { item in
                                 Label(item.rawValue, systemImage: item.symbol).tag(item)
                             }

@@ -116,7 +116,7 @@ struct SchoologyCourseProfileView: View {
             VStack(spacing: 0) {
                 SchoologyProfileHeroImage(url: course.profileURL, fallbackSymbol: "book.closed.fill")
                     .padding(12)
-                List(selection: $tab) {
+                List(selection: Binding<SchoologyCourseTab?>(get: { tab }, set: { if let selected = $0 { tab = selected } })) {
                     ForEach([SchoologyCourseTab.materials, .updates, .grades, .members, .courseApps]) { item in
                         Label(item.rawValue, systemImage: courseTabSymbol(item)).tag(item)
                     }
