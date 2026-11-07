@@ -44,12 +44,12 @@ struct SchoologyCommentRow: View {
                     NavigationLink {
                         SchoologyPersonProfileView(userID: authorID)
                     } label: {
-                        Text(comment.authorName.isEmpty ? (comment.authorID == session.auth?.userID ? (session.user?.nameDisplay ?? "You") : "Schoology user") : comment.authorName)
+                        Text(comment.authorName.isEmpty ? (comment.authorID == session.auth?.userID ? (session.user?.nameDisplay ?? "You") : "ClassWire user") : comment.authorName)
                             .font(.subheadline.weight(.semibold))
                     }
                     .buttonStyle(.plain)
                 } else {
-                    Text(comment.authorName.isEmpty ? "Schoology" : comment.authorName)
+                    Text(comment.authorName.isEmpty ? "ClassWire" : comment.authorName)
                         .font(.subheadline.weight(.semibold))
                 }
                 Spacer()

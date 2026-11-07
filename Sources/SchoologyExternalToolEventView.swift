@@ -22,7 +22,7 @@ struct SchoologyExternalToolEventView: View {
                 ContentUnavailableView(
                     "Unable to open external tool",
                     systemImage: "exclamationmark.triangle",
-                    description: Text(errorMessage ?? "Schoology did not provide an external-tool launch URL.")
+                    description: Text(errorMessage ?? "ClassWire could not load the external-tool launch URL.")
                 )
             }
         }

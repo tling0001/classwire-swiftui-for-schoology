@@ -1,6 +1,6 @@
-# Schoology — Native SwiftUI
+# ClassWire — Native SwiftUI
 
-A native Schoology client for **macOS, iPhone, and iPad**, implemented with SwiftUI.
+A native ClassWire client for **macOS, iPhone, and iPad**, built for Schoology courses and communication.
 
 ## Reference implementations
 
@@ -18,7 +18,7 @@ The app is a native SwiftUI implementation. It does not embed the Tauri renderer
 | iPhone and iPad | iOS 18 |
 | Mac | macOS 14 |
 
-- App name: **Schoology**
+- App name: **ClassWire**
 - Bundle identifier: `com.schoologytauri.app` on iOS and macOS
 - Swift language mode: Swift 6
 - Native UI: SwiftUI, with platform frameworks such as WebKit and AVKit where appropriate

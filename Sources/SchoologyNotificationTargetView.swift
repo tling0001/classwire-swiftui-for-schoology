@@ -37,7 +37,7 @@ struct SchoologyNotificationTargetView: View {
                 SchoologyEmbeddedWebView(url: url, title: argument.title)
             } else {
                 ContentUnavailableView("Unable to open notification item", systemImage: "exclamationmark.triangle",
-                    description: Text("Schoology didn't provide a destination for this item."))
+                    description: Text("ClassWire couldn't open this notification item."))
             }
         }
         .navigationTitle(argument.title)

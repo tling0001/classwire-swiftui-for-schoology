@@ -1,9 +1,27 @@
 import SwiftUI
 import UniformTypeIdentifiers
 struct SchoologyMessageComposerView: View {
+    struct ReplyContext: Identifiable, Hashable, Sendable {
+        let messageID: String
+        let recipientID: String
+        let recipientName: String
+        let subject: String
+        var id: String { messageID }
+    }
+
     @Environment(AppSession.self) private var session
     @Environment(\.dismiss) private var dismiss
     let onSent: () -> Void
+    let reply: ReplyContext?
+
+    init(onSent: @escaping () -> Void, reply: ReplyContext? = nil) {
+        self.onSent = onSent
+        self.reply = reply
+        _selectedRecipients = State(initialValue: reply.map {
+            [SchoologyMessageRecipient(id: $0.recipientID, name: $0.recipientName)]
+        } ?? [])
+        _subject = State(initialValue: reply?.subject ?? "")
+    }
     @State private var recipientQuery = ""
     @State private var recipients: [SchoologyMessageRecipient] = []
     @State private var selectedRecipients: [SchoologyMessageRecipient] = []
@@ -20,31 +38,35 @@ struct SchoologyMessageComposerView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("To") {
-                    TextField("Search recipients", text: $recipientQuery)
-                    ForEach(selectedRecipients) { recipient in
-                        HStack {
-                            Text(recipient.name)
-                            Spacer()
-                            Button("Remove", systemImage: "xmark.circle.fill") { selectedRecipients.removeAll { $0.id == recipient.id } }
-                                .labelStyle(.iconOnly).tint(.secondary)
+                if let reply {
+                    Section("To") { Label(reply.recipientName, systemImage: "person.crop.circle") }
+                } else {
+                    Section("To") {
+                        TextField("Search recipients", text: $recipientQuery)
+                        ForEach(selectedRecipients) { recipient in
+                            HStack {
+                                Text(recipient.name)
+                                Spacer()
+                                Button("Remove", systemImage: "xmark.circle.fill") { selectedRecipients.removeAll { $0.id == recipient.id } }
+                                    .labelStyle(.iconOnly).tint(.secondary)
+                            }
                         }
-                    }
-                    ForEach(recipients.filter { candidate in !selectedRecipients.contains(where: { $0.id == candidate.id }) }) { recipient in
-                        Button {
-                            selectedRecipients.append(recipient)
-                            recipientQuery = ""
-                            recipients = []
-                        } label: {
-                            Label(recipient.name, systemImage: "person.crop.circle").foregroundStyle(.primary)
+                        ForEach(recipients.filter { candidate in !selectedRecipients.contains(where: { $0.id == candidate.id }) }) { recipient in
+                            Button {
+                                selectedRecipients.append(recipient)
+                                recipientQuery = ""
+                                recipients = []
+                            } label: {
+                                Label(recipient.name, systemImage: "person.crop.circle").foregroundStyle(.primary)
+                            }
                         }
-                    }
-                    if !recipientQuery.isEmpty && recipientQuery.count < 2 {
-                        Text("Enter at least two characters to search.").font(.caption).foregroundStyle(.secondary)
+                        if !recipientQuery.isEmpty && recipientQuery.count < 2 {
+                            Text("Enter at least two characters to search.").font(.caption).foregroundStyle(.secondary)
+                        }
                     }
                 }
                 Section("Message") {
-                    TextField("Subject", text: $subject)
+                    if reply == nil { TextField("Subject", text: $subject) }
                     ZStack(alignment: .topLeading) {
                         TextEditor(text: $message)
                             .scrollContentBackground(.hidden)
@@ -62,7 +84,7 @@ struct SchoologyMessageComposerView: View {
                 Section("Attachments") {
                     Button("Attach File", systemImage: "paperclip") { showingFileImporter = true }
                         .disabled(isSending || isUploading)
-                    Button("Attach Schoology Resource", systemImage: "folder") { showingResourcePicker = true }
+                    Button("Attach ClassWire Resource", systemImage: "folder") { showingResourcePicker = true }
                         .disabled(isSending || isUploading)
                     ForEach(Array(attachmentNames.enumerated()), id: \.offset) { _, name in
                         Label(name, systemImage: "paperclip").foregroundStyle(.secondary)
@@ -71,12 +93,12 @@ struct SchoologyMessageComposerView: View {
                 }
                 if let error { Section { Text(error).foregroundStyle(.red) } }
             }
-            .navigationTitle("New Message")
+            .navigationTitle(reply == nil ? "New Message" : "Reply")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() }.disabled(isSending || isUploading) }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Send", systemImage: "paperplane.fill", action: send)
-                        .disabled(isSending || isUploading || selectedRecipients.isEmpty || subject.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        .disabled(isSending || isUploading || selectedRecipients.isEmpty || (reply == nil && subject.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) || message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
             }
             .fileImporter(isPresented: $showingFileImporter, allowedContentTypes: [.item], allowsMultipleSelection: true, onCompletion: importFiles)
@@ -90,7 +112,7 @@ struct SchoologyMessageComposerView: View {
             }
             .task(id: recipientQuery) {
                 let query = recipientQuery.trimmingCharacters(in: .whitespacesAndNewlines)
-                guard query.count >= 2 else { recipients = []; return }
+                guard reply == nil, query.count >= 2 else { recipients = []; return }
                 do {
                     try await Task.sleep(nanoseconds: 250_000_000)
                     try Task.checkCancellation()
@@ -138,7 +160,11 @@ struct SchoologyMessageComposerView: View {
         error = nil
         Task {
             do {
-                try await session.sendMessage(recipientIDs: selectedRecipients.map(\.id), subject: subject, message: message, fileIDs: fileIDs, resourceIDs: resourceIDs)
+                if let reply {
+                    try await session.replyToMessage(messageID: reply.messageID, recipientID: reply.recipientID, subject: reply.subject, message: message, fileIDs: fileIDs, resourceIDs: resourceIDs)
+                } else {
+                    try await session.sendMessage(recipientIDs: selectedRecipients.map(\.id), subject: subject, message: message, fileIDs: fileIDs, resourceIDs: resourceIDs)
+                }
                 onSent()
                 dismiss()
             } catch { self.error = error.localizedDescription }

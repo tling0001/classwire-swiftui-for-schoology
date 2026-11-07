@@ -1198,9 +1198,9 @@ final class AppSession {
 
     func postUpdateComment(realm: String, realmID: String, updateID: String, body: String, parentID: String? = nil) async throws {
         guard let auth else { throw SchoologyAPIError.notSignedIn }
-        _ = try await api.post("\(realm)/\(realmID)/updates/\(updateID)/comments", auth: auth, params: [
+        _ = try await api.postJSON("\(realm)/\(realmID)/updates/\(updateID)/comments", auth: auth, body: [
             "comment": body,
-            "parent_id": parentID ?? "0"
+            "parent_id": Int(parentID ?? "0") ?? 0
         ])
     }
 
@@ -1568,6 +1568,22 @@ final class AppSession {
         let validResourceIDs = resourceIDs.compactMap(Int.init)
         if !validResourceIDs.isEmpty { payload["attachments"] = validResourceIDs.map { ["resource": $0] } }
         _ = try await api.postJSON("messages", auth: auth, body: payload)
+    }
+
+    func replyToMessage(messageID: String, recipientID: String, subject: String, message: String, fileIDs: [String] = [], resourceIDs: [String] = []) async throws {
+        guard let auth else { throw SchoologyAPIError.notSignedIn }
+        let normalizedBody = message.replacingOccurrences(of: "\r\n", with: "\n").replacingOccurrences(of: "\r", with: "\n")
+        guard Int(messageID) != nil, Int(recipientID) != nil,
+              !subject.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              !normalizedBody.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw SchoologyAPIError.invalidResponse
+        }
+        var payload: [String: Any] = ["recipient_ids": recipientID, "subject": subject, "message": normalizedBody]
+        let validFileIDs = fileIDs.compactMap(Int.init)
+        if !validFileIDs.isEmpty { payload["file-attachment"] = ["id": validFileIDs] }
+        let validResourceIDs = resourceIDs.compactMap(Int.init)
+        if !validResourceIDs.isEmpty { payload["attachments"] = validResourceIDs.map { ["resource": $0] } }
+        _ = try await api.postJSON("messages/\(messageID)", auth: auth, params: ["keep_unread": "false"], body: payload)
     }
 
     func loadAssignment(sectionID: String, assignmentID: String) async throws -> SchoologyProfileItem {

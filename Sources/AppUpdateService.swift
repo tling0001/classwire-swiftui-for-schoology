@@ -116,7 +116,7 @@ final class AppUpdateService {
             let endpoint = URL(string: "https://api.github.com/repos/tling0001/schoology-for-desktop-port/releases/latest")!
             var request = URLRequest(url: endpoint)
             request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
-            request.setValue("Schoology-SwiftUI-Classic-Switcher", forHTTPHeaderField: "User-Agent")
+            request.setValue("ClassWire-SwiftUI-Classic-Switcher", forHTTPHeaderField: "User-Agent")
             request.setValue("2022-11-28", forHTTPHeaderField: "X-GitHub-Api-Version")
             let (data, response) = try await URLSession.shared.data(for: request)
             guard let response = response as? HTTPURLResponse, (200..<300).contains(response.statusCode) else {
@@ -125,8 +125,8 @@ final class AppUpdateService {
 
             let release = try JSONDecoder().decode(GitHubRelease.self, from: data)
             guard release.draft != true, release.prerelease != true else {
-                throw NSError(domain: "SchoologyClassicSwitcher", code: 1,
-                              userInfo: [NSLocalizedDescriptionKey: "No stable Schoology Classic release is currently available."])
+                throw NSError(domain: "ClassWireClassicSwitcher", code: 1,
+                              userInfo: [NSLocalizedDescriptionKey: "No stable ClassWire Classic release is currently available."])
             }
             classicLatestVersion = release.tagName
             classicReleaseURL = release.htmlURL
@@ -144,7 +144,7 @@ final class AppUpdateService {
             let suffix = ".dmg"
             #endif
             guard let asset = release.assets.first(where: { $0.name.hasSuffix(suffix) }) else {
-                throw NSError(domain: "SchoologyClassicSwitcher", code: 2,
+                throw NSError(domain: "ClassWireClassicSwitcher", code: 2,
                               userInfo: [NSLocalizedDescriptionKey: "The latest Classic release does not include a macOS installer for this Mac's architecture."])
             }
             classicMacOSDownloadURL = asset.browserDownloadURL
@@ -152,7 +152,7 @@ final class AppUpdateService {
             classicAssetDigest = asset.digest
             #else
             guard let asset = release.assets.first(where: { $0.name.hasSuffix("-iOS-AdHoc.plist") }) else {
-                throw NSError(domain: "SchoologyClassicSwitcher", code: 3,
+                throw NSError(domain: "ClassWireClassicSwitcher", code: 3,
                               userInfo: [NSLocalizedDescriptionKey: "The latest Classic release does not include an iOS Ad Hoc installation manifest."])
             }
             classicIOSManifestURL = asset.browserDownloadURL
@@ -160,7 +160,7 @@ final class AppUpdateService {
             classicAssetDigest = asset.digest
             #endif
         } catch {
-            classicErrorMessage = "Could not find Schoology Classic: \(error.localizedDescription)"
+            classicErrorMessage = "Could not find ClassWire Classic: \(error.localizedDescription)"
         }
     }
 
@@ -175,10 +175,10 @@ final class AppUpdateService {
         defer { isChecking = false }
 
         do {
-            let endpoint = URL(string: "https://api.github.com/repos/tling0001/schoology-swiftui/releases/latest")!
+            let endpoint = URL(string: "https://api.github.com/repos/tling0001/classwire-swiftui-for-schoology/releases/latest")!
             var request = URLRequest(url: endpoint)
             request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
-            request.setValue("Schoology-SwiftUI", forHTTPHeaderField: "User-Agent")
+            request.setValue("ClassWire-SwiftUI", forHTTPHeaderField: "User-Agent")
             request.setValue("2022-11-28", forHTTPHeaderField: "X-GitHub-Api-Version")
 
             let (data, response) = try await URLSession.shared.data(for: request)
@@ -193,10 +193,10 @@ final class AppUpdateService {
             releaseNotes = release.body
             releaseURL = release.htmlURL
             macOSDownloadURL = release.assets.first {
-                $0.name == "Schoology-\(release.tagName)-macOS.dmg"
+                $0.name == "ClassWire-\(release.tagName)-macOS.dmg"
             }?.browserDownloadURL
             iOSManifestURL = release.assets.first {
-                $0.name == "Schoology-\(release.tagName)-iOS-AdHoc.plist"
+                $0.name == "ClassWire-\(release.tagName)-iOS-AdHoc.plist"
             }?.browserDownloadURL
             lastChecked = Date()
 
@@ -224,17 +224,17 @@ final class AppUpdateService {
         do {
             #if os(macOS)
             guard let downloadURL = macOSDownloadURL else {
-                throw NSError(domain: "SchoologyUpdater", code: 10, userInfo: [NSLocalizedDescriptionKey: "The macOS update installer is not available yet."])
+                throw NSError(domain: "ClassWireUpdater", code: 10, userInfo: [NSLocalizedDescriptionKey: "The macOS update installer is not available yet."])
             }
             try await installMacOSApp(downloadURL: downloadURL, expectedSize: nil, expectedDigest: nil, isClassic: false)
             #elseif os(iOS)
             guard let url = installURL else {
-                throw NSError(domain: "SchoologyUpdater", code: 11, userInfo: [NSLocalizedDescriptionKey: "The iOS installation manifest is not available yet."])
+                throw NSError(domain: "ClassWireUpdater", code: 11, userInfo: [NSLocalizedDescriptionKey: "The iOS installation manifest is not available yet."])
             }
             guard await UIApplication.shared.open(url) else {
-                throw NSError(domain: "SchoologyUpdater", code: 12, userInfo: [NSLocalizedDescriptionKey: "Schoology could not open the iOS installation link."])
+                throw NSError(domain: "ClassWireUpdater", code: 12, userInfo: [NSLocalizedDescriptionKey: "ClassWire could not open the iOS installation link."])
             }
-            installationNotice = "Installation will start after closing Schoology or returning to your Home Screen."
+            installationNotice = "Installation will start after closing ClassWire or returning to your Home Screen."
             #endif
         } catch {
             installErrorMessage = error.localizedDescription
@@ -245,15 +245,15 @@ final class AppUpdateService {
     func installClassic() async throws {
         #if os(macOS)
         guard let downloadURL = classicMacOSDownloadURL else {
-            throw NSError(domain: "SchoologyUpdater", code: 13, userInfo: [NSLocalizedDescriptionKey: "The Schoology Classic installer is not available."])
+            throw NSError(domain: "ClassWireUpdater", code: 13, userInfo: [NSLocalizedDescriptionKey: "The ClassWire Classic installer is not available."])
         }
         try await installMacOSApp(downloadURL: downloadURL, expectedSize: classicAssetSize, expectedDigest: classicAssetDigest, isClassic: true)
         #elseif os(iOS)
         guard let url = classicInstallURL else {
-            throw NSError(domain: "SchoologyUpdater", code: 14, userInfo: [NSLocalizedDescriptionKey: "The Schoology Classic installation manifest is not available."])
+            throw NSError(domain: "ClassWireUpdater", code: 14, userInfo: [NSLocalizedDescriptionKey: "The ClassWire Classic installation manifest is not available."])
         }
         guard await UIApplication.shared.open(url) else {
-            throw NSError(domain: "SchoologyUpdater", code: 15, userInfo: [NSLocalizedDescriptionKey: "Schoology could not open the Classic installation link."])
+            throw NSError(domain: "ClassWireUpdater", code: 15, userInfo: [NSLocalizedDescriptionKey: "ClassWire could not open the Classic installation link."])
         }
         #endif
     }
@@ -276,16 +276,16 @@ final class AppUpdateService {
         let isTranslocated = runningBundleURL.path.contains("/AppTranslocation/") ||
             runningBundleURL.path.hasPrefix("/Volumes/")
         let installedCandidates = [
-            URL(fileURLWithPath: "/Applications/Schoology.app", isDirectory: true),
-            fileManager.homeDirectoryForCurrentUser.appendingPathComponent("Applications/Schoology.app", isDirectory: true)
+            URL(fileURLWithPath: "/Applications/ClassWire.app", isDirectory: true),
+            fileManager.homeDirectoryForCurrentUser.appendingPathComponent("Applications/ClassWire.app", isDirectory: true)
         ]
         let targetApp: URL
         if isTranslocated {
             guard let installed = installedCandidates.first(where: {
                 Bundle(url: $0)?.bundleIdentifier == "com.schoologytauri.app"
             }) else {
-                throw NSError(domain: "SchoologyUpdater", code: 16, userInfo: [
-                    NSLocalizedDescriptionKey: "Schoology is running from a disk image or a quarantined temporary location. Move Schoology into Applications, open it there, and try the update again."
+                throw NSError(domain: "ClassWireUpdater", code: 16, userInfo: [
+                    NSLocalizedDescriptionKey: "ClassWire is running from a disk image or a quarantined temporary location. Move ClassWire into Applications, open it there, and try the update again."
                 ])
             }
             targetApp = installed
@@ -293,15 +293,15 @@ final class AppUpdateService {
             targetApp = runningBundleURL
         }
         guard Bundle(url: targetApp)?.bundleIdentifier == "com.schoologytauri.app" else {
-            throw NSError(domain: "SchoologyUpdater", code: 17, userInfo: [
-                NSLocalizedDescriptionKey: "The running app bundle could not be identified as Schoology."
+            throw NSError(domain: "ClassWireUpdater", code: 17, userInfo: [
+                NSLocalizedDescriptionKey: "The running app bundle could not be identified as ClassWire."
             ])
         }
 
         let workDirectory = fileManager.temporaryDirectory
-            .appendingPathComponent("SchoologyUpdate-\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent("ClassWireUpdate-\(UUID().uuidString)", isDirectory: true)
         let logDirectory = fileManager.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library/Logs/Schoology", isDirectory: true)
+            .appendingPathComponent("Library/Logs/ClassWire", isDirectory: true)
         let logURL = logDirectory.appendingPathComponent("update-\(Int(Date().timeIntervalSince1970)).log")
         try fileManager.createDirectory(at: logDirectory, withIntermediateDirectories: true)
         try fileManager.createDirectory(at: workDirectory, withIntermediateDirectories: true)
@@ -317,7 +317,7 @@ final class AppUpdateService {
                 let attributes = try fileManager.attributesOfItem(atPath: downloadedFile.path)
                 let actualSize = (attributes[.size] as? NSNumber)?.int64Value ?? -1
                 guard actualSize == expectedSize else {
-                    throw NSError(domain: "SchoologyUpdater", code: 2,
+                    throw NSError(domain: "ClassWireUpdater", code: 2,
                                   userInfo: [NSLocalizedDescriptionKey: "The downloaded installer size does not match the GitHub release metadata."])
                 }
             }
@@ -326,12 +326,12 @@ final class AppUpdateService {
                 let actualDigest = SHA256.hash(data: fileData).map { String(format: "%02x", $0) }.joined()
                 let expected = String(expectedDigest.dropFirst("sha256:".count)).lowercased()
                 guard actualDigest == expected else {
-                    throw NSError(domain: "SchoologyUpdater", code: 3,
+                    throw NSError(domain: "ClassWireUpdater", code: 3,
                                   userInfo: [NSLocalizedDescriptionKey: "The downloaded installer failed its SHA-256 integrity check."])
                 }
             }
 
-            let dmgURL = workDirectory.appendingPathComponent("Schoology-update.dmg")
+            let dmgURL = workDirectory.appendingPathComponent("ClassWire-update.dmg")
             try fileManager.moveItem(at: downloadedFile, to: dmgURL)
             let scriptURL = workDirectory.appendingPathComponent("install-update.zsh")
             let appPID = ProcessInfo.processInfo.processIdentifier
@@ -352,8 +352,8 @@ final class AppUpdateService {
               local STAGED_APP
               local BACKUP_APP
               TARGET_PARENT="$(/usr/bin/dirname "$TARGET_APP")"
-              STAGED_APP="$TARGET_PARENT/.Schoology-update-new.app"
-              BACKUP_APP="$TARGET_PARENT/.Schoology-update-backup.app"
+              STAGED_APP="$TARGET_PARENT/.ClassWire-update-new.app"
+              BACKUP_APP="$TARGET_PARENT/.ClassWire-update-backup.app"
 
               /bin/mkdir -p "$TARGET_PARENT"
               if [[ -d "$BACKUP_APP" && ! -d "$TARGET_APP" ]]; then
@@ -373,7 +373,7 @@ final class AppUpdateService {
                   return 1
                 fi
               elif ! /usr/bin/codesign --verify --deep --strict "$STAGED_APP"; then
-                log "ERROR: The staged Schoology app failed signature verification."
+                log "ERROR: The staged ClassWire app failed signature verification."
                 return 1
               fi
 
@@ -427,7 +427,7 @@ final class AppUpdateService {
             }
             trap cleanup EXIT
 
-            log "Starting Schoology macOS update."
+            log "Starting ClassWire macOS update."
             log "Target app: $TARGET_APP"
             log "Installer image: $DMG_PATH"
 
@@ -436,7 +436,7 @@ final class AppUpdateService {
               /bin/sleep 1
             done
             if /bin/kill -0 "$APP_PID" 2>/dev/null; then
-              log "ERROR: Schoology did not finish quitting within 120 seconds."
+              log "ERROR: ClassWire did not finish quitting within 120 seconds."
               exit 1
             fi
 
@@ -456,12 +456,12 @@ final class AppUpdateService {
             if [[ "$INSTALL_CLASSIC" == "1" ]]; then
               BUNDLE_ID=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$SOURCE_APP/Contents/Info.plist")
               if [[ "$BUNDLE_ID" != "com.schoologytauri.app" ]]; then
-                log "ERROR: The downloaded app does not have the expected Schoology bundle identifier."
+                log "ERROR: The downloaded app does not have the expected ClassWire bundle identifier."
                 /usr/bin/open -n "$TARGET_APP" || true
                 exit 1
               fi
             elif ! /usr/bin/codesign --verify --deep --strict "$SOURCE_APP"; then
-              log "ERROR: The downloaded Schoology app failed signature verification."
+              log "ERROR: The downloaded ClassWire app failed signature verification."
               /usr/bin/open -n "$TARGET_APP" || true
               exit 1
             fi
@@ -474,7 +474,7 @@ final class AppUpdateService {
                 exit 1
               fi
             else
-              log "The Applications folder requires administrator authorization. Requesting it before replacing Schoology."
+              log "The Applications folder requires administrator authorization. Requesting it before replacing ClassWire."
               ELEVATED_COMMAND="/bin/zsh $(printf '%q' "$0") --elevated-swap $(printf '%q' "$TARGET_APP") $(printf '%q' "$SOURCE_APP") $(printf '%q' "$LOG_FILE") $(printf '%q' "$INSTALL_CLASSIC")"
               if ! /usr/bin/osascript -e 'on run argv' -e 'do shell script (item 1 of argv) with administrator privileges' -e 'end run' "$ELEVATED_COMMAND"; then
                 log "ERROR: Administrator authorization was cancelled or app replacement failed."
@@ -484,7 +484,7 @@ final class AppUpdateService {
             fi
 
             /usr/bin/hdiutil detach "$MOUNT_POINT" -quiet
-            log "Launching the updated Schoology app."
+            log "Launching the updated ClassWire app."
             if ! /usr/bin/open -n "$TARGET_APP"; then
               log "ERROR: The updated app was installed but Launch Services could not open it."
               exit 1

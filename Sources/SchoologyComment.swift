@@ -63,7 +63,7 @@ struct SchoologyComment: Identifiable, Sendable {
                 item["display_name"] ?? item["displayName"] ?? item["author_name"] ??
                 item["authorName"] ?? item["user_name"] ?? item["userName"] ?? item["username"]
             )
-            let rawAuthorName = ["schoology", "schoology user"].contains(rawName.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()) ? "" : rawName
+            let rawAuthorName = ["schoology", "schoology user", "classwire", "classwire user"].contains(rawName.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()) ? "" : rawName
             let authorName = rawAuthorName.isEmpty
                 ? [first, last].filter { !$0.isEmpty }.joined(separator: " ")
                 : rawAuthorName

@@ -80,7 +80,7 @@ struct SchoologyProfileItem: Identifiable, Sendable {
             let school = (person["school"] as? [String: Any]) ?? [:]
             return Self(
                 id: SchoologyValue.string(rawID, fallback: String(index)),
-                title: rawTitle.isEmpty ? (displayName.isEmpty ? "Schoology" : displayName) : rawTitle,
+                title: rawTitle.isEmpty ? (displayName.isEmpty ? "ClassWire" : displayName) : rawTitle,
                 body: SchoologyValue.plainText(SchoologyValue.string(item["body"] ?? item["description"] ?? item["folder_description"] ?? item["folderDescription"] ?? item["message"] ?? person["bio"] ?? person["about"])),
                 subtitle: SchoologyValue.string(roleText.isEmpty ? (item["due"] ?? item["due_date"] ?? item["dueDate"] ?? item["created"] ?? item["timestamp"] ?? item["photo_count"]) : roleText),
                 url: SchoologyValue.url(person["profile_url"] ?? person["profileUrl"] ?? item["link"] ?? item["url"] ?? item["web_url"] ?? item["webUrl"] ?? file["file_download_url"] ?? file["fileDownloadURL"] ?? file["download_path"] ?? file["downloadPath"] ?? item["file_download_url"] ?? item["download_path"] ?? item["photo_url"] ?? item["photoUrl"] ?? item["original_url"] ?? item["originalUrl"]),

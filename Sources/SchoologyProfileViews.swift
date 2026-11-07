@@ -469,7 +469,7 @@ struct SchoolProfileView: View {
                                         ContentUnavailableView(
                                             "School discussions unavailable",
                                             systemImage: "lock",
-                                            description: Text("Schoology does not allow this account to list school discussions through the API.")
+                                            description: Text("ClassWire cannot list school discussions for this account through the API.")
                                         )
                                         if let url = URL(string: "https://app.schoology.com/school/\(schoolID)/discussions") {
                                             Link("Open School Discussions", destination: url)

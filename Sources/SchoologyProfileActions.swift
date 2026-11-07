@@ -51,11 +51,11 @@ struct GroupProfileActionSheet: View {
                     Section("Album") { TextField("Album name", text: $title) }
                 } else {
                     Section("Resource") {
-                        TextField("Schoology resource ID", text: $resourceID)
+                        TextField("Resource ID", text: $resourceID)
                             #if os(iOS)
                             .keyboardType(.numberPad)
                             #endif
-                        Text("Enter the resource ID supplied by Schoology. The app does not guess or create resource IDs.")
+                        Text("Enter the resource ID provided by your learning platform. The app does not guess or create resource IDs.")
                             .font(.footnote).foregroundStyle(.secondary)
                     }
                 }

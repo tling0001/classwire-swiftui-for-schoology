@@ -187,7 +187,7 @@ struct SchoologyTeacherStudentSubmissionView: View {
         }
         revisions = (await revisionRequest) ?? []
         if profile == nil && revisions.isEmpty {
-            error = "Schoology couldn't load this student's profile or submission details."
+            error = "ClassWire couldn't load this student's profile or submission details."
         }
         isLoading = false
     }

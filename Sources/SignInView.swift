@@ -77,7 +77,7 @@ struct SignInView: View {
 
     private var welcome: some View {
         VStack(spacing: 0) {
-            SchoologyBrandLockup()
+            ClassWireBrandLockup()
                 .padding(.top, 30)
                 .padding(.bottom, 34)
 
@@ -295,7 +295,7 @@ struct SignInView: View {
                 .font(.title2.weight(.semibold))
 
             if session.isLoading {
-                ProgressView("Signing in to Schoology…")
+                ProgressView("Signing in to ClassWire…")
                     .frame(maxWidth: .infinity, minHeight: 260)
             } else {
                 Text("Scan Your Code")
@@ -307,7 +307,7 @@ struct SignInView: View {
                 .frame(maxWidth: 390)
                 .frame(height: 300)
 
-                Text("Point your camera at the QR code shown in Schoology.")
+                Text("Point your camera at the sign-in QR code provided by your school.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -328,7 +328,7 @@ struct SignInView: View {
             .accessibilityLabel("Back")
 
             Spacer()
-            SchoologyBrandLockup(compact: true)
+            ClassWireBrandLockup(compact: true)
             Spacer()
 
             Color.clear.frame(width: 44, height: 44)
@@ -339,7 +339,7 @@ struct SignInView: View {
     }
 
     private var instanceSwitch: some View {
-        Button(canadian ? "I sign in to app.schoology.com" : "I sign in to app.schoologyca.com") {
+        Button(canadian ? "Switch to U.S. sign-in server" : "Switch to Canadian sign-in server") {
             canadian.toggle()
             session.canadianServer = canadian
             session.errorMessage = nil
@@ -407,25 +407,25 @@ private enum LoginPalette {
     static let blue = SchoologyStyle.blue
 }
 
-private struct SchoologyBrandLockup: View {
+private struct ClassWireBrandLockup: View {
     var compact = false
 
     var body: some View {
         HStack(spacing: compact ? 7 : 10) {
-            SchoologyMark(size: compact ? 27 : 38)
+            ClassWireMark(size: compact ? 27 : 38)
             HStack(spacing: 0) {
-                Text("School").foregroundStyle(.primary)
-                Text("ogy").foregroundStyle(Color(red: 72.0 / 255, green: 175.0 / 255, blue: 236.0 / 255))
+                Text("Class").foregroundStyle(.primary)
+                Text("Wire").foregroundStyle(Color(red: 72.0 / 255, green: 175.0 / 255, blue: 236.0 / 255))
             }
             .font(.system(size: compact ? 23 : 34, weight: .light, design: .default))
             .tracking(compact ? -0.7 : -1.0)
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Schoology")
+        .accessibilityLabel("ClassWire")
     }
 }
 
-private struct SchoologyMark: View {
+private struct ClassWireMark: View {
     var size: CGFloat
 
     var body: some View {
@@ -436,7 +436,7 @@ private struct SchoologyMark: View {
                     lineWidth: size * 0.083
                 )
                 .padding(size * 0.0415)
-            SchoologyGlyph()
+            ClassWireGlyph()
                 .fill(.primary)
         }
         .frame(width: size, height: size)
@@ -444,7 +444,7 @@ private struct SchoologyMark: View {
     }
 }
 
-private struct SchoologyGlyph: Shape {
+private struct ClassWireGlyph: Shape {
     func path(in rect: CGRect) -> Path {
         func point(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
             CGPoint(
@@ -454,26 +454,16 @@ private struct SchoologyGlyph: Shape {
         }
 
         var path = Path()
-        path.move(to: point(9.634, 10.54))
-        path.addCurve(to: point(6.368, 7.801), control1: point(8.165, 10.18), control2: point(6.368, 9.762))
-        path.addCurve(to: point(9.885, 5), control1: point(6.368, 6.08), control2: point(7.776, 5))
-        path.addCurve(to: point(13.789, 8.081), control1: point(11.624, 5), control2: point(13.479, 5.859))
-        path.addLine(to: point(12.127, 8.301))
-        path.addCurve(to: point(11.469, 6.778), control1: point(12.108, 7.72), control2: point(12.068, 7.261))
-        path.addCurve(to: point(9.713, 6.22), control1: point(10.869, 6.3), control2: point(10.174, 6.22))
-        path.addCurve(to: point(7.915, 7.6), control1: point(8.512, 6.22), control2: point(7.915, 6.959))
-        path.addCurve(to: point(10.096, 9.08), control1: point(7.915, 8.501), control2: point(8.899, 8.781))
-        path.addLine(to: point(10.967, 9.299))
-        path.addCurve(to: point(14, 12.021), control1: point(12.048, 9.559), control2: point(14, 10.041))
-        path.addCurve(to: point(10.174, 15), control1: point(14, 13.559), control2: point(12.687, 15))
-        path.addCurve(to: point(7.354, 14.241), control1: point(9.149, 15), control2: point(8.088, 14.781))
-        path.addCurve(to: point(6, 11.681), control1: point(7.063, 14.019), control2: point(6.174, 13.26))
-        path.addLine(to: point(7.739, 11.401))
-        path.addCurve(to: point(8.375, 13.24), control1: point(7.72, 11.821), control2: point(7.68, 12.621))
-        path.addCurve(to: point(10.214, 13.782), control1: point(8.915, 13.72), control2: point(9.594, 13.782))
-        path.addCurve(to: point(12.355, 12.22), control1: point(11.565, 13.782), control2: point(12.355, 13.24))
-        path.addCurve(to: point(10.462, 10.721), control1: point(12.355, 11.141), control2: point(11.565, 10.941))
-        path.addLine(to: point(9.594, 10.54))
+        path.move(to: point(15.7, 4.6))
+        path.addCurve(to: point(9.8, 2), control1: point(13.5, 2.9), control2: point(11.8, 2))
+        path.addCurve(to: point(2, 10), control1: point(5, 2), control2: point(2, 5.3))
+        path.addCurve(to: point(9.8, 18), control1: point(2, 14.7), control2: point(5, 18))
+        path.addCurve(to: point(15.7, 15.4), control1: point(11.8, 18), control2: point(13.5, 17.1))
+        path.addLine(to: point(13.5, 13.2))
+        path.addCurve(to: point(9.8, 14.8), control1: point(12.5, 14.5), control2: point(11.2, 14.8))
+        path.addCurve(to: point(5.1, 10), control1: point(6.8, 14.8), control2: point(5.1, 12.8))
+        path.addCurve(to: point(9.8, 5.2), control1: point(5.1, 7.2), control2: point(6.8, 5.2))
+        path.addCurve(to: point(13.5, 6.8), control1: point(11.2, 5.2), control2: point(12.5, 5.5))
         path.closeSubpath()
         return path
     }
@@ -523,7 +513,7 @@ private struct LoginActionButton: View {
                 case .school:
                     Image(systemName: "building.2")
                 case .account:
-                    SchoologyMark(size: 27)
+                    ClassWireMark(size: 27)
                 case .qr:
                     Image(systemName: "qrcode")
                 }

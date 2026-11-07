@@ -21,7 +21,7 @@ struct SchoologyUpdateBanner: View {
                     .frame(minWidth: 44, minHeight: 44)
             }
 
-            Text("Schoology \(version) is available. The update will download only after you choose Install update.")
+            Text("ClassWire \(version) is available. The update will download only after you choose Install update.")
                 .font(.subheadline)
                 .fixedSize(horizontal: false, vertical: true)
 

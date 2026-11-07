@@ -13,7 +13,7 @@ struct SchoologyProfileItemDetailSheet: View {
                     if !item.body.isEmpty { SchoologyRichTextText(item.body).textSelection(.enabled) }
                     if let url = item.url {
                         Link(destination: url) {
-                            Label("Open in Schoology", systemImage: "arrow.up.right")
+                            Label("Open in Browser", systemImage: "arrow.up.right")
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
                     }

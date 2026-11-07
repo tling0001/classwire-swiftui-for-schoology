@@ -127,13 +127,13 @@ private struct SchoologySidebar: View {
         List(selection: $selection) {
             sidebarSections
         }
-        .navigationTitle(Text("Schoology"))
+        .navigationTitle(Text("ClassWire"))
         .listStyle(.sidebar)
         #else
         List {
             sidebarSections
         }
-        .navigationTitle(Text("Schoology"))
+        .navigationTitle(Text("ClassWire"))
         .listStyle(.sidebar)
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)

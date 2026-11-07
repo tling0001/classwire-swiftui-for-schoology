@@ -96,7 +96,7 @@ enum SchoologyStyle {
                 : UIColor(red: 0.0, green: 0.39, blue: 0.67, alpha: 1)
         })
         #elseif canImport(AppKit)
-        Color(nsColor: NSColor(name: NSColor.Name("SchoologyBrandBlue")) { appearance in
+        Color(nsColor: NSColor(name: NSColor.Name("ClassWireBrandBlue")) { appearance in
             appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
                 ? NSColor(calibratedRed: 0.38, green: 0.69, blue: 1.0, alpha: 1)
                 : NSColor(calibratedRed: 0.0, green: 0.39, blue: 0.67, alpha: 1)
@@ -174,7 +174,7 @@ struct SchoologyCommands: Commands {
             }
             .keyboardShortcut("r", modifiers: .command)
         }
-        CommandMenu("Schoology") {
+        CommandMenu("ClassWire") {
             Button("Home") { session.destination = .home }
                 .keyboardShortcut("1", modifiers: .command)
             Button("Courses") { session.destination = .courses }

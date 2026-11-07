@@ -1,4 +1,4 @@
-name: Build and release Schoology SwiftUI
+name: Build and release ClassWire SwiftUI
 
 on:
   push:
@@ -20,7 +20,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: schoology-swiftui-release-${{ github.ref }}
+  group: classwire-swiftui-release-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -40,7 +40,7 @@ jobs:
           MACOS_SDK="$(xcrun --sdk macosx --show-sdk-version)"
           [[ "$IOS_SDK" == "27.2" ]] || { echo "Expected iOS SDK 27.2, found $IOS_SDK" >&2; exit 1; }
           [[ "$MACOS_SDK" == "27.2" ]] || { echo "Expected macOS SDK 27.2, found $MACOS_SDK" >&2; exit 1; }
-      - name: Prepare Schoology app icons
+      - name: Prepare ClassWire app icons
         run: swift Scripts/prepare-app-icons.swift
       - name: Read release version
         id: version
@@ -139,7 +139,7 @@ jobs:
           PY
           xcodebuild -exportArchive -archivePath "$RUNNER_TEMP/Schoology-macOS.xcarchive" \
             -exportPath "$RUNNER_TEMP/macOS-export" -exportOptionsPlist "$RUNNER_TEMP/macOS-ExportOptions.plist"
-          APP="$RUNNER_TEMP/macOS-export/Schoology.app"
+          APP="$RUNNER_TEMP/macOS-export/ClassWire.app"
           test -d "$APP" || { find "$RUNNER_TEMP/macOS-export" -maxdepth 3 -print; exit 1; }
           codesign --verify --deep --strict --verbose=2 "$APP"
       - name: Notarize app and package macOS assets
@@ -150,23 +150,28 @@ jobs:
           VERSION: ${{ steps.version.outputs.value }}
         run: |
           set -euo pipefail
-          APP="$RUNNER_TEMP/macOS-export/Schoology.app"
+          APP="$RUNNER_TEMP/macOS-export/ClassWire.app"
           mkdir -p release-macos/dmg-root
-          ditto -c -k --sequesterRsrc --keepParent "$APP" "$RUNNER_TEMP/Schoology-notarization.zip"
-          xcrun notarytool submit "$RUNNER_TEMP/Schoology-notarization.zip" --apple-id "$APPLE_ID" --password "$APPLE_APP_SPECIFIC_PASSWORD" --team-id "$APPLE_TEAM_ID" --wait
+          ditto -c -k --sequesterRsrc --keepParent "$APP" "$RUNNER_TEMP/ClassWire-notarization.zip"
+          xcrun notarytool submit "$RUNNER_TEMP/ClassWire-notarization.zip" --apple-id "$APPLE_ID" --password "$APPLE_APP_SPECIFIC_PASSWORD" --team-id "$APPLE_TEAM_ID" --wait
           xcrun stapler staple "$APP"
           xcrun stapler validate "$APP"
           cp -R "$APP" release-macos/dmg-root/
           ln -s /Applications release-macos/dmg-root/Applications
-          hdiutil create -volname Schoology -srcfolder release-macos/dmg-root -ov -format UDZO "release-macos/Schoology-$VERSION-macOS.dmg"
-          xcrun notarytool submit "release-macos/Schoology-$VERSION-macOS.dmg" --apple-id "$APPLE_ID" --password "$APPLE_APP_SPECIFIC_PASSWORD" --team-id "$APPLE_TEAM_ID" --wait
-          xcrun stapler staple "release-macos/Schoology-$VERSION-macOS.dmg"
-          xcrun stapler validate "release-macos/Schoology-$VERSION-macOS.dmg"
+          hdiutil create -volname ClassWire -srcfolder release-macos/dmg-root -ov -format UDZO "release-macos/ClassWire-$VERSION-macOS.dmg"
+          xcrun notarytool submit "release-macos/ClassWire-$VERSION-macOS.dmg" --apple-id "$APPLE_ID" --password "$APPLE_APP_SPECIFIC_PASSWORD" --team-id "$APPLE_TEAM_ID" --wait
+          xcrun stapler staple "release-macos/ClassWire-$VERSION-macOS.dmg"
+          xcrun stapler validate "release-macos/ClassWire-$VERSION-macOS.dmg"
+          # Keep the previous filename as a one-release compatibility alias so
+          # installed pre-rebrand builds can discover and install this update.
+          cp "release-macos/ClassWire-$VERSION-macOS.dmg" "release-macos/Schoology-$VERSION-macOS.dmg"
       - name: Upload macOS release assets
         uses: actions/upload-artifact@v4
         with:
-          name: Schoology-macOS
-          path: release-macos/Schoology-*-macOS.*
+          name: ClassWire-macOS
+          path: |
+            release-macos/ClassWire-*-macOS.*
+            release-macos/Schoology-*-macOS.dmg
           if-no-files-found: error
           retention-days: 14
 
@@ -185,7 +190,7 @@ jobs:
           MACOS_SDK="$(xcrun --sdk macosx --show-sdk-version)"
           [[ "$IOS_SDK" == "27.2" ]] || { echo "Expected iOS SDK 27.2, found $IOS_SDK" >&2; exit 1; }
           [[ "$MACOS_SDK" == "27.2" ]] || { echo "Expected macOS SDK 27.2, found $MACOS_SDK" >&2; exit 1; }
-      - name: Prepare Schoology app icons
+      - name: Prepare ClassWire app icons
         run: swift Scripts/prepare-app-icons.swift
       - name: Read release version
         id: version
@@ -319,9 +324,9 @@ jobs:
           /usr/libexec/PlistBuddy -c 'Print :ProvisionedDevices' "$RUNNER_TEMP/embedded-profile.plist" >/dev/null
           VERSION="$(tr -d '[:space:]' < VERSION)"
           mkdir -p ios-install-assets
-          IPA_NAME="Schoology-$VERSION-iOS-AdHoc.ipa"
-          MANIFEST_NAME="Schoology-$VERSION-iOS-AdHoc.plist"
-          QR_NAME="Schoology-$VERSION-iOS-Install-QR.png"
+          IPA_NAME="ClassWire-$VERSION-iOS-AdHoc.ipa"
+          MANIFEST_NAME="ClassWire-$VERSION-iOS-AdHoc.plist"
+          QR_NAME="ClassWire-$VERSION-iOS-Install-QR.png"
           cp "$IPA" "ios-install-assets/$IPA_NAME"
           IPA_URL="https://github.com/$GITHUB_REPOSITORY/releases/download/$VERSION/$IPA_NAME"
           BUILD_VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$APP/Info.plist")"
@@ -330,14 +335,19 @@ jobs:
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0"><dict><key>items</key><array><dict>
           <key>assets</key><array><dict><key>kind</key><string>software-package</string><key>url</key><string>$IPA_URL</string></dict></array>
-          <key>metadata</key><dict><key>bundle-identifier</key><string>com.schoologytauri.app</string><key>bundle-version</key><string>$BUILD_VERSION</string><key>kind</key><string>software</string><key>title</key><string>Schoology</string></dict>
+          <key>metadata</key><dict><key>bundle-identifier</key><string>com.schoologytauri.app</string><key>bundle-version</key><string>$BUILD_VERSION</string><key>kind</key><string>software</string><key>title</key><string>ClassWire</string></dict>
           </dict></array></dict></plist>
           PLIST
           MANIFEST_URL="https://github.com/$GITHUB_REPOSITORY/releases/download/$VERSION/$MANIFEST_NAME"
           ENCODED_MANIFEST_URL="$(python3 -c 'import sys,urllib.parse; print(urllib.parse.quote(sys.argv[1], safe=""))' "$MANIFEST_URL")"
           npx --yes qrcode --output "ios-install-assets/$QR_NAME" "itms-services://?action=download-manifest&url=$ENCODED_MANIFEST_URL"
+          # Keep legacy asset aliases for pre-rebrand update checkers. The plist
+          # itself still points to the new ClassWire-named IPA.
+          cp "ios-install-assets/$IPA_NAME" "ios-install-assets/Schoology-$VERSION-iOS-AdHoc.ipa"
+          cp "ios-install-assets/$MANIFEST_NAME" "ios-install-assets/Schoology-$VERSION-iOS-AdHoc.plist"
+          cp "ios-install-assets/$QR_NAME" "ios-install-assets/Schoology-$VERSION-iOS-Install-QR.png"
           cat > ios-install-assets/README.txt <<EOF
-          Schoology iOS Ad Hoc installation
+          ClassWire iOS Ad Hoc installation
           Register this iPhone or iPad UDID and include it in the Ad Hoc provisioning profile before installing.
           Scan the QR code with the device camera and follow the iOS installation prompt.
           If iOS asks, enable Developer Mode in Settings > Privacy & Security > Developer Mode.
@@ -346,13 +356,13 @@ jobs:
       - name: Upload iOS Ad Hoc release assets
         uses: actions/upload-artifact@v4
         with:
-          name: Schoology-iOS-AdHoc
+          name: ClassWire-iOS-AdHoc
           path: ios-install-assets/*
           if-no-files-found: error
           retention-days: 14
 
   release:
-    name: Publish versioned Schoology release
+    name: Publish versioned ClassWire release
     if: >-
       ${{ always() && github.ref == 'refs/heads/main' && (needs['build-macos'].result == 'success' || needs['build-ios'].result == 'success') }}
     needs: [build-macos, build-ios]
@@ -378,7 +388,7 @@ jobs:
       - name: Download platform packages
         uses: actions/download-artifact@v4
         with:
-          pattern: Schoology-*
+          pattern: ClassWire-*
           path: release-assets
           merge-multiple: true
       - name: Validate release assets
@@ -389,14 +399,21 @@ jobs:
           HAS_MACOS=false
           HAS_IOS=false
 
-          if [ -s "release-assets/Schoology-$VERSION-macOS.dmg" ]; then
+          if [ -s "release-assets/ClassWire-$VERSION-macOS.dmg" ]; then
             HAS_MACOS=true
           fi
 
-          if [ -s "release-assets/Schoology-$VERSION-iOS-AdHoc.ipa" ] \
-            && [ -s "release-assets/Schoology-$VERSION-iOS-AdHoc.plist" ] \
-            && [ -s "release-assets/Schoology-$VERSION-iOS-Install-QR.png" ]; then
+          if [ -s "release-assets/ClassWire-$VERSION-iOS-AdHoc.ipa" ] \
+            && [ -s "release-assets/ClassWire-$VERSION-iOS-AdHoc.plist" ] \
+            && [ -s "release-assets/ClassWire-$VERSION-iOS-Install-QR.png" ]; then
             HAS_IOS=true
+          fi
+
+          if [ "$HAS_MACOS" = "true" ]; then
+            test -s "release-assets/Schoology-$VERSION-macOS.dmg" || { echo "Missing the legacy macOS update alias." >&2; exit 1; }
+          fi
+          if [ "$HAS_IOS" = "true" ]; then
+            test -s "release-assets/Schoology-$VERSION-iOS-AdHoc.plist" || { echo "Missing the legacy iOS update alias." >&2; exit 1; }
           fi
 
           if [ "$HAS_MACOS" != "true" ] && [ "$HAS_IOS" != "true" ]; then

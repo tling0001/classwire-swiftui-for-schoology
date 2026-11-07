@@ -42,7 +42,7 @@ struct SchoologyHomeCreateComposerView: View {
                     if eligible.count > 1 {
                         Picker("Destination", selection: $selectedDestinationID) { ForEach(eligible) { Text($0.title).tag($0.id) } }
                     } else if let destination { LabeledContent("Destination", value: destination.title) }
-                    else { ContentUnavailableView("No available destinations", systemImage: "lock", description: Text("Schoology hasn't granted permission to create this item in any loaded course or group.")) }
+                    else { ContentUnavailableView("No available destinations", systemImage: "lock", description: Text("No loaded course or group is currently available for creating this item.")) }
                 }
                 Section(action == .discussion ? "Discussion" : "Event") {
                     TextField("Title", text: $title)
@@ -73,7 +73,7 @@ struct SchoologyHomeCreateComposerView: View {
                 }
                 Section("Attachments") {
                     Button("Attach File", systemImage: "paperclip") { showingFileImporter = true }.disabled(isUploading || isSubmitting)
-                    Button("Attach Schoology Resource", systemImage: "folder") { showingResourcePicker = true }.disabled(isUploading || isSubmitting)
+                    Button("Attach ClassWire Resource", systemImage: "folder") { showingResourcePicker = true }.disabled(isUploading || isSubmitting)
                     ForEach(Array(attachmentNames.enumerated()), id: \.offset) { _, name in Label(name, systemImage: "paperclip").foregroundStyle(.secondary) }
                     if isUploading { ProgressView("Uploading attachment…") }
                 }

@@ -65,7 +65,7 @@ enum SchoologyPushNotifications {
             settings.authorizationStatus == .provisional
         #endif
         guard isAuthorized else {
-            setRegistrationError("Allow notifications for Schoology in system settings before registering this device.")
+            setRegistrationError("Allow notifications for ClassWire in system settings before registering this device.")
             return
         }
         #if os(iOS)

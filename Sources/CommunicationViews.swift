@@ -9,7 +9,20 @@ struct MessagesView: View {
     @State private var loadError: String?
 
     private var isLoading: Bool { loadingFolder == folder }
-    @State private var showingComposer = false
+    @State private var replyContext: SchoologyMessageComposerView.ReplyContext?
+    @State private var presentedComposer: ComposerPresentation?
+    @State private var threadRefreshToken = 0
+
+    private enum ComposerPresentation: Identifiable {
+        case newMessage
+        case reply(SchoologyMessageComposerView.ReplyContext)
+        var id: String {
+            switch self {
+            case .newMessage: "new-message"
+            case .reply(let context): "reply-\(context.messageID)"
+            }
+        }
+    }
 
     var body: some View {
         GeometryReader { geometry in
@@ -20,7 +33,7 @@ struct MessagesView: View {
                     Divider()
                     Group {
                         if let selectedMessage {
-                            MessageThreadView(message: selectedMessage, folder: folder)
+                            MessageThreadView(message: selectedMessage, folder: folder, refreshToken: threadRefreshToken) { replyContext = $0 }
                                 .id(selectedMessage.id + folder.rawValue)
                         } else {
                             ContentUnavailableView("Select a message", systemImage: "envelope", description: Text("Choose a message to read its conversation."))
@@ -31,10 +44,50 @@ struct MessagesView: View {
             } else {
                 messageList
                     .navigationDestination(item: $selectedMessage) { message in
-                        MessageThreadView(message: message, folder: folder)
+                        MessageThreadView(message: message, folder: folder, refreshToken: threadRefreshToken) { replyContext = $0 }
                     }
             }
         }
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    Task { await loadFolder(force: true) }
+                } label: {
+                    if isLoading { ProgressView().controlSize(.small) }
+                    else { Label("Refresh", systemImage: "arrow.clockwise") }
+                }
+                .accessibilityLabel("Refresh messages")
+                .disabled(isLoading)
+            }
+            ToolbarItem(placement: .primaryAction) {
+                Button("Compose Message", systemImage: "square.and.pencil") { presentedComposer = .newMessage }
+            }
+            if selectedMessage != nil {
+                ToolbarItem(placement: .primaryAction) {
+                    Button("Reply", systemImage: "arrowshape.turn.up.left") {
+                        if let replyContext { presentedComposer = .reply(replyContext) }
+                    }
+                    .disabled(replyContext == nil)
+                }
+            }
+        }
+        .sheet(item: $presentedComposer) { presentation in
+            switch presentation {
+            case .newMessage:
+                SchoologyMessageComposerView(onSent: {
+                    if folder == .sent { Task { await loadFolder(force: true) } }
+                    else { folder = .sent }
+                })
+            case .reply(let context):
+                SchoologyMessageComposerView(onSent: {
+                    selectedMessage = nil
+                    replyContext = nil
+                    threadRefreshToken += 1
+                    folder = .sent
+                }, reply: context)
+            }
+        }
+        .onChange(of: selectedMessage) { _, _ in replyContext = nil }
         .task(id: folder) { await loadFolder() }
     }
 
@@ -77,34 +130,7 @@ struct MessagesView: View {
                 .refreshable { await loadFolder(force: true) }
             }
         }
-        .navigationTitle("Messages")
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button {
-                    Task { await loadFolder(force: true) }
-                } label: {
-                    if isLoading {
-                        ProgressView().controlSize(.small)
-                    } else {
-                        Label("Refresh", systemImage: "arrow.clockwise")
-                    }
-                }
-                .accessibilityLabel("Refresh messages")
-                .disabled(isLoading)
-            }
-            ToolbarItem(placement: .primaryAction) {
-                Button("Compose Message", systemImage: "square.and.pencil") { showingComposer = true }
-            }
-        }
-        .sheet(isPresented: $showingComposer) {
-            SchoologyMessageComposerView {
-                if folder == .sent {
-                    Task { await loadFolder(force: true) }
-                } else {
-                    folder = .sent
-                }
-            }
-        }
+.navigationTitle("Messages")
     }
 
     private func messageRow(_ message: SchoologyMessage) -> some View {
@@ -120,7 +146,7 @@ struct MessagesView: View {
             }
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
-                    Text(message.personName.isEmpty ? "Schoology" : message.personName)
+                    Text(message.personName.isEmpty ? "ClassWire" : message.personName)
                         .font(.subheadline.weight(.semibold))
                         .lineLimit(1)
                     Spacer(minLength: 4)
@@ -164,6 +190,8 @@ private struct MessageThreadView: View {
     @Environment(AppSession.self) private var session
     let message: SchoologyMessage
     let folder: SchoologyMessageFolder
+    let refreshToken: Int
+    let onReplyContextChange: (SchoologyMessageComposerView.ReplyContext?) -> Void
     @State private var thread: [SchoologyMessage] = []
     @State private var isLoading = true
     @State private var error: String?
@@ -191,7 +219,7 @@ private struct MessageThreadView: View {
                                             .foregroundStyle(SchoologyStyle.blue)
                                     }
                                     VStack(alignment: .leading, spacing: 3) {
-                                        Text(item.personName.isEmpty ? "Schoology" : item.personName)
+                                        Text(item.personName.isEmpty ? "ClassWire" : item.personName)
                                             .font(.subheadline.weight(.semibold))
                                         if let date = SchoologyValue.date(item.created) {
                                             Text(date, style: .relative).font(.caption2).foregroundStyle(.secondary)
@@ -221,17 +249,34 @@ private struct MessageThreadView: View {
                     let loaded = await session.loadMessageThread(message, folder: folder)
                     thread = loaded
                     error = loaded.isEmpty ? (session.errorMessage ?? "No conversation content was returned.") : nil
+                    onReplyContextChange(makeReplyContext(from: loaded))
                 }
             }
         }
         .navigationTitle(message.subject)
-        .task(id: message.id) {
+        .task(id: "\(message.id):\(folder.rawValue):\(refreshToken)") {
             isLoading = true
             let loaded = await session.loadMessageThread(message, folder: folder)
             thread = loaded
             error = loaded.isEmpty ? (session.errorMessage ?? "No conversation content was returned.") : nil
+            onReplyContextChange(makeReplyContext(from: loaded))
             isLoading = false
         }
+    }
+
+    private func makeReplyContext(from loaded: [SchoologyMessage]) -> SchoologyMessageComposerView.ReplyContext? {
+        guard let currentUserID = session.auth?.userID else { return nil }
+        let source = loaded.reversed().first {
+            guard let authorID = $0.authorID else { return false }
+            return authorID != currentUserID
+        } ?? ((message.authorID != nil && message.authorID != currentUserID) ? message : nil)
+        guard let source, let recipientID = source.authorID, recipientID != currentUserID else { return nil }
+        return SchoologyMessageComposerView.ReplyContext(
+            messageID: message.id,
+            recipientID: recipientID,
+            recipientName: source.personName.isEmpty ? "Reply recipient" : source.personName,
+            subject: message.subject
+        )
     }
 }
 
@@ -268,7 +313,7 @@ struct NotificationsView: View {
             } else if let error = session.notificationsError, session.notifications.isEmpty {
                 ContentUnavailableView("Unable to load notifications", systemImage: "exclamationmark.triangle", description: Text(error))
             } else if session.hasLoadedNotifications && session.notifications.isEmpty {
-                ContentUnavailableView("No notifications", systemImage: "bell", description: Text("New Schoology notifications will appear here."))
+                ContentUnavailableView("No notifications", systemImage: "bell", description: Text("New ClassWire notifications will appear here."))
             }
         }
         .schoologyInsetGroupedListStyle()

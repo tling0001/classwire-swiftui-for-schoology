@@ -43,28 +43,28 @@ struct SettingsView: View {
 
                 Divider()
 
-                Button("Switch to Schoology Classic", systemImage: "arrow.uturn.backward") {
+                Button("Switch to ClassWire Classic", systemImage: "arrow.uturn.backward") {
                     Task { await updates.checkForClassicRelease() }
                 }
                 .disabled(updates.isCheckingClassic || isInstallingClassic)
 
                 if updates.isCheckingClassic {
-                    ProgressView("Finding the latest Schoology Classic release…")
+                    ProgressView("Finding the latest ClassWire Classic release…")
                 } else if let classicVersion = updates.classicLatestVersion {
-                    Label("Schoology Classic \(classicVersion)", systemImage: "desktopcomputer")
+                    Label("ClassWire Classic \(classicVersion)", systemImage: "desktopcomputer")
                         .foregroundStyle(.secondary)
-                    Button("Install Schoology Classic", systemImage: "arrow.down.to.line") {
+                    Button("Install ClassWire Classic", systemImage: "arrow.down.to.line") {
                         showingClassicConfirmation = true
                     }
                     .disabled(!updates.canInstallClassic || isInstallingClassic)
                     if let releaseURL = updates.classicReleaseURL {
-                        Link("View Schoology Classic release", destination: releaseURL)
+                        Link("View ClassWire Classic release", destination: releaseURL)
                     }
                 }
 
                 #if os(macOS)
                 if isInstallingClassic {
-                    ProgressView("Downloading and preparing Schoology Classic…")
+                    ProgressView("Downloading and preparing ClassWire Classic…")
                 }
                 #endif
                 if let classicError = updates.classicErrorMessage {
@@ -146,8 +146,8 @@ struct SettingsView: View {
         .formStyle(.grouped)
         .padding()
         .frame(maxWidth: 720)
-        .confirmationDialog("Switch to Schoology Classic?", isPresented: $showingClassicConfirmation, titleVisibility: .visible) {
-            Button("Replace with Schoology Classic", role: .destructive) {
+        .confirmationDialog("Switch to ClassWire Classic?", isPresented: $showingClassicConfirmation, titleVisibility: .visible) {
+            Button("Replace with ClassWire Classic", role: .destructive) {
                 #if os(macOS)
                 Task { await installClassicMacOS() }
                 #else
@@ -156,12 +156,12 @@ struct SettingsView: View {
             }
             Button("Cancel", role: .cancel) { }
         } message: {
-            Text("This replaces the current Schoology SwiftUI app with Schoology Classic. Your app will be updated in place and may close during installation.")
+            Text("This replaces the current ClassWire app with ClassWire Classic. Your app will be updated in place and may close during installation.")
         }
         .alert("Installing update", isPresented: $showingIOSInstallNotice) {
             Button("OK", role: .cancel) { }
         } message: {
-            Text("Schoology installation will start after closing Schoology or going to your Home Screen.")
+            Text("ClassWire installation will start after closing ClassWire or going to your Home Screen.")
         }
     }
 
@@ -203,7 +203,7 @@ struct SettingsView: View {
         do {
             try await updates.installClassic()
         } catch {
-            classicInstallError = "Could not switch to Schoology Classic: \(error.localizedDescription)"
+            classicInstallError = "Could not switch to ClassWire Classic: \(error.localizedDescription)"
             isInstallingClassic = false
         }
     }
@@ -223,24 +223,24 @@ struct SchoologyNotificationSettingsSection: View {
         #if os(macOS)
         Section("Notifications") {
             if isAuthorized {
-                Toggle("Schoology notifications", isOn: $notificationsEnabled)
+                Toggle("ClassWire notifications", isOn: $notificationsEnabled)
                     .onChange(of: notificationsEnabled) { _, enabled in
                         Task { await SchoologyPushNotifications.setEnabled(enabled) }
                     }
                 Toggle("Notification sound", isOn: $notificationSound)
                     .disabled(!notificationsEnabled)
-                Text("Alerts follow your macOS notification settings. Sound preference applies while Schoology is open.")
+                Text("Alerts follow your macOS notification settings. Sound preference applies while ClassWire is open.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             } else {
-                Button(authorizationStatus == .denied ? "Open Notification Settings" : "Enable Schoology Notifications",
+                Button(authorizationStatus == .denied ? "Open Notification Settings" : "Enable ClassWire Notifications",
                        systemImage: authorizationStatus == .denied ? "gear" : "bell.badge") {
                     if authorizationStatus == .denied { openSystemNotificationSettings() }
                     else { Task { await requestPermission() } }
                 }
                 Text(authorizationStatus == .denied
-                     ? "Notifications are blocked for Schoology. Allow them in System Settings to receive alerts."
-                     : "Allow Schoology to send alerts for new messages, comments, and other activity.")
+                     ? "Notifications are blocked for ClassWire. Allow them in System Settings to receive alerts."
+                     : "Allow ClassWire to send alerts for new messages, comments, and other activity.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
@@ -257,24 +257,24 @@ struct SchoologyNotificationSettingsSection: View {
         #else
         Section("Notifications") {
             if isAuthorized {
-                Toggle("Schoology notifications", isOn: $notificationsEnabled)
+                Toggle("ClassWire notifications", isOn: $notificationsEnabled)
                     .onChange(of: notificationsEnabled) { _, enabled in
                         Task { await SchoologyPushNotifications.setEnabled(enabled) }
                     }
                 Toggle("Notification sound", isOn: $notificationSound)
                     .disabled(!notificationsEnabled)
-                Text("Vibration and alert appearance follow your iPhone or iPad notification settings. Sound preference applies while Schoology is open.")
+                Text("Vibration and alert appearance follow your iPhone or iPad notification settings. Sound preference applies while ClassWire is open.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             } else {
-                Button(authorizationStatus == .denied ? "Open Notification Settings" : "Enable Schoology Notifications",
+                Button(authorizationStatus == .denied ? "Open Notification Settings" : "Enable ClassWire Notifications",
                        systemImage: authorizationStatus == .denied ? "gear" : "bell.badge") {
                     if authorizationStatus == .denied { openSystemNotificationSettings() }
                     else { Task { await requestPermission() } }
                 }
                 Text(authorizationStatus == .denied
-                     ? "Notifications are blocked for Schoology. Allow them in system settings to receive alerts."
-                     : "Allow Schoology to send alerts for new messages, comments, and other activity.")
+                     ? "Notifications are blocked for ClassWire. Allow them in system settings to receive alerts."
+                     : "Allow ClassWire to send alerts for new messages, comments, and other activity.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }

@@ -7,9 +7,9 @@ let macSet = assetCatalog.appendingPathComponent("AppIconMac.appiconset", isDire
 try FileManager.default.createDirectory(at: iosSet, withIntermediateDirectories: true)
 try FileManager.default.createDirectory(at: macSet, withIntermediateDirectories: true)
 
-// Exact vector artwork from assets/icons/ic_sgy_logo.svg in Schoology Tauri port.28.
+// ClassWire brand mark: the original blue circular ring with a custom C glyph.
 let ringPath = #"M10 1.868C5.401 1.868 1.659 5.571 1.659 10.122 1.659 14.674 5.401 18.378 10 18.378 14.599 18.378 18.341 14.674 18.341 10.122 18.341 5.571 14.599 1.868 10 1.868M10 20.226C4.486 20.226 0 15.739 0 10.225 0 4.711 4.486 0.226 10 0.226 15.514 0.226 20 4.711 20 10.225 20 15.739 15.514 20.226 10 20.226Z"#
-let letterPath = #"M9.634 10.54C8.165 10.18 6.368 9.762 6.368 7.801 6.368 6.08 7.776 5 9.885 5c1.739 0 3.594.859 3.904 3.081l-1.662.22c-.019-.581-.059-1.04-.658-1.523-.6-.478-1.295-.558-1.756-.558-1.201 0-1.798.739-1.798 1.38 0 .901.984 1.181 2.181 1.48l.871.219c1.081.26 3.033.742 3.033 2.722 0 1.538-1.313 2.979-3.826 2.979-1.025 0-2.086-.219-2.82-.759-.291-.222-1.18-.981-1.354-2.56l1.739-.28c-.019.42-.059 1.22.636 1.839.54.48 1.219.542 1.839.542 1.351 0 2.141-.542 2.141-1.562 0-1.079-.79-1.279-1.893-1.499l-.868-.181z"#
+let letterPath = #"M15.7 4.6C14.1 2.9 12.1 2 9.8 2 5 2 2 5.3 2 10s3 8 7.8 8c2.3 0 4.3-.9 5.9-2.6l-2.2-2.2c-1 1-2.3 1.6-3.7 1.6-3 0-4.7-2-4.7-4.8s1.7-4.8 4.7-4.8c1.4 0 2.7.6 3.7 1.6z"#
 
 func svg(dark: Bool = false, tinted: Bool = false) -> String {
     let background = tinted ? "" : #"<rect width="20" height="20" fill="\#(dark ? "#243442" : "#ffffff")"/>"#
@@ -28,7 +28,7 @@ func svg(dark: Bool = false, tinted: Bool = false) -> String {
 
 func renderIcon(size: Int, dark: Bool = false, tinted: Bool = false, roundedCorners: Bool = false) throws -> Data {
     guard let image = NSImage(data: Data(svg(dark: dark, tinted: tinted).utf8)) else {
-        throw NSError(domain: "SchoologyIcon", code: 1, userInfo: [NSLocalizedDescriptionKey: "Could not decode official Schoology SVG artwork."])
+        throw NSError(domain: "ClassWireIcon", code: 1, userInfo: [NSLocalizedDescriptionKey: "Could not decode official ClassWire SVG artwork."])
     }
     let dimension = CGFloat(size)
     guard let bitmap = NSBitmapImageRep(
@@ -36,7 +36,7 @@ func renderIcon(size: Int, dark: Bool = false, tinted: Bool = false, roundedCorn
         bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
         colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0
     ), let context = NSGraphicsContext(bitmapImageRep: bitmap) else {
-        throw NSError(domain: "SchoologyIcon", code: 2, userInfo: [NSLocalizedDescriptionKey: "Could not allocate Schoology icon bitmap."])
+        throw NSError(domain: "ClassWireIcon", code: 2, userInfo: [NSLocalizedDescriptionKey: "Could not allocate ClassWire icon bitmap."])
     }
     NSGraphicsContext.saveGraphicsState()
     NSGraphicsContext.current = context
@@ -56,7 +56,7 @@ func renderIcon(size: Int, dark: Bool = false, tinted: Bool = false, roundedCorn
                from: .zero, operation: .sourceOver, fraction: 1)
     NSGraphicsContext.restoreGraphicsState()
     guard let png = bitmap.representation(using: .png, properties: [:]) else {
-        throw NSError(domain: "SchoologyIcon", code: 3, userInfo: [NSLocalizedDescriptionKey: "Could not encode Schoology icon PNG."])
+        throw NSError(domain: "ClassWireIcon", code: 3, userInfo: [NSLocalizedDescriptionKey: "Could not encode ClassWire icon PNG."])
     }
     return png
 }
@@ -78,4 +78,4 @@ for (name, size) in macSizes {
     try write(renderIcon(size: size, dark: true, roundedCorners: true), to: macSet.appendingPathComponent("\(stem)-dark.png"))
     try write(renderIcon(size: size, tinted: true, roundedCorners: true), to: macSet.appendingPathComponent("\(stem)-tinted.png"))
 }
-print("Prepared Schoology light, dark, and tinted icons using the exact Tauri port.28 vector mark.")
+print("Prepared ClassWire light, dark, and tinted icons using the exact Tauri port.28 vector mark.")

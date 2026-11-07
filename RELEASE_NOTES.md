@@ -1,5 +1,27 @@
 # Release notes
 
+## [2026.10.0-port.70]
+
+### ClassWire rebrand
+- Rebrand the app display name, navigation and settings labels, sign-in wordmark, accessibility label, update messaging, and generated iOS/macOS app icons as ClassWire.
+- Replace the original S glyph with a matching custom C mark in the sign-in logo and generated app icons.
+- Rename versioned release assets and the installed macOS app bundle to ClassWire while retaining the existing bundle identifier and Schoology sign-in callback for upgrade compatibility.
+- Publish temporary legacy Schoology-named copies of the new packages so existing pre-rebrand update checkers can discover the transition release.
+
+### Messaging
+- Add a native Reply action to the Messages toolbar, including the macOS and iPad split-pane detail state.
+- Prefill the reply recipient and original subject from the latest incoming message in the conversation, and send through the same message-thread endpoint and JSON payload used by Tauri.
+- Preserve file and resource attachments when replying.
+
+### OAuth and comments
+- Match Android and Tauri OAuth normalization by excluding form-body fields from the signature parameter set.
+- Use Tauri's 128-bit random nonce plus a monotonic per-process sequence, and refresh the server-time offset before the one-time replay retry.
+- Submit activity-post comments as JSON with a numeric parent ID.
+
+### Build
+- Increment the iOS and macOS bundle build number to 70.
+
+
 ## [2026.10.0-port.69]
 
 ### Post comments and OAuth reliability

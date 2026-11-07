@@ -17,7 +17,7 @@ struct SchoologyNotification: Identifiable, Hashable, Sendable {
         case "comment_private_add": "Private comment"
         case "discussion_add": "New discussion"
         case "comment_add": "New comment"
-        default: "Schoology notification"
+        default: "ClassWire notification"
         }
     }
     var formattedBody: String {

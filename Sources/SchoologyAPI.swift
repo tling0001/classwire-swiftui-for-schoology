@@ -22,11 +22,11 @@ enum SchoologyAPIError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .invalidResponse: "Schoology returned an invalid response."
-        case .http(let code, let detail): "Schoology request failed (HTTP \(code)): \(detail)"
+        case .invalidResponse: "ClassWire returned an invalid response."
+        case .http(let code, let detail): "ClassWire request failed (HTTP \(code)): \(detail)"
         case .attachment(let detail): detail
-        case .invalidToken: "Schoology did not return a valid access token."
-        case .notSignedIn: "Please sign in to Schoology."
+        case .invalidToken: "ClassWire did not return a valid access token."
+        case .notSignedIn: "Please sign in to ClassWire."
         }
     }
 }
@@ -40,6 +40,7 @@ actor SchoologyAPI {
     private var timeOffset: Int64 = 0
     private var recentOAuthNonces = Set<String>()
     private var oauthNonceOrder: [String] = []
+    private var oauthNonceCounter: UInt64 = 0
     private var useCanadianServer = false
     private let imageDataCache: NSCache<NSString, NSData> = {
         let cache = NSCache<NSString, NSData>()
@@ -182,7 +183,7 @@ actor SchoologyAPI {
               let id = json["id"] else { throw SchoologyAPIError.invalidResponse }
         return SchoologyUser(
             id: String(describing: id),
-            nameDisplay: json["name_display"] as? String ?? json["name"] as? String ?? "Schoology user",
+            nameDisplay: json["name_display"] as? String ?? json["name"] as? String ?? "ClassWire user",
             pictureURL: URL(string: json["picture_url"] as? String ?? "")
         )
     }
@@ -348,8 +349,8 @@ actor SchoologyAPI {
         await syncServerTime()
         let url = URL(string: "https://\(apiHost)/v1/\(path)")!
         let body = formEncode(params)
-        let extra = params.map { ($0.key, oauthEncode($0.value)) }
-        return try await send(url: url, method: "POST", body: body, auth: auth, signed: true, extra: extra)
+        // Android and Tauri sign URL query parameters and OAuth fields, not form-body fields.
+        return try await send(url: url, method: "POST", body: body, auth: auth, signed: true, extra: [])
     }
 
     func postJSON(_ path: String, auth: SchoologyAuth, params: [String: String] = [:], body: [String: Any]) async throws -> Data {
@@ -504,7 +505,7 @@ actor SchoologyAPI {
             }
             let mimeType = http.value(forHTTPHeaderField: "Content-Type") ?? "application/octet-stream"
             if mimeType.lowercased().contains("text/html") {
-                throw SchoologyAPIError.attachment("Schoology returned an HTML page instead of the attachment. The file session may have expired. Try signing in again.")
+                throw SchoologyAPIError.attachment("ClassWire received an HTML page instead of the attachment. The file session may have expired. Try signing in again.")
             }
             return (data, mimeType)
         }
@@ -544,14 +545,12 @@ actor SchoologyAPI {
     }
 
     private func nextOAuthNonce() -> String {
-        // Match Android's OAuthRequestSigner and the Tauri port: a positive
-        // random 64-bit integer rendered as lowercase hexadecimal.
-        // Retain recent values so a collision cannot replay a nonce in-session.
-        var nonce: String
-        repeat {
-            nonce = String(UInt64.random(in: UInt64.min...UInt64.max), radix: 16)
-        } while recentOAuthNonces.contains(nonce)
-
+        // Match Tauri's 128-bit random value plus a monotonically increasing
+        // process-local sequence so a repeated random value cannot replay a nonce.
+        oauthNonceCounter &+= 1
+        let randomHigh = UInt64.random(in: UInt64.min...UInt64.max)
+        let randomLow = UInt64.random(in: UInt64.min...UInt64.max)
+        let nonce = String(format: "%016llx%016llx%016llx", randomHigh, randomLow, oauthNonceCounter)
         recentOAuthNonces.insert(nonce)
         oauthNonceOrder.append(nonce)
         if oauthNonceOrder.count > 4096 {
@@ -750,6 +749,7 @@ actor SchoologyAPI {
                     // Rebuild the Authorization header on the next pass so both
                     // oauth_nonce and oauth_signature are fresh.
                     replayRetryCount += 1
+                    await syncServerTime()
                     continue
                 }
             }

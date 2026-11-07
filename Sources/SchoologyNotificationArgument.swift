@@ -37,7 +37,7 @@ struct SchoologyNotificationArgument: Identifiable, Hashable, Sendable {
             let children = decodeList(item["all"] ?? item["more"] ?? item["items"], prefix: "\(prefix)-\(index)")
             return SchoologyNotificationArgument(
                 id: "\(prefix)-\(index)-\(targetID ?? type)", targetID: targetID, type: type,
-                title: SchoologyValue.plainText(SchoologyValue.string(item["title"], fallback: "Schoology item")),
+                title: SchoologyValue.plainText(SchoologyValue.string(item["title"], fallback: "ClassWire item")),
                 assignmentType: SchoologyValue.optionalString(item["assignment_type"] ?? item["assignmentType"]),
                 documentType: SchoologyValue.optionalString(item["document_type"] ?? item["documentType"]),
                 url: SchoologyValue.url(item["url"] ?? item["href"] ?? item["web_url"] ?? item["webUrl"]),
