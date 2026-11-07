@@ -1,5 +1,21 @@
 # Release notes
 
+## [2026.10.0-port.71]
+
+### ClassWire identity
+- Reduce the C glyph to 78% of its previous size inside the circular mark in generated iOS/macOS app icons, the sign-in brand lockup, and the account sign-in button.
+
+### TestFlight
+- Add a manual workflow checkbox to build and upload only the iOS TestFlight package, skipping macOS and Ad Hoc jobs.
+- Validate the App Store Connect provisioning profile and exported IPA before upload.
+- Document App Store Connect setup, signing prerequisites, reviewer information, and the real demo-account requirement.
+
+### Build
+- Increment the iOS and macOS bundle build number to 71.
+
+
+# Release notes
+
 ## [2026.10.0-port.70]
 
 ### ClassWire rebrand

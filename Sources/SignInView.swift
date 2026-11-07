@@ -448,8 +448,8 @@ private struct ClassWireGlyph: Shape {
     func path(in rect: CGRect) -> Path {
         func point(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
             CGPoint(
-                x: rect.minX + x * rect.width / 20,
-                y: rect.minY + y * rect.height / 20
+                x: rect.midX + (x - 10) * rect.width / 20 * 0.78,
+                y: rect.midY + (y - 10) * rect.height / 20 * 0.78
             )
         }
 

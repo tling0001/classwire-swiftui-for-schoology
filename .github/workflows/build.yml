@@ -5,6 +5,11 @@ on:
     branches: [main]
   workflow_dispatch:
     inputs:
+      testflight_only:
+        description: Build and upload only the iOS TestFlight package (skips macOS and Ad Hoc)
+        required: false
+        type: boolean
+        default: false
       ios_adhoc_only:
         description: Build and publish only the iOS Ad Hoc package
         required: false
@@ -25,7 +30,7 @@ concurrency:
 
 jobs:
   build-macos:
-    if: ${{ inputs.ios_adhoc_only != true }}
+    if: ${{ inputs.ios_adhoc_only != true && inputs.testflight_only != true }}
     name: Build, sign and notarize macOS
     runs-on: xcode-27
     steps:
@@ -176,6 +181,7 @@ jobs:
           retention-days: 14
 
   build-ios:
+    if: ${{ inputs.testflight_only != true }}
     name: Build signed iOS Ad Hoc IPA
     runs-on: xcode-27
     steps:
@@ -358,6 +364,163 @@ jobs:
         with:
           name: ClassWire-iOS-AdHoc
           path: ios-install-assets/*
+          if-no-files-found: error
+          retention-days: 14
+
+  build-testflight:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.testflight_only == true }}
+    name: Build and upload iOS TestFlight beta
+    runs-on: xcode-27
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode 27.2 and verify iOS SDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo xcode-select --switch /Applications/Xcode_27.2.app/Contents/Developer
+          xcodebuild -version
+          IOS_SDK="$(xcrun --sdk iphoneos --show-sdk-version)"
+          [[ "$IOS_SDK" == "27.2" ]] || { echo "Expected iOS SDK 27.2, found $IOS_SDK" >&2; exit 1; }
+      - name: Prepare ClassWire app icons
+        run: swift Scripts/prepare-app-icons.swift
+      - name: Read release version
+        id: version
+        shell: bash
+        run: |
+          VERSION="$(tr -d '[:space:]' < VERSION)"
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+-port\.[0-9]+$ ]] || { echo "Invalid VERSION: $VERSION" >&2; exit 1; }
+          echo "value=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "marketing=${VERSION%-port.*}" >> "$GITHUB_OUTPUT"
+          echo "build=${VERSION##*-port.}" >> "$GITHUB_OUTPUT"
+      - name: Verify App Store Connect signing configuration
+        shell: bash
+        env:
+          IOS_CERTIFICATE_P12_BASE64: ${{ secrets.IOS_CERTIFICATE_P12_BASE64 }}
+          IOS_CERTIFICATE_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
+          APPSTORE_API_PRIVATE_KEY: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
+          APPSTORE_API_KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID || vars.APPSTORE_API_KEY_ID }}
+          APPSTORE_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID || vars.APPSTORE_ISSUER_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID || vars.APPLE_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          for name in IOS_CERTIFICATE_P12_BASE64 IOS_CERTIFICATE_PASSWORD APPSTORE_API_PRIVATE_KEY APPSTORE_API_KEY_ID APPSTORE_ISSUER_ID APPLE_TEAM_ID; do
+            if [ -z "${!name:-}" ]; then echo "Required signing value $name is missing." >&2; exit 1; fi
+          done
+      - name: Import Apple Distribution certificate
+        uses: apple-actions/import-codesign-certs@v3
+        with:
+          p12-file-base64: ${{ secrets.IOS_CERTIFICATE_P12_BASE64 }}
+          p12-password: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Generate Xcode project
+        run: xcodegen generate
+      - name: Download App Store Connect provisioning profile
+        uses: Apple-Actions/download-provisioning-profiles@v7.0.0
+        with:
+          bundle-id: com.schoologytauri.app
+          profile-type: IOS_APP_STORE
+          issuer-id: ${{ secrets.APPSTORE_ISSUER_ID || vars.APPSTORE_ISSUER_ID }}
+          api-key-id: ${{ secrets.APPSTORE_API_KEY_ID || vars.APPSTORE_API_KEY_ID }}
+          api-private-key: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
+      - name: Select and validate App Store profile
+        id: profile
+        shell: bash
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID || vars.APPLE_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/testflight-profile"
+          SELECTED=""
+          for directory in "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles" "$HOME/Library/MobileDevice/Provisioning Profiles"; do
+            [ -d "$directory" ] || continue
+            for candidate in "$directory"/*.mobileprovision; do
+              [ -f "$candidate" ] || continue
+              plist="$RUNNER_TEMP/testflight-profile/profile.plist"
+              security cms -D -i "$candidate" > "$plist" 2>/dev/null || continue
+              app_id="$(/usr/libexec/PlistBuddy -c 'Print :Entitlements:application-identifier' "$plist" 2>/dev/null || true)"
+              team="$(/usr/libexec/PlistBuddy -c 'Print :TeamIdentifier:0' "$plist" 2>/dev/null || true)"
+              get_task_allow="$(/usr/libexec/PlistBuddy -c 'Print :Entitlements:get-task-allow' "$plist" 2>/dev/null || true)"
+              devices="$(/usr/libexec/PlistBuddy -c 'Print :ProvisionedDevices' "$plist" 2>/dev/null || true)"
+              if [ "$app_id" = "$APPLE_TEAM_ID.com.schoologytauri.app" ] && [ "$team" = "$APPLE_TEAM_ID" ] && [ "$get_task_allow" = "false" ] && [ -z "$devices" ]; then
+                SELECTED="$candidate"; break 2
+              fi
+            done
+          done
+          test -n "$SELECTED" || { echo "::error::No active App Store Connect profile for com.schoologytauri.app. Create one for this exact App ID and confirm the API key can access it." >&2; exit 1; }
+          cp "$SELECTED" "$RUNNER_TEMP/ClassWire-AppStore.mobileprovision"
+          security cms -D -i "$RUNNER_TEMP/ClassWire-AppStore.mobileprovision" > "$RUNNER_TEMP/ClassWire-AppStore-profile.plist"
+          PROFILE_NAME="$(/usr/libexec/PlistBuddy -c 'Print :Name' "$RUNNER_TEMP/ClassWire-AppStore-profile.plist")"
+          PROFILE_UUID="$(/usr/libexec/PlistBuddy -c 'Print :UUID' "$RUNNER_TEMP/ClassWire-AppStore-profile.plist")"
+          echo "name=$PROFILE_NAME" >> "$GITHUB_OUTPUT"
+          echo "uuid=$PROFILE_UUID" >> "$GITHUB_OUTPUT"
+          echo "Validated App Store profile: $PROFILE_NAME ($PROFILE_UUID)"
+      - name: Archive iOS app for App Store Connect
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID || vars.APPLE_TEAM_ID }}
+          PROFILE_NAME: ${{ steps.profile.outputs.name }}
+          MARKETING_VERSION: ${{ steps.version.outputs.marketing }}
+          CURRENT_PROJECT_VERSION: ${{ steps.version.outputs.build }}
+        run: |
+          set -euo pipefail
+          xcodebuild -project Schoology.xcodeproj -scheme Schoology-iOS -configuration Release \
+            -destination 'generic/platform=iOS' -archivePath "$RUNNER_TEMP/ClassWire-TestFlight.xcarchive" \
+            CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="Apple Distribution" \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" PROVISIONING_PROFILE_SPECIFIER="$PROFILE_NAME" \
+            MARKETING_VERSION="$MARKETING_VERSION" CURRENT_PROJECT_VERSION="$CURRENT_PROJECT_VERSION" archive
+      - name: Export and validate TestFlight IPA
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID || vars.APPLE_TEAM_ID }}
+          PROFILE_NAME: ${{ steps.profile.outputs.name }}
+        run: |
+          set -euo pipefail
+          python3 - "$RUNNER_TEMP/TestFlight-ExportOptions.plist" "$APPLE_TEAM_ID" "$PROFILE_NAME" <<'PY'
+          import plistlib, sys
+          path, team, profile = sys.argv[1:]
+          options = {"method":"app-store-connect","destination":"export","signingStyle":"manual","teamID":team,"signingCertificate":"Apple Distribution","provisioningProfiles":{"com.schoologytauri.app":profile},"stripSwiftSymbols":True}
+          with open(path, "wb") as stream: plistlib.dump(options, stream)
+          PY
+          xcodebuild -exportArchive -archivePath "$RUNNER_TEMP/ClassWire-TestFlight.xcarchive" \
+            -exportPath "$RUNNER_TEMP/TestFlight-export" -exportOptionsPlist "$RUNNER_TEMP/TestFlight-ExportOptions.plist"
+          IPA="$(find "$RUNNER_TEMP/TestFlight-export" -maxdepth 2 -type f -name '*.ipa' -print -quit)"
+          test -n "$IPA" && test -s "$IPA" || { find "$RUNNER_TEMP/TestFlight-export" -maxdepth 3 -print; exit 1; }
+          mkdir -p "$RUNNER_TEMP/testflight-validation"
+          ditto -x -k "$IPA" "$RUNNER_TEMP/testflight-validation"
+          APP="$(find "$RUNNER_TEMP/testflight-validation/Payload" -maxdepth 2 -type d -name '*.app' -print -quit)"
+          test -n "$APP"
+          APP_ID="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Info.plist")"
+          test "$APP_ID" = "com.schoologytauri.app" || { echo "Unexpected bundle identifier: $APP_ID" >&2; exit 1; }
+          test -s "$APP/Assets.car" || { echo "The exported app is missing its compiled asset catalog." >&2; exit 1; }
+          ICON_NAME="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIcons:CFBundlePrimaryIcon:CFBundleIconName' "$APP/Info.plist" 2>/dev/null || true)"
+          test "$ICON_NAME" = "AppIcon" || { echo "The exported app is missing AppIcon primary-icon metadata (found: $ICON_NAME)." >&2; exit 1; }
+          security cms -D -i "$APP/embedded.mobileprovision" > "$RUNNER_TEMP/testflight-embedded-profile.plist"
+          APP_IDENTIFIER="$(/usr/libexec/PlistBuddy -c 'Print :Entitlements:application-identifier' "$RUNNER_TEMP/testflight-embedded-profile.plist")"
+          test "$APP_IDENTIFIER" = "$APPLE_TEAM_ID.com.schoologytauri.app"
+          GET_TASK_ALLOW="$(/usr/libexec/PlistBuddy -c 'Print :Entitlements:get-task-allow' "$RUNNER_TEMP/testflight-embedded-profile.plist")"
+          test "$GET_TASK_ALLOW" = "false"
+          if /usr/libexec/PlistBuddy -c 'Print :ProvisionedDevices' "$RUNNER_TEMP/testflight-embedded-profile.plist" >/dev/null 2>&1; then echo "Unexpected device-limited profile in TestFlight IPA." >&2; exit 1; fi
+          echo "Validated App Store Connect IPA for $APP_ID."
+      - name: Upload IPA to App Store Connect
+        shell: bash
+        env:
+          APPSTORE_API_PRIVATE_KEY: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
+          APPSTORE_API_KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID || vars.APPSTORE_API_KEY_ID }}
+          APPSTORE_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID || vars.APPSTORE_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          IPA="$(find "$RUNNER_TEMP/TestFlight-export" -maxdepth 2 -type f -name '*.ipa' -print -quit)"
+          test -n "$IPA" && test -s "$IPA"
+          mkdir -p "$HOME/.appstoreconnect/private_keys"
+          KEY_PATH="$HOME/.appstoreconnect/private_keys/AuthKey_${APPSTORE_API_KEY_ID}.p8"
+          printf '%s' "$APPSTORE_API_PRIVATE_KEY" > "$KEY_PATH"
+          chmod 600 "$KEY_PATH"
+          xcrun altool --upload-app --type ios --file "$IPA" --apiKey "$APPSTORE_API_KEY_ID" --apiIssuer "$APPSTORE_ISSUER_ID" --verbose
+          echo "Upload accepted by App Store Connect. Apple still needs to process the build before it appears in TestFlight."
+      - name: Upload TestFlight IPA as a workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ClassWire-iOS-TestFlight
+          path: ${{ runner.temp }}/TestFlight-export/*.ipa
           if-no-files-found: error
           retention-days: 14
 
