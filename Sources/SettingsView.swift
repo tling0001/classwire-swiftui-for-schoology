@@ -141,6 +141,9 @@ struct SettingsView: View {
 
             Section("About") {
                 LabeledContent("Version", value: AppVersion.current)
+                Link(destination: URL(string: "https://github.com/tling0001/classwire-swiftui-for-schoology/blob/main/privacy_policy.md")!) {
+                    Label("Privacy Policy", systemImage: "hand.raised")
+                }
             }
         }
         .formStyle(.grouped)

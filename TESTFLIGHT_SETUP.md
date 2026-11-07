@@ -76,7 +76,7 @@ A local interactive demo mode is available using the credentials in [APP_REVIEW_
 
 Enter them through **Sign in with my account**. The app presents a confirmation dialog before opening the demo. No Schoology authentication request is made, and demo interactions remain local.
 
-**Important:** Apple App Review Guideline 2.1(a) requires prior approval before using a built-in demo mode instead of a demo account when legal or security obligations prevent providing one. The current demo covers principal app areas but is not yet a complete simulator of all production operations or backend effects. Do not submit it as a complete replacement for a live account without Apple's approval and a feature-by-feature review. If Apple requires live service access, arrange an institution-authorized Schoology test account.
+**Important:** Apple App Review Guideline 2.1(a) requires prior approval before using a built-in demo mode instead of a demo account when legal or security obligations prevent providing one. The demo now covers the main student and teacher workflows: Home, Courses, Upcoming, Assignments, Grades, Calendar, Messages, Notifications, Groups, People, Requests, Resources, Profile, and Settings. In Settings → Demo account type, switch between fictional Student and Teacher views to inspect student submission and teacher gradebook/grade-entry examples. It is still not a complete simulator of every production operation or backend effect. School-specific SSO, live LTI launches, actual Schoology uploads/downloads, real message delivery, push registration, and server-side record changes are not performed in demo mode. Do not submit it as a complete replacement for a live account without Apple's approval and a feature-by-feature review. If Apple requires live service access, arrange an institution-authorized Schoology test account.
 
 Use the checklist in [APP_REVIEW_ACCOUNT.md](APP_REVIEW_ACCOUNT.md) to arrange a dedicated, authorized Schoology test account with representative, non-sensitive sample data. ClassWire cannot create a Schoology account on behalf of a school, and a fake login or placeholder account would not provide reviewers with access to real functionality.
 
@@ -109,3 +109,25 @@ If you cannot provide a functioning Schoology demo account, contact Apple about 
 - [Create an App Store Connect provisioning profile](https://developer.apple.com/help/account/provisioning-profiles/create-an-app-store-provisioning-profile)
 - [App Review Guidelines](https://developer.apple.com/app-store/review/guidelines/)
 - [Provide information for a complete review](https://developer.apple.com/help/app-review/before-submitting-for-review/complete-review/)
+
+
+## Experimental Mac Catalyst TestFlight build
+
+The TestFlight-only workflow now builds two platform packages independently: the iOS app and an experimental Mac Catalyst app built from the iPad/iOS source. The existing native macOS target and its Developer ID distribution workflow are not changed.
+
+Before running the TestFlight-only workflow:
+
+1. In App Store Connect, open the ClassWire app and use **Add Platform → macOS**. This is required to receive a macOS/Catalyst build on the same app record.
+2. In Apple Developer → Certificates, Identifiers & Profiles → Certificates, create both a **Mac App Distribution** certificate and a **Mac Installer Distribution** certificate. Export each certificate together with its private key as a password-protected `.p12` file.
+3. Add these four GitHub Actions secrets:
+   - `MAC_APP_DISTRIBUTION_CERTIFICATE_P12_BASE64`
+   - `MAC_APP_DISTRIBUTION_CERTIFICATE_PASSWORD`
+   - `MAC_INSTALLER_DISTRIBUTION_CERTIFICATE_P12_BASE64`
+   - `MAC_INSTALLER_DISTRIBUTION_CERTIFICATE_PASSWORD`
+
+   Base64-encode each `.p12` file for the corresponding `*_P12_BASE64` secret. Do not reuse the existing Developer ID certificate (`MACOS_CERTIFICATE_P12_BASE64`) or the iOS Apple Distribution certificate; Mac App Store signing uses the Mac App Distribution and Mac Installer Distribution certificate types.
+4. In Certificates, Identifiers & Profiles → Profiles, create a **Mac App Store Connect** distribution profile for the explicit App ID `com.schoologytauri.app`, selecting the new Mac App Distribution certificate.
+5. Confirm the App Store Connect API key has access to download provisioning profiles.
+6. Run the TestFlight-only workflow. It uploads the iOS IPA and Mac Catalyst PKG as separate platform builds. Apple processes them independently.
+
+The Catalyst target is a separate XcodeGen target named `Schoology-Catalyst`, but it reuses the existing iPad/iOS source. It is experimental and does not modify the separate `Schoology-macOS` native app target. Its App Store Connect upload will fail if the macOS platform or Mac App Store profile is missing.

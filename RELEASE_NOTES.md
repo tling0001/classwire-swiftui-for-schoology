@@ -1,5 +1,27 @@
 # Release notes
 
+## [2026.10.0-port.75]
+
+### App Review and demo
+- Expand the local demo to cover notifications, assignments, people, requests, settings, detailed assignment workflows, post discussions, and file previews using local-only sample interactions.
+- Keep LTI assignments distinct from normal assignments and omit submission creation controls for external-tool activities.
+- Preserve any previously saved Schoology credentials when entering and exiting demo mode.
+
+### Privacy
+- Replace the inaccurate privacy policy with a description of the actual Schoology, Apple APNs, GitHub, WebKit, and external-tool data flows and local storage behavior.
+- Add an in-app Privacy Policy link in Settings.
+
+### TestFlight and Mac Catalyst
+- Add a separate experimental Mac Catalyst target that reuses the iPad app source without modifying the native macOS target.
+- Extend the TestFlight-only workflow to build, sign, and upload the Catalyst platform build to App Store Connect alongside the iOS build.
+
+### Brand mark
+- Nudge the C glyph slightly left to correct its visual balance.
+
+### Build
+- Increment the app build number to 75.
+
+
 ## [2026.10.0-port.74]
 
 ### App Review demo mode

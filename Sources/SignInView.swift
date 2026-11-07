@@ -257,7 +257,7 @@ struct SignInView: View {
             Button("Enter Demo") { session.beginDemoMode() }
             Button("Cancel", role: .cancel) { }
         } message: {
-            Text("You are entering a full-interface demo with sample data. You can explore ClassWire without connecting to a Schoology account. Changes are simulated locally and are not sent to Schoology, submitted as coursework, or delivered as messages.")
+            Text("You are entering ClassWire’s interactive demo with fictional sample data. It covers the main learning and communication workflows; some Schoology-backed actions and external tools are simulated or unavailable. Changes stay local and are not sent to Schoology, submitted as coursework, or delivered as messages.")
         }
     }
 
@@ -465,7 +465,7 @@ private struct ClassWireGlyph: Shape {
     func path(in rect: CGRect) -> Path {
         func point(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
             CGPoint(
-                x: rect.midX + (x - 10 + 1.15) * rect.width / 20 * 0.70,
+                x: rect.midX + (x - 10 + 1.0) * rect.width / 20 * 0.70,
                 y: rect.midY + (y - 10) * rect.height / 20 * 0.70
             )
         }

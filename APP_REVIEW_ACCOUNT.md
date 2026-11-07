@@ -13,15 +13,18 @@ Enter these credentials through Sign in with my account. ClassWire recognizes th
 
 The demo includes representative fictional sample data and local interactions for:
 
-- Home and recent activity, including a local like toggle
-- Courses and course sections
-- Upcoming assignments and events
-- Grades and grade summaries
-- Calendar
-- Messages and local message composition
-- Groups and group sections
-- Resources and local sample previews
-- Profile
+- Home and recent activity, post discussions, likes, comments, and sample polls
+- Courses, course materials, updates, grades, members, and connected-tool information
+- Upcoming assignments, normal assignment details, comments, text submissions, file selection, and submission status
+- LTI/external-tool assignment information without a native submission composer
+- Student grades and teacher gradebook, submission review, and sample grade/feedback entry
+- Calendar events and event details
+- Messages, local message composition, and sample attachment flow
+- Notifications and local read/unread state
+- Groups, discussions, members, upcoming events, and shared resources
+- People directory, profile details, and group request accept/decline
+- Resources and local sample previews for documents, images, audio, and video types
+- Profile and demo settings, including a switch between fictional student and teacher roles
 
 The sample assignment submission control, like toggle, resource review state, and message composition are local simulations. No message is delivered, no coursework is submitted, and no real grade or Schoology record is changed.
 
@@ -33,4 +36,4 @@ This initial implementation is an interactive demonstration of the principal app
 
 ## Suggested review notes
 
-ClassWire includes a local demonstration mode because Schoology accounts and student records are institution-controlled. On the sign-in screen, choose Sign in with my account and enter username tester@classwire.app and password ClassWireDemo2026!. A confirmation explains that the following experience uses fictional sample data. Select Enter Demo. The demo includes Home, Courses, Upcoming, Grades, Calendar, Messages, Groups, Resources, and Profile. Interactions are simulated locally and do not create or modify Schoology records. We request review of this demonstration approach under App Review Guideline 2.1(a), subject to Apple's prior approval. Please let us know if an institution-authorized live test account is required instead.
+ClassWire includes a local demonstration mode because Schoology accounts and student records are institution-controlled. On the sign-in screen, choose Sign in with my account and enter username tester@classwire.app and password ClassWireDemo2026!. A confirmation explains that the following experience uses fictional sample data. Select Enter Demo. The demo includes Home, Courses, Upcoming, Assignments, Grades, Calendar, Messages, Notifications, Groups, People, Requests, Resources, Profile, and Settings. In Settings → Demo account type, switch between the fictional Student and Teacher views to inspect student submissions and teacher gradebook/grade-entry examples. Interactions are simulated locally and do not create or modify Schoology records. We request review of this demonstration approach under App Review Guideline 2.1(a), subject to Apple's prior approval. Please let us know if an institution-authorized live test account is required instead.

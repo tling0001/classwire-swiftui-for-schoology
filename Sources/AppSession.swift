@@ -2063,7 +2063,7 @@ final class AppSession {
     }
 
     func beginDemoMode() {
-        KeychainStore.clear()
+        // Keep any existing Keychain credentials intact; demo mode is an alternate local view, not sign-out.
         auth = nil
         user = SchoologyUser(id: "demo-student", nameDisplay: "Alex Morgan", pictureURL: nil)
         isDemoMode = true
@@ -2071,6 +2071,17 @@ final class AppSession {
         destination = .home
         homeSection = .recent
         errorMessage = nil
+    }
+
+    func exitDemoMode() {
+        isDemoMode = false
+        UserDefaults.standard.set(false, forKey: "classwire.demoMode")
+        user = nil
+        destination = .home
+        homeSection = .recent
+        if let savedCredentials = KeychainStore.loadAuth() {
+            Task { await restore(savedCredentials) }
+        }
     }
 
     func signOut() {
