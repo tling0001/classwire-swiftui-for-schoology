@@ -1,5 +1,17 @@
 # Release notes
 
+## [2026.10.0-port.82]
+
+### iPhone and iPad navigation
+- Restore native SwiftUI NavigationLink navigation for iPhone and iPad sidebar destinations, courses, and groups.
+- Let NavigationSplitView present those links in the next column on wide layouts and push them onto the navigation stack when collapsed on iPhone.
+- Keep selection-driven sidebar synchronization on macOS, where the native selectable List behavior is appropriate.
+- Avoid manually mutating split-view selection from plain sidebar buttons on compact iPhone layouts.
+
+### Build
+- Increment the iOS and macOS bundle build number to 82.
+
+
 ## [2026.10.0-port.81]
 
 ### Adaptive navigation

@@ -47,6 +47,7 @@ struct RootView: View {
                     if session.isSignedIn && !session.isDemoMode { SchoologyBackgroundRefresh.schedule() }
                     #endif
                 }
+                #if os(macOS)
                 .onChange(of: selectedRoute) { _, route in
                     detailPath.removeAll()
                     if case .destination(let destination) = route {
@@ -57,6 +58,7 @@ struct RootView: View {
                     let route = SchoologySidebarSelection.destination(destination)
                     if selectedRoute != route { selectedRoute = route }
                 }
+                #endif
                 .onChange(of: session.pendingPersonProfileID) { _, userID in
                     guard let userID else { return }
                     detailPath.append(.person(userID))
@@ -162,14 +164,11 @@ private struct SchoologySidebar: View {
                         .lineLimit(1)
                         .tag(SchoologySidebarSelection.course(course.id))
                     #else
-                    Button {
-                        selection = .course(course.id)
+                    NavigationLink {
+                        SchoologyCourseProfileView(course: course)
                     } label: {
                         Label(course.title, systemImage: "book.closed").lineLimit(1)
                     }
-                    .buttonStyle(.plain)
-                    .listRowBackground(selection == .course(course.id) ? Color.accentColor.opacity(0.14) : Color.clear)
-                    .accessibilityAddTraits(selection == .course(course.id) ? .isSelected : [])
                     #endif
                 }
             } label: {
@@ -183,14 +182,11 @@ private struct SchoologySidebar: View {
                         .lineLimit(1)
                         .tag(SchoologySidebarSelection.group(group.id))
                     #else
-                    Button {
-                        selection = .group(group.id)
+                    NavigationLink {
+                        GroupProfileView(group: group)
                     } label: {
                         Label(group.title, systemImage: "person.3").lineLimit(1)
                     }
-                    .buttonStyle(.plain)
-                    .listRowBackground(selection == .group(group.id) ? Color.accentColor.opacity(0.14) : Color.clear)
-                    .accessibilityAddTraits(selection == .group(group.id) ? .isSelected : [])
                     #endif
                 }
             } label: {
@@ -235,14 +231,11 @@ private struct SchoologySidebar: View {
         Label(item.rawValue, systemImage: item.symbol)
             .tag(SchoologySidebarSelection.destination(item))
         #else
-        Button {
-            selection = .destination(item)
+        NavigationLink {
+            DestinationView(destination: item)
         } label: {
             Label(item.rawValue, systemImage: item.symbol)
         }
-        .buttonStyle(.plain)
-        .listRowBackground(selection == .destination(item) ? Color.accentColor.opacity(0.14) : Color.clear)
-        .accessibilityAddTraits(selection == .destination(item) ? .isSelected : [])
         #endif
     }
 }
