@@ -1,5 +1,21 @@
 # Release notes
 
+## [2026.10.0-port.73]
+
+### Icon refinement
+- Reduce the ClassWire C glyph to 70% and shift its artwork right to visually center it within the circular mark, in both generated app icons and the SwiftUI sign-in brand mark.
+
+### Assignments
+- Hide the Create Submission toolbar action for LTI plugin assignments; retain it for normal assignments that support submissions.
+
+### Mac Catalyst preview
+- Add an optional manual GitHub Actions workflow to build an unsigned Mac Catalyst preview from the existing iPad app target.
+- Keep the existing native macOS target and distribution workflow unchanged; the preview does not modify project settings or upload to the Mac App Store.
+
+### Build
+- Increment the app build number to 73.
+
+
 ## [2026.10.0-port.72]
 
 ### ClassWire identity

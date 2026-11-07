@@ -20,7 +20,7 @@ Both platforms in one record share the same Apple app identifier, SKU, and bundl
 
 The current project has two separate targets: the iOS/iPadOS app and the existing native macOS app. The iOS target currently has Mac Catalyst disabled. The existing macOS target is a native macOS app distributed with Developer ID and notarization; it is not a Mac Catalyst build and must remain unchanged.
 
-A Mac Catalyst version would need its own separately configured Catalyst build/archive and Mac App Store Connect signing workflow, using the same bundle ID for a universal purchase. This has not been enabled by this setup. Do not upload the existing Developer ID DMG as the macOS App Store build.
+A Mac Catalyst App Store version needs its own platform build/archive and Mac App Store Connect signing workflow, using the same bundle ID for a universal purchase. However, you can preview the current iPad UI as Catalyst without changing the native macOS target or maintaining a second source implementation: use the manual **Build a temporary Mac Catalyst preview** workflow input. It temporarily overrides SUPPORTS_MACCATALYST for the existing iOS target, builds an unsigned .app, and uploads it as a GitHub artifact. This preview is for visual inspection only; it is not a signed Mac App Store build. Do not upload the existing Developer ID DMG as the macOS App Store build.
 
 Apple does not provide TestFlight distribution for macOS builds. The iOS/iPadOS build can use TestFlight; a Catalyst Mac build needs to be tested and distributed through the Mac App Store workflow or another supported Mac distribution/testing route.
 

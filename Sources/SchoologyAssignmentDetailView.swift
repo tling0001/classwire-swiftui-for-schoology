@@ -47,7 +47,7 @@ struct SchoologyAssignmentDetailView: View {
         }
         .navigationTitle(context?.assignment.title ?? title)
         .toolbar {
-            if let context, context.canSubmit, !context.isTeacher {
+            if let context, context.canSubmit, !context.isTeacher, context.ltiURL == nil {
                 ToolbarItem(placement: .primaryAction) {
                     Menu("Create submission", systemImage: "plus") {
                         Button("Create Text Submission", systemImage: "square.and.pencil") { showingSubmissionTextComposer = true }

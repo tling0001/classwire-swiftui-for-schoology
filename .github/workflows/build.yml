@@ -10,6 +10,11 @@ on:
         required: false
         type: boolean
         default: false
+      catalyst_preview_only:
+        description: Build a temporary Mac Catalyst preview from the iPad app (no changes to the native Mac app; no signing or store upload)
+        required: false
+        type: boolean
+        default: false
       ios_adhoc_only:
         description: Build and publish only the iOS Ad Hoc package
         required: false
@@ -30,7 +35,7 @@ concurrency:
 
 jobs:
   build-macos:
-    if: ${{ inputs.ios_adhoc_only != true && inputs.testflight_only != true }}
+    if: ${{ inputs.ios_adhoc_only != true && inputs.testflight_only != true && inputs.catalyst_preview_only != true }}
     name: Build, sign and notarize macOS
     runs-on: xcode-27
     steps:
@@ -181,7 +186,7 @@ jobs:
           retention-days: 14
 
   build-ios:
-    if: ${{ inputs.testflight_only != true }}
+    if: ${{ inputs.testflight_only != true && inputs.catalyst_preview_only != true }}
     name: Build signed iOS Ad Hoc IPA
     runs-on: xcode-27
     steps:
@@ -368,7 +373,7 @@ jobs:
           retention-days: 14
 
   build-testflight:
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.testflight_only == true }}
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.testflight_only == true && inputs.catalyst_preview_only != true }}
     name: Build and upload iOS TestFlight beta
     runs-on: xcode-27
     steps:
@@ -524,10 +529,50 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  build-catalyst-preview:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.catalyst_preview_only == true }}
+    name: Build unsigned Mac Catalyst preview from the iPad app
+    runs-on: xcode-27
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode 27.2
+        run: |
+          sudo xcode-select --switch /Applications/Xcode_27.2.app/Contents/Developer
+          xcodebuild -version
+      - name: Prepare ClassWire app icons
+        run: swift Scripts/prepare-app-icons.swift
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Generate Xcode project
+        run: xcodegen generate
+      - name: Build iOS target as Mac Catalyst without modifying project settings
+        shell: bash
+        run: |
+          set -euo pipefail
+          DERIVED_DATA="$RUNNER_TEMP/ClassWire-Catalyst-DerivedData"
+          xcodebuild -project Schoology.xcodeproj -scheme Schoology-iOS -configuration Release \
+            -destination 'generic/platform=macOS,variant=Mac Catalyst' \
+            -derivedDataPath "$DERIVED_DATA" \
+            SUPPORTS_MACCATALYST=YES CODE_SIGNING_ALLOWED=NO build
+          APP="$(find "$DERIVED_DATA/Build/Products" -maxdepth 3 -type d -name 'ClassWire.app' -print -quit)"
+          test -n "$APP" && test -d "$APP" || {
+            echo "The Catalyst build completed without the expected ClassWire.app bundle." >&2
+            find "$DERIVED_DATA/Build/Products" -maxdepth 4 -print
+            exit 1
+          }
+          ditto -c -k --sequesterRsrc --keepParent "$APP" "$RUNNER_TEMP/ClassWire-Mac-Catalyst-Preview.zip"
+      - name: Upload unsigned Catalyst preview
+        uses: actions/upload-artifact@v4
+        with:
+          name: ClassWire-Mac-Catalyst-Preview
+          path: ${{ runner.temp }}/ClassWire-Mac-Catalyst-Preview.zip
+          if-no-files-found: error
+          retention-days: 14
+
   release:
     name: Publish versioned ClassWire release
     if: >-
-      ${{ always() && github.ref == 'refs/heads/main' && (needs['build-macos'].result == 'success' || needs['build-ios'].result == 'success') }}
+      ${{ always() && inputs.catalyst_preview_only != true && github.ref == 'refs/heads/main' && (needs['build-macos'].result == 'success' || needs['build-ios'].result == 'success') }}
     needs: [build-macos, build-ios]
     runs-on: ubuntu-latest
     steps:
