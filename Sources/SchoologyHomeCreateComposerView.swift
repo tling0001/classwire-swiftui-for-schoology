@@ -73,7 +73,7 @@ struct SchoologyHomeCreateComposerView: View {
                 }
                 Section("Attachments") {
                     Button("Attach File", systemImage: "paperclip") { showingFileImporter = true }.disabled(isUploading || isSubmitting)
-                    Button("Attach ClassWire Resource", systemImage: "folder") { showingResourcePicker = true }.disabled(isUploading || isSubmitting)
+                    Button("Attach Schoology Resource", systemImage: "folder") { showingResourcePicker = true }.disabled(isUploading || isSubmitting)
                     ForEach(Array(attachmentNames.enumerated()), id: \.offset) { _, name in Label(name, systemImage: "paperclip").foregroundStyle(.secondary) }
                     if isUploading { ProgressView("Uploading attachment…") }
                 }

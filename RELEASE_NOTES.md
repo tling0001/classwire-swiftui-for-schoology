@@ -1,5 +1,19 @@
 # Release notes
 
+## [2026.10.0-port.78]
+
+### Schoology terminology
+- Restore the accurate “Attach Schoology Resource” label in message, update, and home-create composers.
+
+### App Store encryption compliance
+- Declare that the app uses no non-exempt encryption in the generated iOS, Catalyst, and macOS Info.plists.
+- Document the app's OS-provided HTTPS/TLS transport, CryptoKit HMAC request authentication, SHA-256 integrity checks, and Keychain usage.
+- Validate the TestFlight IPA's export-compliance Info.plist value before attempting App Store Connect upload.
+
+### Build
+- Increment the iOS and macOS bundle build number to 78.
+
+
 ## [2026.10.0-port.77]
 
 ### Messages

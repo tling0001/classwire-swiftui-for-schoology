@@ -119,6 +119,37 @@ If you cannot provide a functioning Schoology demo account, contact Apple about 
 - Complete Test Information before inviting external testers.
 - TestFlight builds expire after 90 days. Upload a new build when needed.
 
+## App encryption and export compliance
+
+I reviewed the app's cryptography-related source and build configuration. The current implementation uses:
+
+- **HTTPS/TLS networking** through Apple's `URLSession` and App Transport Security. The operating system negotiates and manages the secure transport.
+- **OAuth 1.0 HMAC-SHA1 request signing** through Apple's CryptoKit. HMAC is a message-authentication algorithm: it authenticates request data but does not encrypt or hide that data.
+- **SHA-256 digest verification** through CryptoKit for downloaded update integrity. A digest detects changes; it does not encrypt the downloaded file.
+- **Apple Keychain** for storing OAuth credentials.
+
+The project does not implement AES, ChaChaPoly, or a proprietary encryption algorithm, and I found no third-party cryptography dependency in the project configuration. Apple's CryptoKit documentation explicitly distinguishes HMAC (which does not hide data) from encryption ciphers such as AES and ChaChaPoly.
+
+For the App Store Connect question **“What type of encryption algorithms does your app implement?”**, the source-based answer is **“None of the algorithms mentioned above.”** HMAC-SHA1 is a standard authentication code, not a standard encryption algorithm, and the app's transport encryption is provided by Apple's operating system.
+
+If App Store Connect separately asks whether the app uses or incorporates cryptography, answer **Yes**: it uses CryptoKit HMAC/SHA-1 and SHA-256, as well as HTTPS/TLS. If it asks whether encryption is limited to Apple's operating-system implementation or whether the app only makes HTTPS calls, that describes the app's network-encryption use. Do not select the option for implementing standard encryption algorithms outside Apple's OS based solely on HMAC or SHA-256.
+
+The iOS, Catalyst, and macOS generated Info.plists now set:
+
+```xml
+<key>ITSAppUsesNonExemptEncryption</key>
+<false/>
+```
+
+Apple documents `NO` as the correct value when an app uses no encryption or only encryption exempt from export-compliance documentation. The TestFlight workflow also validates that the exported iOS IPA contains this Boolean value before upload. If you later add your own encryption implementation or a dependency that performs encryption outside Apple's OS facilities, reassess this declaration before release.
+
+Apple references:
+- [Complying with Encryption Export Regulations](https://developer.apple.com/documentation/Security/complying-with-encryption-export-regulations)
+- [Overview of export compliance](https://developer.apple.com/help/app-store-connect/manage-app-information/overview-of-export-compliance/)
+- [ITSAppUsesNonExemptEncryption](https://developer.apple.com/documentation/bundleresources/information_property_list/itsappusesnonexemptencryption)
+- [CryptoKit HMAC](https://developer.apple.com/documentation/cryptokit/hmac)
+- [Preventing Insecure Network Connections](https://developer.apple.com/documentation/Security/preventing-insecure-network-connections)
+
 ## Apple references
 
 - [Create an app record](https://developer.apple.com/help/app-store-connect/create-an-app-record/add-a-new-app)

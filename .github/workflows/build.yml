@@ -684,7 +684,9 @@ jobs:
           iphone = set(info.get("UISupportedInterfaceOrientations~iphone", []))
           if "UIInterfaceOrientationPortraitUpsideDown" in iphone:
               raise SystemExit("The iPhone orientation override must not enable upside-down portrait.")
-          print("Validated all four iPad orientations and the iPhone-specific orientation override.")
+          if info.get("ITSAppUsesNonExemptEncryption") is not False:
+              raise SystemExit("Exported Info.plist must declare ITSAppUsesNonExemptEncryption=false.")
+          print("Validated iPad/iPhone orientations and the exempt-encryption declaration.")
           PY
           test -s "$APP/Assets.car" || { echo "The exported app is missing its compiled asset catalog." >&2; exit 1; }
           ICON_NAME="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIcons:CFBundlePrimaryIcon:CFBundleIconName' "$APP/Info.plist" 2>/dev/null || true)"

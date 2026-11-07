@@ -9,7 +9,7 @@ settings:
   base:
     SWIFT_VERSION: "6.0"
     MARKETING_VERSION: "2026.10.0"
-    CURRENT_PROJECT_VERSION: "76"
+    CURRENT_PROJECT_VERSION: "78"
     PRODUCT_NAME: ClassWire
     INFOPLIST_KEY_CFBundleDisplayName: ClassWire
     GENERATE_INFOPLIST_FILE: YES
@@ -42,6 +42,7 @@ targets:
     info:
       path: Config/Generated-iOS-Info.plist
       properties:
+        ITSAppUsesNonExemptEncryption: false
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
           - UIInterfaceOrientationPortraitUpsideDown
@@ -83,6 +84,7 @@ targets:
     info:
       path: Config/Generated-Catalyst-Info.plist
       properties:
+        ITSAppUsesNonExemptEncryption: false
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
           - UIInterfaceOrientationPortraitUpsideDown
@@ -121,6 +123,7 @@ targets:
     info:
       path: Config/Generated-macOS-Info.plist
       properties:
+        ITSAppUsesNonExemptEncryption: false
         CFBundleURLTypes:
           - CFBundleURLName: com.schoologytauri.app
             CFBundleURLSchemes:
