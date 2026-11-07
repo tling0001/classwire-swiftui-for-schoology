@@ -114,8 +114,7 @@ struct SchoologyPeopleDirectoryView: View {
                                             AuthenticatedSchoologyImage(url: pictureURL)
                                                 .frame(width: 38, height: 38).clipShape(RoundedRectangle(cornerRadius: 9))
                                         } else {
-                                            Image(systemName: "person.crop.circle.fill")
-                                                .font(.system(size: 36)).foregroundStyle(.secondary)
+                                            SchoologyAvatarPlaceholder(size: 38)
                                         }
                                         VStack(alignment: .leading, spacing: 3) {
                                             Text(directoryName(person)).font(.body.weight(.medium))

@@ -18,6 +18,8 @@ struct SchoologyProfileInfobox: View {
                         AuthenticatedSchoologyImage(url: imageURL)
                             .frame(width: 48, height: 48)
                             .clipShape(RoundedRectangle(cornerRadius: 12))
+                    } else if fallbackSymbol == "person.crop.circle.fill" || fallbackSymbol == "person.fill" {
+                        SchoologyAvatarPlaceholder(size: 48, tint: SchoologyStyle.blue)
                     } else {
                         Image(systemName: fallbackSymbol)
                             .font(.system(size: 23))

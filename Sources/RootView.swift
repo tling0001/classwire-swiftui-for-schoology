@@ -22,7 +22,9 @@ struct RootView: View {
 
     var body: some View {
         Group {
-            if session.isSignedIn {
+            if session.isDemoMode {
+                ClassWireDemoView()
+            } else if session.isSignedIn {
                 NavigationSplitView(preferredCompactColumn: $preferredCompactColumn) {
                     SchoologySidebar(selection: $selectedRoute)
                         #if os(macOS)

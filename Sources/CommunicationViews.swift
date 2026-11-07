@@ -140,9 +140,7 @@ struct MessagesView: View {
                     .frame(width: 42, height: 42)
                     .clipShape(RoundedRectangle(cornerRadius: 10))
             } else {
-                Image(systemName: "person.crop.circle.fill")
-                    .font(.system(size: 38))
-                    .foregroundStyle(SchoologyStyle.blue)
+                SchoologyAvatarPlaceholder(size: 42, tint: SchoologyStyle.blue)
             }
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
@@ -214,8 +212,7 @@ private struct MessageThreadView: View {
                                             .frame(width: 38, height: 38)
                                             .clipShape(RoundedRectangle(cornerRadius: 9))
                                     } else {
-                                        Image(systemName: "person.crop.circle.fill")
-                                            .font(.system(size: 36))
+                                        SchoologyAvatarPlaceholder(size: 40)
                                             .foregroundStyle(SchoologyStyle.blue)
                                     }
                                     VStack(alignment: .leading, spacing: 3) {

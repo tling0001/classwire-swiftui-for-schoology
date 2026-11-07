@@ -35,9 +35,7 @@ struct SchoologyCommentRow: View {
                         .frame(width: 34, height: 34)
                         .clipShape(RoundedRectangle(cornerRadius: 8))
                 } else {
-                    Image(systemName: "person.crop.circle.fill")
-                        .font(.system(size: 32))
-                        .foregroundStyle(.secondary)
+                    SchoologyAvatarPlaceholder(size: 34)
                 }
 
                 if let authorID = comment.authorID {

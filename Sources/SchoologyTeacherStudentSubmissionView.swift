@@ -112,9 +112,7 @@ struct SchoologyTeacherStudentSubmissionView: View {
                     .frame(width: 54, height: 54)
                     .clipShape(RoundedRectangle(cornerRadius: 13))
             } else {
-                Image(systemName: "person.crop.circle.fill")
-                    .font(.system(size: 48))
-                    .foregroundStyle(SchoologyStyle.blue)
+                SchoologyAvatarPlaceholder(size: 54, tint: SchoologyStyle.blue)
             }
             VStack(alignment: .leading, spacing: 4) {
                 Text(profile?.title ?? student.name)

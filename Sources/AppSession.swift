@@ -53,6 +53,7 @@ final class AppSession {
         didSet { UserDefaults.standard.set(appearance.rawValue, forKey: "schoology.appearance") }
     }
     var canadianServer = UserDefaults.standard.bool(forKey: "schoology.canadian")
+    var isDemoMode = UserDefaults.standard.bool(forKey: "classwire.demoMode")
 
     private let api = SchoologyAPI.shared
     private let schoolBrowserAuthenticator = SchoolBrowserAuthenticator()
@@ -149,6 +150,8 @@ final class AppSession {
             secret: credentials.secret,
             userID: profile.id
         )
+        isDemoMode = false
+        UserDefaults.standard.set(false, forKey: "classwire.demoMode")
         KeychainStore.save(verifiedCredentials)
         auth = verifiedCredentials
         user = profile
@@ -2059,8 +2062,21 @@ final class AppSession {
         peopleDirectoryEnabled = enterprise && directoryPublic
     }
 
+    func beginDemoMode() {
+        KeychainStore.clear()
+        auth = nil
+        user = SchoologyUser(id: "demo-student", nameDisplay: "Alex Morgan", pictureURL: nil)
+        isDemoMode = true
+        UserDefaults.standard.set(true, forKey: "classwire.demoMode")
+        destination = .home
+        homeSection = .recent
+        errorMessage = nil
+    }
+
     func signOut() {
         let credentials = auth
+        isDemoMode = false
+        UserDefaults.standard.set(false, forKey: "classwire.demoMode")
         Task { await SchoologyPushNotifications.unregisterForSignOut(auth: credentials) }
         KeychainStore.clear()
         auth = nil

@@ -69,6 +69,15 @@ When TestFlight is checked, the macOS, Ad Hoc IPA, and GitHub Release jobs are s
 
 ## 6. Reviewer sign-in and Apple's beta review
 
+A local interactive demo mode is available using the credentials in [APP_REVIEW_ACCOUNT.md](APP_REVIEW_ACCOUNT.md):
+
+- Username: tester@classwire.app
+- Password: ClassWireDemo2026!
+
+Enter them through **Sign in with my account**. The app presents a confirmation dialog before opening the demo. No Schoology authentication request is made, and demo interactions remain local.
+
+**Important:** Apple App Review Guideline 2.1(a) requires prior approval before using a built-in demo mode instead of a demo account when legal or security obligations prevent providing one. The current demo covers principal app areas but is not yet a complete simulator of all production operations or backend effects. Do not submit it as a complete replacement for a live account without Apple's approval and a feature-by-feature review. If Apple requires live service access, arrange an institution-authorized Schoology test account.
+
 Use the checklist in [APP_REVIEW_ACCOUNT.md](APP_REVIEW_ACCOUNT.md) to arrange a dedicated, authorized Schoology test account with representative, non-sensitive sample data. ClassWire cannot create a Schoology account on behalf of a school, and a fake login or placeholder account would not provide reviewers with access to real functionality.
 
 Before requesting external TestFlight review:

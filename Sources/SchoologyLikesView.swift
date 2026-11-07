@@ -33,9 +33,7 @@ struct SchoologyLikesView: View {
                                             .frame(width: 36, height: 36)
                                             .clipShape(RoundedRectangle(cornerRadius: 9))
                                     } else {
-                                        Image(systemName: "person.crop.circle.fill")
-                                            .font(.system(size: 34))
-                                            .foregroundStyle(.secondary)
+                                        SchoologyAvatarPlaceholder(size: 36)
                                     }
                                     Text(user.title)
                                         .font(.body.weight(.medium))

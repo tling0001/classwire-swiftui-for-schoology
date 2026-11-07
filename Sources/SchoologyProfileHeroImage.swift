@@ -12,7 +12,7 @@ struct SchoologyProfileHeroImage: View {
                         .frame(width: geometry.size.width, height: geometry.size.height)
                         .clipped()
                 } else {
-                    Image(systemName: fallbackSymbol)
+                    Image(systemName: fallbackSymbol == "person.crop.circle.fill" ? "person.fill" : fallbackSymbol)
                         .font(.system(size: 40))
                         .foregroundStyle(SchoologyStyle.blue)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)

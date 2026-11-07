@@ -1,5 +1,20 @@
 # Release notes
 
+## [2026.10.0-port.74]
+
+### App Review demo mode
+- Add a local interactive demo entry for tester@classwire.app with a confirmation dialog before entering.
+- Add representative sample screens for Home, Courses, Upcoming, Grades, Calendar, Messages, Groups, Resources, and Profile.
+- Keep demo interactions local and clearly disclose that no Schoology records are changed.
+- Document Apple's prior-approval requirement and the remaining gap between this initial interactive demo and a fully featured production-equivalent demo.
+
+### Profile avatars
+- Standardize missing profile-photo fallbacks as person glyphs in rounded-square containers across profile, comments, likes, directory, messages, and submissions.
+
+### Build
+- Increment the app build number to 74.
+
+
 ## [2026.10.0-port.73]
 
 ### Icon refinement

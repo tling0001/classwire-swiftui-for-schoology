@@ -366,7 +366,7 @@ struct SchoologyPersonProfileView: View {
             title: person.title,
             subtitle: person.schoolName.isEmpty ? nil : person.schoolName,
             imageURL: person.pictureURL,
-            fallbackSymbol: "person.crop.circle.fill",
+            fallbackSymbol: "person.fill",
             details: [person.preferredName, person.role]
         )
     }

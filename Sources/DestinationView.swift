@@ -226,7 +226,7 @@ struct HomeView: View {
                 if let avatar = user.pictureURL {
                     AuthenticatedSchoologyImage(url: avatar).frame(width: 48, height: 48).clipShape(RoundedRectangle(cornerRadius: 12))
                 } else {
-                    Image(systemName: "person.crop.circle.fill").font(.system(size: 42)).foregroundStyle(SchoologyStyle.blue)
+                    SchoologyAvatarPlaceholder(size: 48, tint: SchoologyStyle.blue)
                 }
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Welcome back").font(.subheadline).foregroundStyle(.secondary)
@@ -349,8 +349,7 @@ private struct SchoologyActivityCard: View {
     }
 
     private var avatarPlaceholder: some View {
-        Image(systemName: "person.crop.circle.fill")
-            .font(.system(size: 38))
+        SchoologyAvatarPlaceholder(size: 42, tint: SchoologyStyle.blue)
             .foregroundStyle(SchoologyStyle.blue.opacity(0.8))
             .frame(width: 42, height: 42)
             .accessibilityHidden(true)

@@ -14,6 +14,7 @@ struct SignInView: View {
     @State private var password = ""
     @State private var canadian = false
     @State private var searching = false
+    @State private var showingDemoConfirmation = false
 
     private enum Mode {
         case welcome, school, credentials, schoolBrowser, qr
@@ -252,6 +253,12 @@ struct SignInView: View {
         .onAppear {
             if selectedSchool == nil { focusedField = .username }
         }
+        .alert("Welcome to the ClassWire demo", isPresented: $showingDemoConfirmation) {
+            Button("Enter Demo") { session.beginDemoMode() }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("You are entering a full-interface demo with sample data. You can explore ClassWire without connecting to a Schoology account. Changes are simulated locally and are not sent to Schoology, submitted as coursework, or delivered as messages.")
+        }
     }
 
     private var schoolBrowserProgress: some View {
@@ -377,6 +384,16 @@ struct SignInView: View {
 
     private func signIn() {
         focusedField = nil
+        let normalizedUsername = username.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if selectedSchool == nil && normalizedUsername == "tester@classwire.app" {
+            guard password == "ClassWireDemo2026!" else {
+                session.errorMessage = "The ClassWire demo password is incorrect."
+                return
+            }
+            session.errorMessage = nil
+            showingDemoConfirmation = true
+            return
+        }
         Task {
             await session.signIn(
                 username: username,
