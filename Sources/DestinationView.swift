@@ -23,7 +23,7 @@ struct DestinationView: View {
             case .grades: SchoologyGradesView()
             case .calendar: SchoologyCalendarView()
             case .profile:
-                if let userID = session.auth?.userID {
+                if let userID = session.user?.id {
                     SchoologyPersonProfileView(userID: userID)
                 } else {
                     ContentUnavailableView("Profile unavailable", systemImage: "person.crop.circle")

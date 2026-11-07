@@ -61,12 +61,14 @@ final class AppSession {
     init() {
         appearance = AppAppearance(rawValue: UserDefaults.standard.string(forKey: "schoology.appearance") ?? "") ?? .system
         auth = KeychainStore.loadAuth()
-        if let auth {
+        if isDemoMode {
+            beginDemoMode()
+        } else if let auth {
             Task { await restore(auth) }
         }
     }
 
-    var isSignedIn: Bool { auth != nil }
+    var isSignedIn: Bool { auth != nil || isDemoMode }
 
     func showPersonProfile(userID: String) {
         guard !userID.isEmpty else { return }
@@ -171,6 +173,7 @@ final class AppSession {
     }
 
     func refresh() async {
+        if isDemoMode { return }
         guard let auth else { return }
         isRefreshing = true
         defer { isRefreshing = false }
@@ -237,6 +240,7 @@ final class AppSession {
     }
 
     func loadCourseMaterials(courseID: String, folderID: String = "0") async throws -> [SchoologyProfileItem] {
+        if isDemoMode { return demoMaterials }
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         let data = try await api.get("courses/\(courseID)/folder/\(folderID)", auth: auth)
         return SchoologyProfileItem.decodeList(Self.object(data), keys: ["folder-item", "folder_item", "folderItems", "items", "documents"])
@@ -357,6 +361,7 @@ final class AppSession {
     }
 
     func loadCourseUpdates(courseID: String) async throws -> [SchoologyActivity] {
+        if isDemoMode { return activities.filter { $0.commentRealmID == courseID } }
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         let data = try await api.get("sections/\(courseID)/updates", auth: auth, params: ["start": "0", "limit": "50", "with_attachments": "TRUE", "richtext": "1"])
         var updates = SchoologyActivity.decodeList(Self.object(data))
@@ -368,18 +373,21 @@ final class AppSession {
     }
 
     func loadCourseAssignments(courseID: String) async throws -> [SchoologyProfileItem] {
+        if isDemoMode { return demoAssignments(for: courseID) }
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         let data = try await api.get("sections/\(courseID)/assignments", auth: auth, params: ["start": "0", "limit": "100", "with_attachments": "TRUE", "richtext": "1"])
         return SchoologyProfileItem.decodeList(Self.object(data), keys: ["assignment", "assignments", "items"])
     }
 
     func loadCourseMembers(courseID: String) async throws -> [SchoologyProfileItem] {
+        if isDemoMode { return demoPeople }
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         let data = try await api.get("sections/\(courseID)/enrollments", auth: auth, params: ["start": "0", "limit": "200", "enrollment_status": "1"])
         return SchoologyProfileItem.decodeList(Self.object(data), keys: ["enrollment", "enrollments", "user", "users"])
     }
 
     func loadCourseApps(courseID: String) async throws -> [SchoologyCourseApp] {
+        if isDemoMode { return [] }
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         let data = try await api.getV2("sections/\(courseID)/applications", auth: auth)
         return SchoologyCourseApp.decodeList(data)
@@ -403,6 +411,7 @@ final class AppSession {
     }
 
     func loadPeopleDirectory() async throws -> [SchoologyProfileItem] {
+        if isDemoMode { return demoPeople }
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         do {
             let data = try await api.get("users", auth: auth, params: ["start": "0", "limit": "200"])
@@ -430,6 +439,7 @@ final class AppSession {
     }
 
     func loadCourseGradebook(courseID: String) async throws -> SchoologyGradebook {
+        if isDemoMode { return demoGradebook(for: courseID) }
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         async let sectionRequest = api.get("sections/\(courseID)", auth: auth)
         async let periodsRequest = api.get("sections/\(courseID)/grading_periods", auth: auth)
@@ -676,6 +686,7 @@ final class AppSession {
     }
 
     func loadResources(force: Bool = false) async {
+        if isDemoMode { resourceCollections = demoCollections; resourceApps = []; hasLoadedResources = true; return }
         guard let auth, !isLoadingResources else { return }
         if hasLoadedResources && !force { return }
         isLoadingResources = true
@@ -709,6 +720,7 @@ final class AppSession {
     }
 
     func loadResourceItems(collectionID: String, folderID: String? = nil) async throws -> [SchoologyProfileItem] {
+        if isDemoMode { return demoMaterials }
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         var params = ["start": "0", "limit": "200", "with_attachments": "TRUE"]
         if let folderID, !folderID.isEmpty, folderID != "0" { params["f"] = folderID }
@@ -748,6 +760,7 @@ final class AppSession {
     }
 
     func loadUserGradeCourses(force: Bool = false) async {
+        if isDemoMode { userGradeCourses = demoGradeCourses; hasLoadedUserGrades = true; return }
         guard let auth, !isLoadingUserGrades else { return }
         if hasLoadedUserGrades && !force { return }
         isLoadingUserGrades = true
@@ -905,6 +918,13 @@ final class AppSession {
 
 
     func loadCalendarMonth(_ month: Date, force: Bool = false) async {
+        if isDemoMode {
+            if let interval = Calendar.current.dateInterval(of: .month, for: month) {
+                calendarMonthEvents = upcomingEvents.filter { guard let date = $0.date else { return false }; return date >= interval.start && date < interval.end }
+            }
+            calendarLoadedMonth = ISO8601DateFormatter().string(from: month).prefix(7).description
+            return
+        }
         guard let auth, !isLoadingCalendar else { return }
         let calendar = Calendar.current
         guard let interval = calendar.dateInterval(of: .month, for: month) else { return }
@@ -953,6 +973,7 @@ final class AppSession {
     }
 
     func loadCalendarUpcoming(force: Bool = false) async {
+        if isDemoMode { calendarUpcomingEvents = upcomingEvents; hasLoadedCalendarUpcoming = true; return }
         guard let auth, !isLoadingCalendar else { return }
         if hasLoadedCalendarUpcoming && !force { return }
         isLoadingCalendar = true
@@ -982,6 +1003,7 @@ final class AppSession {
     }
 
     func loadSchoolName(for course: SchoologyCourse) async -> String {
+        if isDemoMode { return "Cedar Valley High School" }
         if let cached = schoolNames[course.id] { return cached }
         guard let auth else { return "" }
 
@@ -1005,6 +1027,7 @@ final class AppSession {
     }
 
     func loadUpcomingEvents(for course: SchoologyCourse) async -> [SchoologyUpcomingEvent] {
+        if isDemoMode { return upcomingEvents.filter { $0.sectionID == course.id } }
         guard let auth,
               let data = try? await api.get("sections/\(course.id)/events", auth: auth, params: [
                 "start_date": Self.apiDate(Date()), "start": "0", "limit": "50"
@@ -1085,6 +1108,7 @@ final class AppSession {
     }
 
     func loadDiscussion(realm: String, realmID: String, discussionID: String) async throws -> SchoologyProfileItem {
+        if isDemoMode { return demoDiscussions.first { $0.id == discussionID } ?? demoDiscussions[0] }
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         let data = try await api.get("\(apiRealm(realm))/\(realmID)/discussions/\(discussionID)", auth: auth, params: ["with_attachments": "TRUE", "richtext": "1"])
         let json = Self.object(data)
@@ -1135,6 +1159,15 @@ final class AppSession {
     }
 
     func loadEventContext(realm: String, realmID: String, eventID: String) async throws -> SchoologyEventContext {
+        if isDemoMode {
+            let event = upcomingEvents.first { $0.id == eventID }
+            let item = SchoologyProfileItem(id: eventID, title: event?.title ?? "Class Event",
+                body: "A fictional class event in the ClassWire demo.", subtitle: event?.timeLabel ?? "",
+                url: nil, isAdmin: false, kind: "event", collectionID: nil)
+            return SchoologyEventContext(event: item, richDescription: "A fictional class event. This content is only available in demo mode.",
+                start: event?.start ?? "", end: event?.end ?? "", allDay: event?.allDay ?? false,
+                commentsEnabled: false, attachments: [])
+        }
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         let data = try await api.get("\(apiRealm(realm))/\(realmID)/events/\(eventID)", auth: auth, params: ["with_attachments": "TRUE", "richtext": "1"])
         let root = Self.object(data)
@@ -1311,6 +1344,7 @@ final class AppSession {
     }
 
     func loadPersonProfile(userID: String) async throws -> SchoologyProfileItem {
+        if isDemoMode { return demoPeople.first { $0.id == userID } ?? demoPeople[0] }
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         let data = try await api.get("users/\(userID)", auth: auth)
         let json = Self.object(data)
@@ -1320,6 +1354,7 @@ final class AppSession {
     }
 
     func loadPersonUpdates(userID: String) async throws -> [SchoologyActivity] {
+        if isDemoMode { return activities.filter { $0.authorID == userID || userID == "demo-student" } }
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         let data = try await api.get("users/\(userID)/updates", auth: auth, params: [
             "start": "0", "limit": "20", "with_attachments": "TRUE", "richtext": "1"
@@ -1344,6 +1379,14 @@ final class AppSession {
 
 
     func loadAssignmentContext(sectionID: String, assignmentID: String) async throws -> SchoologyAssignmentContext {
+        if isDemoMode {
+            let assignment = demoAssignments(for: sectionID).first { $0.id == assignmentID }
+                ?? demoAssignments(for: sectionID).first
+                ?? SchoologyProfileItem(id: assignmentID, title: "Assignment", body: "Fictional assignment details.", subtitle: "", url: nil, isAdmin: false, kind: "assignment", collectionID: nil)
+            return SchoologyAssignmentContext(assignment: assignment, canSubmit: false, allowComments: false, isTeacher: false,
+                gradeItemID: assignmentID, enrollmentID: nil, ltiURL: nil, currentGrade: "18", maxPoints: "20",
+                richDescription: assignment.body, teacherComment: "Nice work — keep it up!", attachments: [])
+        }
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         async let assignmentRequest = api.get("sections/\(sectionID)/assignments/\(assignmentID)", auth: auth, params: ["richtext": "1", "with_attachments": "TRUE"])
         async let sectionRequest = try? await api.get("sections/\(sectionID)", auth: auth)
@@ -1590,6 +1633,7 @@ final class AppSession {
     }
 
     func loadAssignment(sectionID: String, assignmentID: String) async throws -> SchoologyProfileItem {
+        if isDemoMode { return demoAssignments(for: sectionID).first { $0.id == assignmentID } ?? demoAssignments(for: sectionID).first! }
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         let data = try await api.get("sections/\(sectionID)/assignments/\(assignmentID)", auth: auth, params: ["richtext": "1", "with_attachments": "TRUE"])
         let json = Self.object(data)
@@ -1659,6 +1703,7 @@ final class AppSession {
     }
 
     func loadMessages(folder: SchoologyMessageFolder, force: Bool = false) async -> [SchoologyMessage] {
+        if isDemoMode { messageFolder = folder; return cachedMessagesByFolder[folder.rawValue] ?? [] }
         guard let auth else { return [] }
         messageFolder = folder
         if !force, let cached = cachedMessagesByFolder[folder.rawValue] {
@@ -1696,6 +1741,7 @@ final class AppSession {
     }
 
     func loadMessageThread(_ message: SchoologyMessage, folder: SchoologyMessageFolder) async -> [SchoologyMessage] {
+        if isDemoMode { return [message] }
         guard let auth else { return [] }
         let sourceFolder = folder == .sent ? "sent" : "inbox"
         errorMessage = nil
@@ -1729,6 +1775,7 @@ final class AppSession {
     }
 
     func loadNotifications(force: Bool = false, markRead: Bool = true) async {
+        if isDemoMode { notifications = demoNotifications; hasLoadedNotifications = true; notificationsHasMore = false; return }
         guard let auth, !isLoadingNotifications else { return }
         if !force && hasLoadedNotifications && !notificationsHasMore { return }
         let start = force ? 0 : notifications.count
@@ -1824,6 +1871,12 @@ final class AppSession {
     }
 
     func loadGroupProfile(_ group: SchoologyGroup) async throws -> SchoologyGroupProfile {
+        if isDemoMode {
+            return SchoologyGroupProfile(group: group,
+                permissions: SchoologyGroupPermissions(canPostUpdates: true, canCreateDiscussion: true, canCreateEvent: true, canCreateAlbum: true, canAddResources: true),
+                members: demoPeople, updates: activities.filter { $0.commentRealmID == group.id },
+                upcoming: upcomingEvents.filter { $0.groupID == group.id }, discussions: demoDiscussions, albums: demoAlbums, resources: demoMaterials)
+        }
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         let data = try await api.get("groups/\(group.id)", auth: auth)
         let raw = Self.object(data)
@@ -1843,6 +1896,7 @@ final class AppSession {
     }
 
     func loadGroupUpdates(groupID: String) async throws -> [SchoologyActivity] {
+        if isDemoMode { return activities.filter { $0.commentRealmID == groupID } }
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         let data = try await api.get("groups/\(groupID)/updates", auth: auth,
             params: ["start": "0", "limit": "20", "with_attachments": "TRUE", "richtext": "1"])
@@ -1855,6 +1909,7 @@ final class AppSession {
     }
 
     func loadGroupMembers(groupID: String) async throws -> [SchoologyProfileItem] {
+        if isDemoMode { return demoPeople }
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         let data = try await api.get("groups/\(groupID)/enrollments", auth: auth,
             params: ["start": "0", "limit": "200", "enrollment_status": "1"])
@@ -1862,6 +1917,7 @@ final class AppSession {
     }
 
     func loadGroupUpcoming(groupID: String) async throws -> [SchoologyUpcomingEvent] {
+        if isDemoMode { return upcomingEvents.filter { $0.groupID == groupID } }
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         let data = try await api.get("groups/\(groupID)/events", auth: auth,
             params: ["start": Self.apiDate(Date()), "limit": "20"])
@@ -1870,18 +1926,21 @@ final class AppSession {
     }
 
     func loadGroupDiscussions(groupID: String) async throws -> [SchoologyProfileItem] {
+        if isDemoMode { return demoDiscussions }
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         let data = try await api.get("groups/\(groupID)/discussions", auth: auth, params: ["limit": "50"])
         return SchoologyProfileItem.decodeDiscussionList(Self.object(data))
     }
 
     func loadGroupAlbums(groupID: String) async throws -> [SchoologyProfileItem] {
+        if isDemoMode { return demoAlbums }
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         let data = try await api.get("groups/\(groupID)/albums", auth: auth, params: ["limit": "50"])
         return SchoologyProfileItem.decodeList(Self.object(data), keys: ["album", "albums"])
     }
 
     func loadGroupResources(groupID: String) async throws -> [SchoologyProfileItem] {
+        if isDemoMode { return demoMaterials }
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         let data = try await api.get("groups/\(groupID)/resources", auth: auth,
             params: ["limit": "50", "with_attachments": "TRUE"])
@@ -1889,6 +1948,7 @@ final class AppSession {
     }
 
     func loadSchoolName(for group: SchoologyGroup) async -> String {
+        if isDemoMode { return "Cedar Valley High School" }
         if let cached = schoolNames[group.id] { return cached }
         guard let auth, let schoolID = group.schoolID, !schoolID.isEmpty,
               let data = try? await api.get("schools/\(schoolID)", auth: auth) else { return "" }
@@ -1914,6 +1974,7 @@ final class AppSession {
     }
 
     func loadCoursePermissions(courseID: String) async -> SchoologyCoursePermissions? {
+        if isDemoMode { return SchoologyCoursePermissions(canPostUpdates: true, canAddResources: true) }
         guard let auth else { return nil }
         let paths = ["/v1/sections/\(courseID)/documents", "/v1/sections/\(courseID)/updates"]
         guard let data = try? await api.postMultiOptions(paths, auth: auth) else { return nil }
@@ -1935,6 +1996,7 @@ final class AppSession {
     }
 
     func loadPostableUpdateDestinations() async -> [SchoologyUpdateDestination] {
+        if isDemoMode { return courses.map { SchoologyUpdateDestination(realm: "sections", resourceID: $0.id, title: $0.title) } + groups.map { SchoologyUpdateDestination(realm: "groups", resourceID: $0.id, title: $0.title) } }
         guard let auth else { return [] }
         let destinations =
             courses.map { SchoologyUpdateDestination(realm: "sections", resourceID: $0.id, title: $0.title) } +
@@ -1957,6 +2019,7 @@ final class AppSession {
     }
 
     func loadHomeCreateDestinations() async -> [SchoologyHomeCreateDestination] {
+        if isDemoMode { return groups.map { SchoologyHomeCreateDestination(realm: "groups", resourceID: $0.id, title: $0.title, canCreateDiscussion: true, canCreateEvent: true) } }
         guard let auth else { return [] }
         let destinations = [SchoologyHomeCreateDestination(realm: "users", resourceID: auth.userID, title: "My Account", canCreateDiscussion: false, canCreateEvent: false)] +
             courses.map { SchoologyHomeCreateDestination(realm: "sections", resourceID: $0.id, title: $0.title, canCreateDiscussion: false, canCreateEvent: false) } +
@@ -2062,8 +2125,89 @@ final class AppSession {
         peopleDirectoryEnabled = enterprise && directoryPublic
     }
 
+
+    private var demoPeople: [SchoologyProfileItem] {
+        [
+            SchoologyProfileItem(id:"demo-student",title:"Alex Morgan",body:"Student at Cedar Valley High School.",subtitle:"Student",url:nil,isAdmin:false,kind:"user",collectionID:nil,firstName:"Alex",lastName:"Morgan",role:"Student",schoolName:"Cedar Valley High School"),
+            SchoologyProfileItem(id:"demo-teacher",title:"Sofia Rivera",body:"Biology teacher.",subtitle:"Teacher",url:nil,isAdmin:true,kind:"user",collectionID:nil,firstName:"Sofia",lastName:"Rivera",role:"Teacher",schoolName:"Cedar Valley High School"),
+            SchoologyProfileItem(id:"demo-jordan",title:"Jordan Lee",body:"Student at Cedar Valley High School.",subtitle:"Student",url:nil,isAdmin:false,kind:"user",collectionID:nil,firstName:"Jordan",lastName:"Lee",role:"Student",schoolName:"Cedar Valley High School"),
+            SchoologyProfileItem(id:"demo-maya",title:"Maya Patel",body:"Student at Cedar Valley High School.",subtitle:"Student",url:nil,isAdmin:false,kind:"user",collectionID:nil,firstName:"Maya",lastName:"Patel",role:"Student",schoolName:"Cedar Valley High School")
+        ]
+    }
+    private var demoMaterials: [SchoologyProfileItem] {
+        [
+            SchoologyProfileItem(id:"demo-folder",title:"Unit 3 · Cell Biology",body:"Study materials and class handouts.",subtitle:"Folder",url:nil,isAdmin:false,kind:"folder",collectionID:"demo-collection"),
+            SchoologyProfileItem(id:"demo-guide",title:"Cell Structure Study Guide.pdf",body:"A fictional study guide for the cell structure unit.",subtitle:"PDF · 2.4 MB",url:URL(string:"https://example.com/demo-study-guide.pdf"),isAdmin:false,kind:"file",collectionID:"demo-collection",fileName:"Cell Structure Study Guide.pdf",fileMIME:"application/pdf"),
+            SchoologyProfileItem(id:"demo-video",title:"Cell Transport Overview.mp4",body:"A sample video resource.",subtitle:"Video · 8 min",url:URL(string:"https://example.com/demo-video.mp4"),isAdmin:false,kind:"file",collectionID:"demo-collection",fileName:"Cell Transport Overview.mp4",fileMIME:"video/mp4")
+        ]
+    }
+    private var demoDiscussions: [SchoologyProfileItem] {
+        [SchoologyProfileItem(id:"demo-discussion",title:"What makes a good scientific model?",body:"Share an example and explain what it helps us understand.",subtitle:"8 replies",url:nil,isAdmin:false,kind:"discussion",collectionID:nil)]
+    }
+    private var demoAlbums: [SchoologyProfileItem] {
+        [SchoologyProfileItem(id:"demo-album",title:"Science Fair Projects",body:"Sample classroom project photos.",subtitle:"12 photos",url:nil,isAdmin:false,kind:"album",collectionID:nil)]
+    }
+    private var demoCollections: [SchoologyResourceCollection] {
+        [
+            SchoologyResourceCollection(id:"demo-collection",title:"Biology Study Resources",ownerID:"demo-student",realm:"",sharedCount:0,typeID:"1",folderID:"0",category:.mine,imageURL:nil),
+            SchoologyResourceCollection(id:"demo-shared",title:"Shared Class Materials",ownerID:"demo-teacher",realm:"",sharedCount:8,typeID:"1",folderID:"0",category:.shared,imageURL:nil)
+        ]
+    }
+    private var demoGradeCourses: [SchoologyUserGradeCourse] {
+        courses.map { c in SchoologyUserGradeCourse(id:c.id,title:c.title,courseTitle:c.title,overallGrade:c.id == "demo-biology" ? "A- (91.4%)" : (c.id == "demo-algebra" ? "B+ (88%)" : "A (95%)"),imageURL:c.profileURL) }
+    }
+    private func demoAssignments(for id:String)->[SchoologyProfileItem] {
+        let values:[(String,String,String)] = id == "demo-biology" ? [("demo-assignment-1","Cell Structure Lab","Due in 2 days"),("demo-assignment-2","Cell Transport Worksheet","Due in 5 days")] : (id == "demo-algebra" ? [("demo-assignment-3","Quadratic Functions","Due in 4 days")] : [("demo-assignment-4","Primary Source Analysis","Due in 6 days")])
+        return values.map { i,t,d in SchoologyProfileItem(id:i,title:t,body:"Fictional assignment instructions and learning objectives.",subtitle:d,url:nil,isAdmin:false,kind:"assignment",collectionID:nil) }
+    }
+    private func demoGradebook(for id:String)->SchoologyGradebook {
+        let rows=[SchoologyGradeAssignment(id:"demo-grade-1",title:"Cell Structure Lab",grade:"18",maxPoints:"20",due:"Nov 10",comment:"Clear observations and strong detail.",itemType:"assignment"),SchoologyGradeAssignment(id:"demo-grade-2",title:"Cell Transport Quiz",grade:"9",maxPoints:"10",due:"Nov 12",comment:"",itemType:"assessment")]
+        let category=SchoologyGradeCategory(id:"demo-category",title:"Coursework",weight:"100%",assignments:rows)
+        let period=SchoologyGradePeriod(id:"final",title:"Current term",categories:[category])
+        let grade=id == "demo-biology" ? "A- (91.4%)" : (id == "demo-algebra" ? "B+ (88%)" : "A (95%)")
+        return SchoologyGradebook(courseID:id,overallGrade:grade,overallComment:"Fictional demonstration grade.",gradingScaleID:"demo-scale",periods:[period])
+    }
+    private var demoNotifications: [SchoologyNotification] {
+        let json = """
+        {"notifications":{"notification":[
+        {"id":"demo-notice-1","body":"Ms. Rivera posted a new update in Biology.","type":"discussion_add","created":"2026-11-06T16:30:00Z","realm":"section","realm_id":"demo-biology","viewed":false},
+        {"id":"demo-notice-2","body":"Your Cell Structure Lab grade was updated.","type":"grade_add","created":"2026-11-05T18:15:00Z","realm":"section","realm_id":"demo-biology","viewed":true},
+        {"id":"demo-notice-3","body":"Jordan Lee commented on your class update.","type":"comment_add","created":"2026-11-04T19:00:00Z","realm":"group","realm_id":"demo-science","viewed":true}
+        ],"count":3,"unviewed_count":1}}
+        """
+        return SchoologyNotificationPage.decode(Data(json.utf8),start:0,limit:50).notifications
+    }
+    private func seedDemoContent() {
+        courses=[SchoologyCourse(id:"demo-biology",title:"Biology",courseCode:"BIO-204",section:"Period 2",profileURL:nil,schoolID:"demo-school"),SchoologyCourse(id:"demo-algebra",title:"Algebra II",courseCode:"MATH-310",section:"Period 4",profileURL:nil,schoolID:"demo-school"),SchoologyCourse(id:"demo-history",title:"World History",courseCode:"HIST-112",section:"Period 6",profileURL:nil,schoolID:"demo-school")]
+        groups=[SchoologyGroup(id:"demo-science",title:"Science Club",schoolID:"demo-school"),SchoologyGroup(id:"demo-yearbook",title:"Yearbook Committee",schoolID:"demo-school")]
+        let iso=ISO8601DateFormatter()
+        func date(_ n:Int)->String { iso.string(from:Calendar.current.date(byAdding:.day,value:n,to:.now) ?? .now) }
+        activities=[
+            SchoologyActivity(id:"demo-update-1",authorName:"Sofia Rivera",authorID:"demo-teacher",avatarURL:nil,body:"Welcome to our **cell biology unit**! This week we’ll explore how cells transport materials and maintain balance.",created:date(-1),contextLabel:"Biology",attachments:[],imageURLs:[],likes:18,comments:3,commentRealm:"sections",commentRealmID:"demo-biology",isLiked:false),
+            SchoologyActivity(id:"demo-update-2",authorName:"Jordan Lee",authorID:"demo-jordan",avatarURL:nil,body:"Our Science Club experiment is ready for Friday. Remember to bring your observation notes!",created:date(-2),contextLabel:"Science Club",attachments:[],imageURLs:[],likes:9,comments:2,commentRealm:"groups",commentRealmID:"demo-science",isLiked:true)
+        ]
+        upcomingEvents=[
+            SchoologyUpcomingEvent(id:"demo-event-1",title:"Cell Structure Lab",type:"assignment",start:date(2),end:"",allDay:true,realm:"sections",realmID:"demo-biology",sectionID:"demo-biology",groupID:nil,schoolID:"demo-school",userID:nil,assignmentID:"demo-assignment-1",discussionID:nil,externalToolID:nil,webURL:nil),
+            SchoologyUpcomingEvent(id:"demo-event-2",title:"Quadratic Functions",type:"assignment",start:date(4),end:"",allDay:true,realm:"sections",realmID:"demo-algebra",sectionID:"demo-algebra",groupID:nil,schoolID:"demo-school",userID:nil,assignmentID:"demo-assignment-3",discussionID:nil,externalToolID:nil,webURL:nil),
+            SchoologyUpcomingEvent(id:"demo-event-3",title:"Science Club Meeting",type:"event",start:date(1),end:date(1),allDay:false,realm:"groups",realmID:"demo-science",sectionID:nil,groupID:"demo-science",schoolID:"demo-school",userID:nil,assignmentID:nil,discussionID:nil,externalToolID:nil,webURL:nil)
+        ]
+        notifications=demoNotifications; hasLoadedNotifications=true; notificationsHasMore=false
+        cachedMessagesByFolder=[
+            "Inbox":[SchoologyMessage(id:"demo-message-1",subject:"Biology project",body:"Hi Alex! Are we still meeting to review the biology project?",created:date(-1),status:"read",isUnread:false,authorID:"demo-teacher",recipientID:"demo-student",personName:"Sofia Rivera",personPictureURL:nil,attachments:[]),SchoologyMessage(id:"demo-message-2",subject:"Study group",body:"I shared the review topics for our next meeting.",created:date(-2),status:"unread",isUnread:true,authorID:"demo-jordan",recipientID:"demo-student",personName:"Jordan Lee",personPictureURL:nil,attachments:[])],
+            "Unread":[SchoologyMessage(id:"demo-message-2",subject:"Study group",body:"I shared the review topics for our next meeting.",created:date(-2),status:"unread",isUnread:true,authorID:"demo-jordan",recipientID:"demo-student",personName:"Jordan Lee",personPictureURL:nil,attachments:[])],
+            "Sent":[SchoologyMessage(id:"demo-message-3",subject:"Re: Biology project",body:"Yes, I’ll bring my notes. See you after class!",created:date(-1),status:"read",isUnread:false,authorID:"demo-student",recipientID:"demo-teacher",personName:"Sofia Rivera",personPictureURL:nil,attachments:[])]
+        ]
+        resourceCollections=demoCollections; hasLoadedResources=true
+        userGradeCourses=demoGradeCourses; hasLoadedUserGrades=true
+        calendarMonthEvents=upcomingEvents; calendarUpcomingEvents=upcomingEvents; hasLoadedCalendarUpcoming=true
+        calendarLoadedMonth=iso.string(from:.now).prefix(7).description
+        hasLoadedHomeActivities=true; hasLoadedHomeCourses=true; hasLoadedHomeUpcoming=true
+        schoolNames=["demo-biology":"Cedar Valley High School","demo-algebra":"Cedar Valley High School","demo-history":"Cedar Valley High School"]
+        peopleDirectoryEnabled=true
+    }
+
     func beginDemoMode() {
-        // Keep any existing Keychain credentials intact; demo mode is an alternate local view, not sign-out.
+        // Keep saved Keychain credentials intact; demo data is isolated from the real account.
         auth = nil
         user = SchoologyUser(id: "demo-student", nameDisplay: "Alex Morgan", pictureURL: nil)
         isDemoMode = true
@@ -2071,6 +2215,7 @@ final class AppSession {
         destination = .home
         homeSection = .recent
         errorMessage = nil
+        seedDemoContent()
     }
 
     func exitDemoMode() {

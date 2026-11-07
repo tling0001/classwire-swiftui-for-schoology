@@ -21,9 +21,13 @@ struct SchoologyApp: App {
                 .environment(session)
                 .environment(updateService)
                 .task {
-                    SchoologyPushNotifications.configure(session)
+                    if !session.isDemoMode {
+                        SchoologyPushNotifications.configure(session)
+                    }
                     await updateService.checkForUpdates()
-                    await SchoologyPushNotifications.registerIfAuthorized()
+                    if !session.isDemoMode {
+                        await SchoologyPushNotifications.registerIfAuthorized()
+                    }
                 }
                 .tint(SchoologyStyle.blue)
                 .preferredColorScheme(session.appearance.colorScheme)
@@ -39,7 +43,7 @@ struct SchoologyApp: App {
         }
         #if os(iOS)
         .backgroundTask(.appRefresh(SchoologyBackgroundRefresh.identifier)) {
-            if await session.isSignedIn {
+            if await session.isSignedIn, !(await session.isDemoMode) {
                 await session.loadNotifications(force: true, markRead: false)
                 SchoologyBackgroundRefresh.schedule()
             }

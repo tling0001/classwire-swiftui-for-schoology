@@ -1,5 +1,18 @@
 # Release notes
 
+## [2026.10.0-port.79]
+
+### Demo mode
+- Replace the separate demo-only app shell with the normal ClassWire navigation split view and existing destination screens.
+- Move the iOS demo status and exit control to a safe-area-aware bottom bar; use the macOS toolbar instead of placing critical controls at the bottom of a resizable window.
+- Seed normal app screens with fictional courses, groups, activity, upcoming events, messages, notifications, grades, resources, and people.
+- Route supported demo screen loads to local sample models without making Schoology API requests or changing saved Keychain credentials.
+- Keep demo exit available from the bottom bar and the standard sidebar.
+
+### Build
+- Increment the iOS and macOS bundle build number to 79.
+
+
 ## [2026.10.0-port.78]
 
 ### Schoology terminology

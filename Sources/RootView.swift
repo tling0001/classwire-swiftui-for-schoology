@@ -22,9 +22,7 @@ struct RootView: View {
 
     var body: some View {
         Group {
-            if session.isDemoMode {
-                ClassWireDemoView()
-            } else if session.isSignedIn {
+            if session.isSignedIn {
                 NavigationSplitView(preferredCompactColumn: $preferredCompactColumn) {
                     SchoologySidebar(selection: $selectedRoute)
                         #if os(macOS)
@@ -46,7 +44,7 @@ struct RootView: View {
                 .task {
                     selectedRoute = .destination(session.destination)
                     #if os(iOS)
-                    if session.isSignedIn { SchoologyBackgroundRefresh.schedule() }
+                    if session.isSignedIn && !session.isDemoMode { SchoologyBackgroundRefresh.schedule() }
                     #endif
                 }
                 #if os(macOS)
@@ -84,9 +82,22 @@ struct RootView: View {
                 )
             }
         }
+        #if os(iOS)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if session.isDemoMode { ClassWireDemoModeBar(onExit: session.exitDemoMode) }
+        }
+        #endif
+        .toolbar {
+            #if os(macOS)
+            if session.isDemoMode {
+                ToolbarItem(placement: .status) { Label("Demo data", systemImage: "checkmark.seal.fill").foregroundStyle(.secondary) }
+                ToolbarItem(placement: .automatic) { Button("Exit Demo", systemImage: "rectangle.portrait.and.arrow.right", action: session.exitDemoMode) }
+            }
+            #endif
+        }
         .onChange(of: scenePhase) { _, phase in
             #if os(iOS)
-            if phase == .background, session.isSignedIn {
+            if phase == .background, session.isSignedIn, !session.isDemoMode {
                 SchoologyBackgroundRefresh.schedule()
             }
             #endif
@@ -203,10 +214,14 @@ private struct SchoologySidebar: View {
         }
 
         Section {
-            Button(role: .destructive) {
-                session.signOut()
-            } label: {
-                Label("Sign Out", systemImage: "rectangle.portrait.and.arrow.right")
+            if session.isDemoMode {
+                Button { session.exitDemoMode() } label: {
+                    Label("Exit Demo", systemImage: "rectangle.portrait.and.arrow.right")
+                }
+            } else {
+                Button(role: .destructive) { session.signOut() } label: {
+                    Label("Sign Out", systemImage: "rectangle.portrait.and.arrow.right")
+                }
             }
         }
     }
