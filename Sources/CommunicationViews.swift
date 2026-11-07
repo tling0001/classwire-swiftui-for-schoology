@@ -266,7 +266,7 @@ private struct MessageThreadView: View {
     }
 
     private func makeReplyContext(from loaded: [SchoologyMessage]) -> SchoologyMessageComposerView.ReplyContext? {
-        guard let currentUserID = session.auth?.userID else { return nil }
+        guard let currentUserID = session.user?.id else { return nil }
         let source = loaded.reversed().first {
             guard let authorID = $0.authorID else { return false }
             return authorID != currentUserID

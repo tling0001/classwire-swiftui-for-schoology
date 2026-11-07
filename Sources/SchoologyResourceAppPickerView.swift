@@ -108,6 +108,17 @@ struct SchoologyResourceAppPickerView: View {
     private func launch() async {
         isLoading = true
         error = nil
+        if session.isDemoMode {
+            do {
+                let resources = try await session.importResourceAppItems(from: URL(fileURLWithPath: "/ClassWireDemo/ResourceApp"))
+                imported = resources
+                selectedIDs = Set(resources.map(\.id))
+            } catch {
+                self.error = error.localizedDescription
+            }
+            isLoading = false
+            return
+        }
         do {
             launchURL = try await session.launchResourceApp(app)
         } catch {

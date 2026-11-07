@@ -1,5 +1,21 @@
 # Release notes
 
+## [2026.10.0-port.80]
+
+### Offline demo interactions
+- Simulate update posting, group updates, discussions, events, albums, and resource sharing in local demo state.
+- Add local comment and like behavior across updates, discussions, assignments, and events.
+- Support fictional message recipient search, composing, sending, replying, and conversation refresh without Schoology requests.
+- Simulate text and file assignment submissions, keep demo revisions locally, and make demo uploads downloadable from a temporary local folder.
+- Add offline resource-app import selection, a sample course app, and local HTML previews for external launch experiences.
+- Route school, course, group, notification-document, and resource detail requests to sample content while demo mode is active.
+- Preserve local demo state across screen refreshes during the active demo session; no demo action is sent to Schoology.
+
+### Build
+- Increment the iOS and macOS bundle build number to 80.
+
+
+
 ## [2026.10.0-port.79]
 
 ### Demo mode

@@ -39,6 +39,14 @@ final class AppSession {
     var notificationsError: String?
     var messageFolder = SchoologyMessageFolder.inbox
     var cachedMessagesByFolder: [String: [SchoologyMessage]] = [:]
+    private var demoMessageThreads: [String: [SchoologyMessage]] = [:]
+    private var demoCommentsByEntity: [String: [SchoologyComment]] = [:]
+    private var demoAssignmentRevisions: [String: [SchoologyAssignmentRevision]] = [:]
+    private var demoUploadedFiles: [String: (data: Data, filename: String, mime: String)] = [:]
+    private var demoCreatedDiscussions: [String: [SchoologyProfileItem]] = [:]
+    private var demoCreatedAlbums: [String: [SchoologyProfileItem]] = [:]
+    private var demoGroupResourceItems: [String: [SchoologyProfileItem]] = [:]
+    private var demoEventAttachments: [String: [SchoologyAttachment]] = [:]
     var messageErrors: [String: String] = [:]
     var activities: [SchoologyActivity] = []
     var upcomingEvents: [SchoologyUpcomingEvent] = []
@@ -165,6 +173,7 @@ final class AppSession {
     }
 
     private func fetchHomeData(path: String, auth: SchoologyAuth, params: [String: String] = [:]) async -> (Data?, String?) {
+        if isDemoMode { return (nil, nil) }
         do {
             return (try await api.get(path, auth: auth, params: params), nil)
         } catch {
@@ -224,6 +233,10 @@ final class AppSession {
     }
 
     func loadCoursePage(courseID: String, pageID: String) async throws -> SchoologyPage {
+        if isDemoMode {
+            let course = courses.first { $0.id == courseID }?.title ?? "Class"
+            return SchoologyPage(title: "Course Overview", body: "Welcome to \(course). This sample page includes course expectations, helpful links, and learning goals.", baseURL: URL(fileURLWithPath: "/ClassWireDemo/"))
+        }
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         let data = try await api.get("sections/\(courseID)/pages/\(pageID)", auth: auth)
         let response = Self.object(data)
@@ -240,13 +253,20 @@ final class AppSession {
     }
 
     func loadCourseMaterials(courseID: String, folderID: String = "0") async throws -> [SchoologyProfileItem] {
-        if isDemoMode { return demoMaterials }
+        if isDemoMode {
+            if folderID == "demo-folder" { return demoMaterials.filter { $0.id != "demo-folder" } }
+            return demoMaterials
+        }
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         let data = try await api.get("courses/\(courseID)/folder/\(folderID)", auth: auth)
         return SchoologyProfileItem.decodeList(Self.object(data), keys: ["folder-item", "folder_item", "folderItems", "items", "documents"])
     }
 
     func loadCourseMaterialDetail(courseID: String, item: SchoologyProfileItem) async throws -> (attachment: SchoologyAttachment?, linkURL: URL?) {
+        if isDemoMode {
+            let url = try demoHTMLURL(title: item.title, body: item.body.isEmpty ? "Sample course material preview." : item.body)
+            return (SchoologyAttachment(title: item.title + " · Demo Preview.html", url: url), nil)
+        }
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         let data = try await api.get("sections/\(courseID)/documents/\(item.id)", auth: auth)
         return try Self.resolveDocumentDetail(data: data, item: item)
@@ -258,6 +278,10 @@ final class AppSession {
         title: String,
         documentTypeHint: String? = nil
     ) async throws -> (attachment: SchoologyAttachment?, linkURL: URL?) {
+        if isDemoMode {
+            let url = try demoHTMLURL(title: title, body: "A sample document opened from a notification. All content is stored locally for this demo.")
+            return (SchoologyAttachment(title: title + " · Demo Preview.html", url: url), nil)
+        }
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         let data = try await api.get(
             "sections/\(realmID)/documents/\(documentID)",
@@ -387,24 +411,27 @@ final class AppSession {
     }
 
     func loadCourseApps(courseID: String) async throws -> [SchoologyCourseApp] {
-        if isDemoMode { return [] }
+        if isDemoMode { return [SchoologyCourseApp(id: "demo-course-app", title: "Interactive Practice Lab", logoURL: nil, launchURL: URL(fileURLWithPath: "/ClassWireDemo/CourseApp"))] }
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         let data = try await api.getV2("sections/\(courseID)/applications", auth: auth)
         return SchoologyCourseApp.decodeList(data)
     }
 
     func launchCourseApp(_ app: SchoologyCourseApp, courseID: String) async throws -> URL {
+        if isDemoMode { return try demoHTMLURL(title: app.title, body: "This sample course app demonstrates an offline learning activity.") }
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         guard let launchURL = app.launchURL else { throw SchoologyAPIError.invalidResponse }
         return try await api.launchCourseApp(launchURL, sectionID: courseID, auth: auth)
     }
 
     func launchResourceApp(_ app: SchoologyResourceCollection) async throws -> URL {
+        if isDemoMode { return URL(fileURLWithPath: "/ClassWireDemo/ResourceApp") }
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         return try await api.launchResourceApp(appID: app.id, auth: auth)
     }
 
     func importResourceAppItems(from url: URL) async throws -> [SchoologyPickedResource] {
+        if isDemoMode { return [SchoologyPickedResource(id: "demo-guide", title: "Cell Structure Study Guide.pdf"), SchoologyPickedResource(id: "demo-video", title: "Cell Transport Overview.mp4"), SchoologyPickedResource(id: "demo-link", title: "Interactive Cell Model")] }
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         let cookies = try await loadWebSessionCookies()
         return try await api.importResourceApp(url: url, auth: auth, cookies: cookies)
@@ -686,7 +713,13 @@ final class AppSession {
     }
 
     func loadResources(force: Bool = false) async {
-        if isDemoMode { resourceCollections = demoCollections; resourceApps = []; hasLoadedResources = true; return }
+        if isDemoMode {
+            resourceCollections = demoCollections
+            resourceApps = [SchoologyResourceCollection(id: "demo-resource-app", title: "Class Library App", ownerID: "demo-teacher",
+                realm: "apps", sharedCount: 0, typeID: "app", folderID: "0", category: .apps, imageURL: nil)]
+            hasLoadedResources = true
+            return
+        }
         guard let auth, !isLoadingResources else { return }
         if hasLoadedResources && !force { return }
         isLoadingResources = true
@@ -720,7 +753,10 @@ final class AppSession {
     }
 
     func loadResourceItems(collectionID: String, folderID: String? = nil) async throws -> [SchoologyProfileItem] {
-        if isDemoMode { return demoMaterials }
+        if isDemoMode {
+            if folderID == "demo-folder" { return demoMaterials.filter { $0.id != "demo-folder" } }
+            return demoMaterials
+        }
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         var params = ["start": "0", "limit": "200", "with_attachments": "TRUE"]
         if let folderID, !folderID.isEmpty, folderID != "0" { params["f"] = folderID }
@@ -730,6 +766,21 @@ final class AppSession {
 
 
     func downloadAttachment(_ attachment: SchoologyAttachment, forViewing: Bool = false) async throws -> URL {
+        if isDemoMode {
+            if attachment.url.isFileURL, FileManager.default.fileExists(atPath: attachment.url.path) {
+                return attachment.url
+            }
+            let id = attachment.url.lastPathComponent
+            let file = demoUploadedFiles[id]
+            let directory = FileManager.default.temporaryDirectory.appending(path: "ClassWireDemo/Downloads")
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            let destination = directory.appending(path: file?.filename ?? attachment.title)
+            if file == nil && attachment.title.lowercased().hasSuffix(".html") {
+                return try demoHTMLURL(title: attachment.title, body: "This fictional resource preview is generated locally for the ClassWire demo.")
+            }
+            try (file?.data ?? Data("Fictional ClassWire demo document: \(attachment.title)".utf8)).write(to: destination, options: .atomic)
+            return destination
+        }
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         let sourceURL = forViewing ? (attachment.viewURL ?? attachment.url) : attachment.url
         // File downloads may require the authenticated web session from /v1/sessionstart.
@@ -785,6 +836,7 @@ final class AppSession {
     /// Hydrates the current user's overall grade from section final-grade records.
     /// Match the signed-in user's enrollment before reading the "final" period.
     private func loadOverallGradeSummary(for course: SchoologyUserGradeCourse, auth: SchoologyAuth) async -> SchoologyUserGradeCourse {
+        if isDemoMode { return course }
         async let gradesRequest = try? await api.get("sections/\(course.id)/grades", auth: auth)
         async let scalesRequest = try? await api.get("sections/\(course.id)/grading_scales", auth: auth)
         async let enrollmentsRequest = try? await api.get("sections/\(course.id)/enrollments", auth: auth,
@@ -1093,6 +1145,7 @@ final class AppSession {
 
 
     func loadWebSessionCookies() async throws -> [SchoologyWebCookie] {
+        if isDemoMode { return [] }
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         return try await api.webSessionCookies(auth: auth)
     }
@@ -1108,7 +1161,11 @@ final class AppSession {
     }
 
     func loadDiscussion(realm: String, realmID: String, discussionID: String) async throws -> SchoologyProfileItem {
-        if isDemoMode { return demoDiscussions.first { $0.id == discussionID } ?? demoDiscussions[0] }
+        if isDemoMode {
+            return demoCreatedDiscussions[realmID]?.first { $0.id == discussionID }
+                ?? demoDiscussions.first { $0.id == discussionID }
+                ?? demoDiscussions[0]
+        }
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         let data = try await api.get("\(apiRealm(realm))/\(realmID)/discussions/\(discussionID)", auth: auth, params: ["with_attachments": "TRUE", "richtext": "1"])
         let json = Self.object(data)
@@ -1135,6 +1192,7 @@ final class AppSession {
     }
 
     func loadExternalToolURL(sectionID: String, documentID: String) async throws -> URL {
+        if isDemoMode { return try demoHTMLURL(title: "External Learning Tool", body: "This sample external tool is running locally in the ClassWire demo.") }
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         let data = try await api.get("sections/\(sectionID)/documents/\(documentID)", auth: auth, params: [
             "with_attachments": "TRUE",
@@ -1166,7 +1224,7 @@ final class AppSession {
                 url: nil, isAdmin: false, kind: "event", collectionID: nil)
             return SchoologyEventContext(event: item, richDescription: "A fictional class event. This content is only available in demo mode.",
                 start: event?.start ?? "", end: event?.end ?? "", allDay: event?.allDay ?? false,
-                commentsEnabled: false, attachments: [])
+                commentsEnabled: true, attachments: demoEventAttachments[eventID] ?? [])
         }
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         let data = try await api.get("\(apiRealm(realm))/\(realmID)/events/\(eventID)", auth: auth, params: ["with_attachments": "TRUE", "richtext": "1"])
@@ -1225,6 +1283,7 @@ final class AppSession {
     }
 
     func loadUpdateComments(realm: String, realmID: String, updateID: String) async throws -> [SchoologyComment] {
+        if isDemoMode { return demoCommentsByEntity[updateID] ?? [] }
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         let data = try await api.get("\(realm)/\(realmID)/updates/\(updateID)/comments", auth: auth, params: [
             "start": "0", "limit": "100", "with_attachments": "TRUE", "richtext": "1"
@@ -1233,6 +1292,7 @@ final class AppSession {
     }
 
     func postUpdateComment(realm: String, realmID: String, updateID: String, body: String, parentID: String? = nil) async throws {
+        if isDemoMode { appendDemoComment(body, entityID: updateID, parentID: parentID); return }
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         _ = try await api.postJSON("\(realm)/\(realmID)/updates/\(updateID)/comments", auth: auth, body: [
             "comment": body,
@@ -1241,12 +1301,22 @@ final class AppSession {
     }
 
     func loadUpdateLikes(updateID: String) async throws -> [SchoologyProfileItem] {
+        if isDemoMode { return Array(demoPeople.prefix(3)) }
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         let data = try await api.get("like/\(updateID)", auth: auth)
         return SchoologyProfileItem.decodeList(Self.object(data), keys: ["users", "user", "items", "data"])
     }
 
     func setUpdateLike(updateID: String, liked: Bool) async throws -> Bool {
+        if isDemoMode {
+            guard let index = activities.firstIndex(where: { $0.id == updateID }) else { return liked }
+            let old = activities[index]
+            activities[index] = SchoologyActivity(id: old.id, authorName: old.authorName, authorID: old.authorID,
+                avatarURL: old.avatarURL, body: old.body, created: old.created, contextLabel: old.contextLabel,
+                attachments: old.attachments, imageURLs: old.imageURLs, likes: max(0, old.likes + (liked ? 1 : -1)),
+                comments: old.comments, commentRealm: old.commentRealm, commentRealmID: old.commentRealmID, isLiked: liked)
+            return liked
+        }
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         let data = try await api.postJSON("like/\(updateID)", auth: auth, body: [
             "like_action": liked
@@ -1259,12 +1329,22 @@ final class AppSession {
     }
 
     func loadCommentLikes(updateID: String, commentID: String) async throws -> [SchoologyProfileItem] {
+        if isDemoMode { return Array(demoPeople.prefix(2)) }
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         let data = try await api.get("like/\(updateID)/comment/\(commentID)", auth: auth)
         return SchoologyProfileItem.decodeList(Self.object(data), keys: ["users", "user", "items", "data"])
     }
 
     func setCommentLike(updateID: String, commentID: String, liked: Bool) async throws -> Bool {
+        if isDemoMode {
+            guard var rows = demoCommentsByEntity[updateID], let index = rows.firstIndex(where: { $0.id == commentID }) else { return liked }
+            let old = rows[index]
+            rows[index] = SchoologyComment(id: old.id, parentID: old.parentID, authorID: old.authorID,
+                authorName: old.authorName, avatarURL: old.avatarURL, body: old.body, created: old.created,
+                likes: max(0, old.likes + (liked ? 1 : -1)), isLiked: liked, isDeleted: old.isDeleted, attachments: old.attachments)
+            demoCommentsByEntity[updateID] = rows
+            return liked
+        }
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         let data = try await api.postJSON("like/\(updateID)/comment/\(commentID)", auth: auth, body: [
             "like_action": liked
@@ -1277,12 +1357,14 @@ final class AppSession {
     }
 
     func loadDiscussionComments(realm: String, realmID: String, discussionID: String) async throws -> [SchoologyComment] {
+        if isDemoMode { return demoCommentsByEntity[discussionID] ?? [] }
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         let data = try await api.get("\(apiRealm(realm))/\(realmID)/discussions/\(discussionID)/comments", auth: auth, params: ["start": "0", "limit": "100", "with_attachments": "TRUE", "richtext": "1"])
         return await hydrateCommentAuthors(SchoologyComment.decodeList(Self.object(data)), auth: auth)
     }
 
     func postDiscussionComment(realm: String, realmID: String, discussionID: String, body: String, parentID: String? = nil) async throws {
+        if isDemoMode { appendDemoComment(body, entityID: discussionID, parentID: parentID); return }
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         _ = try await api.postJSON("\(apiRealm(realm))/\(realmID)/discussions/\(discussionID)/comments", auth: auth, body: [
             "comment": body,
@@ -1291,6 +1373,7 @@ final class AppSession {
     }
 
     func loadAssignmentComments(sectionID: String, assignmentID: String) async throws -> [SchoologyComment] {
+        if isDemoMode { return demoCommentsByEntity[assignmentID] ?? [] }
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         let data = try await api.get("sections/\(sectionID)/assignments/\(assignmentID)/comments", auth: auth, params: ["start": "0", "limit": "100", "with_attachments": "TRUE", "richtext": "1"])
         return await hydrateCommentAuthors(SchoologyComment.decodeList(Self.object(data)), auth: auth)
@@ -1298,6 +1381,7 @@ final class AppSession {
 
     /// Assignment comments belong to the assignment discussion, not to a submission revision.
     func postAssignmentComment(sectionID: String, assignmentID: String, body: String, parentID: String? = nil) async throws {
+        if isDemoMode { appendDemoComment(body, entityID: assignmentID, parentID: parentID); return }
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         let replyID = Int(parentID ?? "0") ?? 0
         _ = try await api.postJSON("sections/\(sectionID)/assignments/\(assignmentID)/comments", auth: auth, body: [
@@ -1307,6 +1391,7 @@ final class AppSession {
     }
 
     func loadEventComments(realm: String, realmID: String, eventID: String) async throws -> [SchoologyComment] {
+        if isDemoMode { return demoCommentsByEntity[eventID] ?? [] }
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         let data = try await api.get(
             "\(apiRealm(realm))/\(realmID)/events/\(eventID)/comments",
@@ -1317,6 +1402,7 @@ final class AppSession {
     }
 
     func postComment(realm: String, realmID: String, entity: String, entityID: String, body: String, parentID: String? = nil) async throws {
+        if isDemoMode { appendDemoComment(body, entityID: entityID, parentID: parentID); return }
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         _ = try await api.postJSON("\(apiRealm(realm))/\(realmID)/\(entity)/\(entityID)/comments", auth: auth, body: [
             "comment": body,
@@ -1325,6 +1411,12 @@ final class AppSession {
     }
 
     func loadGroupAlbum(groupID: String, albumID: String) async throws -> [SchoologyProfileItem] {
+        if isDemoMode {
+            return [
+                SchoologyProfileItem(id: "demo-photo-1", title: "Science Fair Display", body: "A sample classroom science fair photograph.", subtitle: "Photo", url: nil, isAdmin: false, kind: "image", collectionID: nil),
+                SchoologyProfileItem(id: "demo-photo-2", title: "Cell Model Project", body: "A sample student-built cell model.", subtitle: "Photo", url: nil, isAdmin: false, kind: "image", collectionID: nil)
+            ]
+        }
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         let data = try await api.get("groups/\(groupID)/albums/\(albumID)", auth: auth, params: ["with_content": "TRUE"])
         let json = Self.object(data)
@@ -1333,6 +1425,7 @@ final class AppSession {
     }
 
     func loadGroupResources(groupID: String, folderID: String? = nil, collectionID: String? = nil) async throws -> [SchoologyProfileItem] {
+        if isDemoMode { return demoGroupResourceItems[groupID] ?? demoMaterials }
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         var params = ["limit": "50", "with_attachments": "TRUE"]
         if let folderID, !folderID.isEmpty { params["f"] = folderID }
@@ -1372,6 +1465,7 @@ final class AppSession {
     }
 
     func loadPersonBadges(userID: String) async throws -> [SchoologyProfileItem] {
+        if isDemoMode { return [SchoologyProfileItem(id: "demo-badge", title: "Curious Mind", body: "Awarded for thoughtful participation.", subtitle: "Science Club", url: nil, isAdmin: false, kind: "badge", collectionID: nil)] }
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         let data = try await api.get("users/\(userID)/badges", auth: auth)
         return SchoologyProfileItem.decodeList(Self.object(data), keys: ["badge", "badges", "items"])
@@ -1383,7 +1477,7 @@ final class AppSession {
             let assignment = demoAssignments(for: sectionID).first { $0.id == assignmentID }
                 ?? demoAssignments(for: sectionID).first
                 ?? SchoologyProfileItem(id: assignmentID, title: "Assignment", body: "Fictional assignment details.", subtitle: "", url: nil, isAdmin: false, kind: "assignment", collectionID: nil)
-            return SchoologyAssignmentContext(assignment: assignment, canSubmit: false, allowComments: false, isTeacher: false,
+            return SchoologyAssignmentContext(assignment: assignment, canSubmit: true, allowComments: true, isTeacher: false,
                 gradeItemID: assignmentID, enrollmentID: nil, ltiURL: nil, currentGrade: "18", maxPoints: "20",
                 richDescription: assignment.body, teacherComment: "Nice work — keep it up!", attachments: [])
         }
@@ -1442,6 +1536,10 @@ final class AppSession {
     }
 
     func loadAssignmentSubmissions(sectionID: String, context: SchoologyAssignmentContext) async throws -> SchoologyAssignmentSubmissionSummary {
+        if isDemoMode {
+            return SchoologyAssignmentSubmissionSummary(grade: context.currentGrade, teacherComment: context.teacherComment,
+                revisions: demoAssignmentRevisions[context.assignment.id] ?? [], students: [])
+        }
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         func commentText(_ record: [String: Any]) -> String {
             let value = record["comment"] ?? record["teacher_comment"] ?? record["teacherComment"]
@@ -1505,6 +1603,14 @@ final class AppSession {
     }
 
     func submitAssignmentText(sectionID: String, gradeItemID: String, text: String, draft: Bool) async throws {
+        if isDemoMode {
+            let value = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !value.isEmpty else { throw SchoologyAPIError.invalidResponse }
+            demoAssignmentRevisions[gradeItemID, default: []].insert(SchoologyAssignmentRevision(
+                id: "demo-revision-\(UUID().uuidString)", created: ISO8601DateFormatter().string(from: .now),
+                body: value, status: draft ? "Draft" : "Submitted", attachments: []), at: 0)
+            return
+        }
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         let value = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !value.isEmpty else { throw SchoologyAPIError.invalidResponse }
@@ -1514,12 +1620,21 @@ final class AppSession {
     }
 
     func uploadAssignmentFile(data: Data, filename: String, mime: String) async throws -> String {
+        if isDemoMode { return storeDemoUpload(data, filename: filename, mime: mime) }
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         return try await api.uploadAssignmentFile(data: data, filename: filename, mime: mime, auth: auth)
     }
 
     /// Submit uploaded files and Schoology resources together as one revision.
     func submitAssignmentFiles(fileIDs: [String], resourceIDs: [String], sectionID: String, assignmentID: String) async throws {
+        if isDemoMode {
+            guard !fileIDs.isEmpty || !resourceIDs.isEmpty else { throw SchoologyAPIError.invalidResponse }
+            demoAssignmentRevisions[assignmentID, default: []].insert(SchoologyAssignmentRevision(
+                id: "demo-revision-\(UUID().uuidString)", created: ISO8601DateFormatter().string(from: .now),
+                body: "File and resource submission", status: "Submitted",
+                attachments: demoAttachments(fileIDs: fileIDs, resourceIDs: resourceIDs)), at: 0)
+            return
+        }
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         guard !sectionID.isEmpty, !assignmentID.isEmpty,
               !fileIDs.isEmpty || !resourceIDs.isEmpty else {
@@ -1535,6 +1650,7 @@ final class AppSession {
     }
 
     func loadTeacherAssignmentGrade(sectionID: String, assignmentID: String, enrollmentID: String) async throws -> SchoologyTeacherGrade {
+        if isDemoMode { return SchoologyTeacherGrade(grade: "18", comment: "Nice work — keep it up!", commentVisible: true) }
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         let data = try await api.get("sections/\(sectionID)/grades", auth: auth, params: ["assignment_id": assignmentID, "enrollment_id": enrollmentID])
         let row = SchoologyValue.list(Self.object(data), keys: ["grade", "grades", "items"]).first ?? [:]
@@ -1545,6 +1661,7 @@ final class AppSession {
     }
 
     func loadTeacherAssignmentRevisions(sectionID: String, gradeItemID: String, userID: String) async throws -> [SchoologyAssignmentRevision] {
+        if isDemoMode { return demoAssignmentRevisions[gradeItemID] ?? [] }
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         let data = try await api.get(
             "sections/\(sectionID)/submissions/\(gradeItemID)/\(userID)",
@@ -1577,6 +1694,7 @@ final class AppSession {
     }
 
     func updateTeacherAssignmentGrade(sectionID: String, assignmentID: String, enrollmentID: String, grade: String, comment: String, commentVisible: Bool) async throws {
+        if isDemoMode { return }
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         let value = grade.trimmingCharacters(in: .whitespacesAndNewlines)
         if !value.isEmpty && Double(value) == nil { throw SchoologyAPIError.invalidResponse }
@@ -1587,17 +1705,34 @@ final class AppSession {
     }
 
     func searchMessageRecipients(_ query: String) async throws -> [SchoologyMessageRecipient] {
+        if isDemoMode {
+            let value = query.trimmingCharacters(in: .whitespacesAndNewlines)
+            return demoPeople.filter { $0.title.localizedStandardContains(value) }.map { SchoologyMessageRecipient(id: $0.id, name: $0.title) }
+        }
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         let data = try await api.get("messages/recipients", auth: auth, params: ["name": query, "limit": "10"])
         return SchoologyMessageRecipient.decodeList(data)
     }
 
     func uploadMessageFile(data: Data, filename: String, mime: String) async throws -> String {
+        if isDemoMode { return storeDemoUpload(data, filename: filename, mime: mime) }
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         return try await api.uploadMessageFile(data: data, filename: filename, mime: mime, auth: auth)
     }
 
     func sendMessage(recipientIDs: [String], subject: String, message: String, fileIDs: [String] = [], resourceIDs: [String] = []) async throws {
+        if isDemoMode {
+            guard let recipient = recipientIDs.compactMap({ id in demoPeople.first { $0.id == id } }).first,
+                  !subject.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                  !message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { throw SchoologyAPIError.invalidResponse }
+            let sent = SchoologyMessage(id: "demo-message-\(UUID().uuidString)", subject: subject, body: message,
+                created: ISO8601DateFormatter().string(from: .now), status: "read", isUnread: false,
+                authorID: user?.id ?? "demo-student", recipientID: recipient.id, personName: recipient.title,
+                personPictureURL: nil, attachments: demoAttachments(fileIDs: fileIDs, resourceIDs: resourceIDs))
+            cachedMessagesByFolder[SchoologyMessageFolder.sent.rawValue, default: []].insert(sent, at: 0)
+            demoMessageThreads[sent.id] = [sent]
+            return
+        }
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         let ids = Array(Set(recipientIDs.filter { Int($0) != nil })).sorted()
         let messageBody = message
@@ -1617,6 +1752,20 @@ final class AppSession {
     }
 
     func replyToMessage(messageID: String, recipientID: String, subject: String, message: String, fileIDs: [String] = [], resourceIDs: [String] = []) async throws {
+        if isDemoMode {
+            guard !message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { throw SchoologyAPIError.invalidResponse }
+            if demoMessageThreads[messageID] == nil {
+                demoMessageThreads[messageID] = cachedMessagesByFolder.values.flatMap { $0 }.first { $0.id == messageID }.map { [$0] } ?? []
+            }
+            let reply = SchoologyMessage(id: "demo-message-\(UUID().uuidString)", subject: subject, body: message,
+                created: ISO8601DateFormatter().string(from: .now), status: "read", isUnread: false,
+                authorID: user?.id ?? "demo-student", recipientID: recipientID,
+                personName: user?.nameDisplay ?? "Alex Morgan", personPictureURL: user?.pictureURL,
+                attachments: demoAttachments(fileIDs: fileIDs, resourceIDs: resourceIDs))
+            demoMessageThreads[messageID, default: []].append(reply)
+            cachedMessagesByFolder[SchoologyMessageFolder.sent.rawValue, default: []].insert(reply, at: 0)
+            return
+        }
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         let normalizedBody = message.replacingOccurrences(of: "\r\n", with: "\n").replacingOccurrences(of: "\r", with: "\n")
         guard Int(messageID) != nil, Int(recipientID) != nil,
@@ -1741,7 +1890,7 @@ final class AppSession {
     }
 
     func loadMessageThread(_ message: SchoologyMessage, folder: SchoologyMessageFolder) async -> [SchoologyMessage] {
-        if isDemoMode { return [message] }
+        if isDemoMode { return demoMessageThreads[message.id] ?? [message] }
         guard let auth else { return [] }
         let sourceFolder = folder == .sent ? "sent" : "inbox"
         errorMessage = nil
@@ -1775,7 +1924,18 @@ final class AppSession {
     }
 
     func loadNotifications(force: Bool = false, markRead: Bool = true) async {
-        if isDemoMode { notifications = demoNotifications; hasLoadedNotifications = true; notificationsHasMore = false; return }
+        if isDemoMode {
+            if !hasLoadedNotifications { notifications = demoNotifications }
+            if markRead {
+                notifications = notifications.map { item in
+                    SchoologyNotification(id: item.id, body: item.body, type: item.type, createdAt: item.createdAt,
+                        realm: item.realm, realmID: item.realmID, isViewed: true, arguments: item.arguments)
+                }
+            }
+            hasLoadedNotifications = true
+            notificationsHasMore = false
+            return
+        }
         guard let auth, !isLoadingNotifications else { return }
         if !force && hasLoadedNotifications && !notificationsHasMore { return }
         let start = force ? 0 : notifications.count
@@ -1810,6 +1970,7 @@ final class AppSession {
 
 
     func createGroupUpdate(groupID: String, body: String) async throws {
+        if isDemoMode { appendDemoActivity(body, realm: "groups", realmID: groupID, title: groups.first { $0.id == groupID }?.title ?? "Group"); return }
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         _ = try await api.post("groups/\(groupID)/updates", auth: auth, params: ["body": body])
     }
@@ -1821,6 +1982,12 @@ final class AppSession {
     }
 
     func createHomeDiscussion(destination: SchoologyHomeCreateDestination, title: String, body: String, published: Bool, dueDate: Date?, graded: Bool, maxPoints: Double?, factor: Double, fileIDs: [String] = [], resourceIDs: [String] = []) async throws {
+        if isDemoMode {
+            let item = SchoologyProfileItem(id: "demo-discussion-\(UUID().uuidString)", title: title, body: body,
+                subtitle: published ? "Published" : "Draft", url: nil, isAdmin: false, kind: "discussion", collectionID: nil)
+            demoCreatedDiscussions[destination.resourceID, default: []].insert(item, at: 0)
+            return
+        }
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         guard destination.canCreateDiscussion, !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { throw SchoologyAPIError.invalidResponse }
         var payload: [String: Any] = ["title": title.trimmingCharacters(in: .whitespacesAndNewlines), "body": body, "published": published ? 1 : 0]
@@ -1832,6 +1999,13 @@ final class AppSession {
     }
 
     func createHomeEvent(destination: SchoologyHomeCreateDestination, title: String, description: String, start: Date, allDay: Bool, end: Date?, rsvp: Int, commentsEnabled: Bool, fileIDs: [String] = [], resourceIDs: [String] = []) async throws {
+        if isDemoMode {
+            guard !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                  end.map({ $0 >= start }) ?? true else { throw SchoologyAPIError.invalidResponse }
+            appendDemoEvent(title: title, realm: destination.realm, realmID: destination.resourceID,
+                start: start, allDay: allDay, fileIDs: fileIDs, resourceIDs: resourceIDs)
+            return
+        }
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         guard destination.canCreateEvent, !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, end.map({ $0 >= start }) ?? true else { throw SchoologyAPIError.invalidResponse }
         var payload: [String: Any] = ["title": title.trimmingCharacters(in: .whitespacesAndNewlines), "description": description, "start": createPostDate(start, allDay: allDay), "is_all_day": allDay ? 1 : 0, "rsvp": rsvp, "comments_enabled": commentsEnabled ? 1 : 0]
@@ -1842,6 +2016,11 @@ final class AppSession {
     }
 
     func createGroupDiscussion(groupID: String, title: String, body: String) async throws {
+        if isDemoMode {
+            demoCreatedDiscussions[groupID, default: []].insert(SchoologyProfileItem(id: "demo-discussion-\(UUID().uuidString)",
+                title: title, body: body, subtitle: "Just now", url: nil, isAdmin: false, kind: "discussion", collectionID: nil), at: 0)
+            return
+        }
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         _ = try await api.post("groups/\(groupID)/discussions", auth: auth, params: [
             "title": title, "body": body, "published": "1"
@@ -1849,6 +2028,7 @@ final class AppSession {
     }
 
     func createGroupEvent(groupID: String, title: String, description: String, start: Date, allDay: Bool) async throws {
+        if isDemoMode { appendDemoEvent(title: title, realm: "groups", realmID: groupID, start: start, allDay: allDay); return }
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
@@ -1861,11 +2041,20 @@ final class AppSession {
     }
 
     func createGroupAlbum(groupID: String, title: String) async throws {
+        if isDemoMode {
+            demoCreatedAlbums[groupID, default: []].insert(SchoologyProfileItem(id: "demo-album-\(UUID().uuidString)",
+                title: title, body: "A locally created demo album.", subtitle: "0 photos", url: nil, isAdmin: false, kind: "album", collectionID: nil), at: 0)
+            return
+        }
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         _ = try await api.post("groups/\(groupID)/albums", auth: auth, params: ["title": title])
     }
 
     func addGroupResource(groupID: String, resourceID: String) async throws {
+        if isDemoMode {
+            if let resource = demoMaterials.first(where: { $0.id == resourceID }) { demoGroupResourceItems[groupID, default: []].append(resource) }
+            return
+        }
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         _ = try await api.post("groups/\(groupID)/resources", auth: auth, params: ["resource": resourceID])
     }
@@ -1875,7 +2064,10 @@ final class AppSession {
             return SchoologyGroupProfile(group: group,
                 permissions: SchoologyGroupPermissions(canPostUpdates: true, canCreateDiscussion: true, canCreateEvent: true, canCreateAlbum: true, canAddResources: true),
                 members: demoPeople, updates: activities.filter { $0.commentRealmID == group.id },
-                upcoming: upcomingEvents.filter { $0.groupID == group.id }, discussions: demoDiscussions, albums: demoAlbums, resources: demoMaterials)
+                upcoming: upcomingEvents.filter { $0.groupID == group.id },
+                discussions: (demoCreatedDiscussions[group.id] ?? []) + demoDiscussions,
+                albums: (demoCreatedAlbums[group.id] ?? []) + demoAlbums,
+                resources: demoGroupResourceItems[group.id] ?? demoMaterials)
         }
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         let data = try await api.get("groups/\(group.id)", auth: auth)
@@ -1926,21 +2118,21 @@ final class AppSession {
     }
 
     func loadGroupDiscussions(groupID: String) async throws -> [SchoologyProfileItem] {
-        if isDemoMode { return demoDiscussions }
+        if isDemoMode { return (demoCreatedDiscussions[groupID] ?? []) + demoDiscussions }
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         let data = try await api.get("groups/\(groupID)/discussions", auth: auth, params: ["limit": "50"])
         return SchoologyProfileItem.decodeDiscussionList(Self.object(data))
     }
 
     func loadGroupAlbums(groupID: String) async throws -> [SchoologyProfileItem] {
-        if isDemoMode { return demoAlbums }
+        if isDemoMode { return (demoCreatedAlbums[groupID] ?? []) + demoAlbums }
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         let data = try await api.get("groups/\(groupID)/albums", auth: auth, params: ["limit": "50"])
         return SchoologyProfileItem.decodeList(Self.object(data), keys: ["album", "albums"])
     }
 
     func loadGroupResources(groupID: String) async throws -> [SchoologyProfileItem] {
-        if isDemoMode { return demoMaterials }
+        if isDemoMode { return demoGroupResourceItems[groupID] ?? demoMaterials }
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         let data = try await api.get("groups/\(groupID)/resources", auth: auth,
             params: ["limit": "50", "with_attachments": "TRUE"])
@@ -1960,6 +2152,7 @@ final class AppSession {
     }
 
     func loadSchoolResources(schoolID: String, folderID: String? = nil, collectionID: String? = nil) async throws -> [SchoologyProfileItem] {
+        if isDemoMode { return demoMaterials }
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         var params = ["start": "0", "limit": "200", "with_attachments": "TRUE"]
         if let folderID, !folderID.isEmpty, folderID != "0" { params["f"] = folderID }
@@ -2019,7 +2212,10 @@ final class AppSession {
     }
 
     func loadHomeCreateDestinations() async -> [SchoologyHomeCreateDestination] {
-        if isDemoMode { return groups.map { SchoologyHomeCreateDestination(realm: "groups", resourceID: $0.id, title: $0.title, canCreateDiscussion: true, canCreateEvent: true) } }
+        if isDemoMode {
+            return courses.map { SchoologyHomeCreateDestination(realm: "sections", resourceID: $0.id, title: $0.title, canCreateDiscussion: true, canCreateEvent: true) } +
+                groups.map { SchoologyHomeCreateDestination(realm: "groups", resourceID: $0.id, title: $0.title, canCreateDiscussion: true, canCreateEvent: true) }
+        }
         guard let auth else { return [] }
         let destinations = [SchoologyHomeCreateDestination(realm: "users", resourceID: auth.userID, title: "My Account", canCreateDiscussion: false, canCreateEvent: false)] +
             courses.map { SchoologyHomeCreateDestination(realm: "sections", resourceID: $0.id, title: $0.title, canCreateDiscussion: false, canCreateEvent: false) } +
@@ -2039,6 +2235,7 @@ final class AppSession {
     }
 
     func postUpdate(destination: SchoologyUpdateDestination, body: String, fileIDs: [String] = [], resourceIDs: [String] = []) async throws {
+        if isDemoMode { appendDemoActivity(body, realm: destination.realm, realmID: destination.resourceID, title: destination.title, fileIDs: fileIDs, resourceIDs: resourceIDs); return }
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         let text = body.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { throw SchoologyAPIError.invalidResponse }
@@ -2051,6 +2248,10 @@ final class AppSession {
     }
 
     func loadSchoolProfile(_ id: String) async throws -> SchoologySchoolProfile {
+        if isDemoMode {
+            return SchoologySchoolProfile(school: SchoologyProfileSchool(id: "demo-school", title: "Cedar Valley High School", pictureURL: nil, address: "100 Learning Lane", phone: "(555) 010-2026"),
+                updates: activities.filter { $0.commentRealm == "schools" }, upcoming: upcomingEvents.filter { $0.schoolID == "demo-school" }, resources: demoMaterials)
+        }
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         let data = try await api.get("schools/\(id)", auth: auth)
         let root = Self.object(data)
@@ -2071,6 +2272,7 @@ final class AppSession {
     }
 
     func loadSchoolUpdates(schoolID: String) async throws -> [SchoologyActivity] {
+        if isDemoMode { return activities.filter { $0.commentRealm == "schools" } }
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         let data = try await api.get(
             "schools/\(schoolID)/updates", auth: auth,
@@ -2085,6 +2287,7 @@ final class AppSession {
     }
 
     func loadSchoolUpcoming(schoolID: String) async throws -> [SchoologyUpcomingEvent] {
+        if isDemoMode { return upcomingEvents.filter { $0.schoolID == schoolID } }
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         let data = try await api.get(
             "schools/\(schoolID)/events", auth: auth,
@@ -2095,12 +2298,14 @@ final class AppSession {
     }
 
     func loadSchoolDiscussions(_ id: String) async throws -> [SchoologyProfileItem] {
+        if isDemoMode { return (demoCreatedDiscussions[id] ?? []) + demoDiscussions }
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         let data=try await api.get("schools/\(id)/discussions",auth:auth,params:["start":"0","limit":"50","with_attachments":"TRUE","richtext":"1"])
         return SchoologyProfileItem.decodeDiscussionList(Self.object(data))
     }
 
     private func refreshPeopleDirectoryAvailability(auth: SchoologyAuth) async {
+        if isDemoMode { peopleDirectoryEnabled = true; return }
         async let userData = try? api.get("users/\(auth.userID)", auth: auth)
         async let mobileData = try? api.get("mobile/me", auth: auth)
         let (userResponse, mobileResponse) = await (userData, mobileData)
@@ -2126,6 +2331,71 @@ final class AppSession {
     }
 
 
+
+    private func demoAttachmentURL(id: String) -> URL { URL(fileURLWithPath: "/ClassWireDemo/\(id)") }
+    private func storeDemoUpload(_ data: Data, filename: String, mime: String) -> String {
+        let id = "demo-upload-\(UUID().uuidString)"
+        demoUploadedFiles[id] = (data, filename, mime)
+        return id
+    }
+    private func demoAttachments(fileIDs: [String], resourceIDs: [String]) -> [SchoologyAttachment] {
+        let files = fileIDs.compactMap { id -> SchoologyAttachment? in
+            guard let file = demoUploadedFiles[id] else { return nil }
+            return SchoologyAttachment(title: file.filename, url: demoAttachmentURL(id: id))
+        }
+        let resources = resourceIDs.compactMap { id -> SchoologyAttachment? in
+            guard let item = demoMaterials.first(where: { $0.id == id }) else { return nil }
+            return SchoologyAttachment(title: item.title + " · Demo Preview.html", url: demoAttachmentURL(id: id))
+        }
+        return files + resources
+    }
+    private func demoHTMLURL(title: String, body: String) throws -> URL {
+        let directory = FileManager.default.temporaryDirectory.appending(path: "ClassWireDemo")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let url = directory.appending(path: "\(UUID().uuidString).html")
+        let titleText = title.replacingOccurrences(of: "&", with: "&amp;").replacingOccurrences(of: "<", with: "&lt;").replacingOccurrences(of: ">", with: "&gt;")
+        let bodyText = body.replacingOccurrences(of: "&", with: "&amp;").replacingOccurrences(of: "<", with: "&lt;").replacingOccurrences(of: ">", with: "&gt;")
+        let html = "<!doctype html><html><head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><meta name=\"color-scheme\" content=\"light dark\"><title>\(titleText)</title><style>:root{color-scheme:light dark}body{font:17px -apple-system;padding:24px;line-height:1.5;color:#222;background:#f7f7f7}main{max-width:760px;margin:auto;background:white;padding:24px;border-radius:18px}small{color:#666}@media(prefers-color-scheme:dark){body{color:#f5f5f5;background:#151515}main{background:#242424}small{color:#aaa}}</style></head><body><main><small>CLASSWIRE · OFFLINE DEMO</small><h1>\(titleText)</h1><p>\(bodyText)</p><p>This is fictional sample content. No external service was contacted.</p></main></body></html>"
+        try Data(html.utf8).write(to: url, options: .atomic)
+        return url
+    }
+    private func appendDemoActivity(_ body: String, realm: String, realmID: String, title: String, fileIDs: [String] = [], resourceIDs: [String] = []) {
+        activities.insert(SchoologyActivity(id: "demo-update-\(UUID().uuidString)", authorName: user?.nameDisplay ?? "Alex Morgan",
+            authorID: user?.id ?? "demo-student", avatarURL: user?.pictureURL, body: body,
+            created: ISO8601DateFormatter().string(from: .now), contextLabel: title,
+            attachments: demoAttachments(fileIDs: fileIDs, resourceIDs: resourceIDs), imageURLs: [],
+            likes: 0, comments: 0, commentRealm: realm, commentRealmID: realmID, isLiked: false), at: 0)
+        hasLoadedHomeActivities = true
+    }
+    private func appendDemoEvent(title: String, realm: String, realmID: String, start: Date, allDay: Bool,
+                                  fileIDs: [String] = [], resourceIDs: [String] = []) {
+        let event = SchoologyUpcomingEvent(id: "demo-event-\(UUID().uuidString)", title: title, type: "event",
+            start: ISO8601DateFormatter().string(from: start), end: "", allDay: allDay, realm: realm, realmID: realmID,
+            sectionID: realm == "sections" ? realmID : nil, groupID: realm == "groups" ? realmID : nil,
+            schoolID: realm == "schools" ? realmID : "demo-school", userID: nil, assignmentID: nil,
+            discussionID: nil, externalToolID: nil, webURL: nil)
+        upcomingEvents.append(event)
+        upcomingEvents.sort { ($0.date ?? .distantFuture) < ($1.date ?? .distantFuture) }
+        demoEventAttachments[event.id] = demoAttachments(fileIDs: fileIDs, resourceIDs: resourceIDs)
+        calendarUpcomingEvents = upcomingEvents
+        calendarMonthEvents = upcomingEvents
+    }
+    private func appendDemoComment(_ body: String, entityID: String, parentID: String? = nil) {
+        let value = body.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty else { return }
+        demoCommentsByEntity[entityID, default: []].append(SchoologyComment(id: "demo-comment-\(UUID().uuidString)",
+            parentID: parentID, authorID: user?.id ?? "demo-student", authorName: user?.nameDisplay ?? "Alex Morgan",
+            avatarURL: user?.pictureURL, body: value, created: ISO8601DateFormatter().string(from: .now),
+            likes: 0, isLiked: false, isDeleted: false, attachments: []))
+        if let index = activities.firstIndex(where: { $0.id == entityID }) {
+            let old = activities[index]
+            activities[index] = SchoologyActivity(id: old.id, authorName: old.authorName, authorID: old.authorID,
+                avatarURL: old.avatarURL, body: old.body, created: old.created, contextLabel: old.contextLabel,
+                attachments: old.attachments, imageURLs: old.imageURLs, likes: old.likes, comments: old.comments + 1,
+                commentRealm: old.commentRealm, commentRealmID: old.commentRealmID, isLiked: old.isLiked)
+        }
+    }
+
     private var demoPeople: [SchoologyProfileItem] {
         [
             SchoologyProfileItem(id:"demo-student",title:"Alex Morgan",body:"Student at Cedar Valley High School.",subtitle:"Student",url:nil,isAdmin:false,kind:"user",collectionID:nil,firstName:"Alex",lastName:"Morgan",role:"Student",schoolName:"Cedar Valley High School"),
@@ -2137,8 +2407,9 @@ final class AppSession {
     private var demoMaterials: [SchoologyProfileItem] {
         [
             SchoologyProfileItem(id:"demo-folder",title:"Unit 3 · Cell Biology",body:"Study materials and class handouts.",subtitle:"Folder",url:nil,isAdmin:false,kind:"folder",collectionID:"demo-collection"),
-            SchoologyProfileItem(id:"demo-guide",title:"Cell Structure Study Guide.pdf",body:"A fictional study guide for the cell structure unit.",subtitle:"PDF · 2.4 MB",url:URL(string:"https://example.com/demo-study-guide.pdf"),isAdmin:false,kind:"file",collectionID:"demo-collection",fileName:"Cell Structure Study Guide.pdf",fileMIME:"application/pdf"),
-            SchoologyProfileItem(id:"demo-video",title:"Cell Transport Overview.mp4",body:"A sample video resource.",subtitle:"Video · 8 min",url:URL(string:"https://example.com/demo-video.mp4"),isAdmin:false,kind:"file",collectionID:"demo-collection",fileName:"Cell Transport Overview.mp4",fileMIME:"video/mp4")
+            SchoologyProfileItem(id:"demo-guide",title:"Cell Structure Study Guide.pdf",body:"A fictional study guide for the cell structure unit.",subtitle:"PDF · 2.4 MB",url:nil,isAdmin:false,kind:"file",collectionID:"demo-collection",fileName:"Cell Structure Study Guide.pdf",fileMIME:"application/pdf"),
+            SchoologyProfileItem(id:"demo-video",title:"Cell Transport Overview.mp4",body:"A sample video resource.",subtitle:"Video · 8 min",url:nil,isAdmin:false,kind:"file",collectionID:"demo-collection",fileName:"Cell Transport Overview.mp4",fileMIME:"video/mp4"),
+            SchoologyProfileItem(id:"demo-link",title:"Interactive Cell Model",body:"A sample interactive link resource.",subtitle:"Link",url:nil,isAdmin:false,kind:"link",collectionID:"demo-collection")
         ]
     }
     private var demoDiscussions: [SchoologyProfileItem] {
@@ -2178,6 +2449,14 @@ final class AppSession {
         return SchoologyNotificationPage.decode(Data(json.utf8),start:0,limit:50).notifications
     }
     private func seedDemoContent() {
+        demoMessageThreads = [:]
+        demoCommentsByEntity = [:]
+        demoAssignmentRevisions = [:]
+        demoUploadedFiles = [:]
+        demoCreatedDiscussions = [:]
+        demoCreatedAlbums = [:]
+        demoGroupResourceItems = [:]
+        demoEventAttachments = [:]
         courses=[SchoologyCourse(id:"demo-biology",title:"Biology",courseCode:"BIO-204",section:"Period 2",profileURL:nil,schoolID:"demo-school"),SchoologyCourse(id:"demo-algebra",title:"Algebra II",courseCode:"MATH-310",section:"Period 4",profileURL:nil,schoolID:"demo-school"),SchoologyCourse(id:"demo-history",title:"World History",courseCode:"HIST-112",section:"Period 6",profileURL:nil,schoolID:"demo-school")]
         groups=[SchoologyGroup(id:"demo-science",title:"Science Club",schoolID:"demo-school"),SchoologyGroup(id:"demo-yearbook",title:"Yearbook Committee",schoolID:"demo-school")]
         let iso=ISO8601DateFormatter()
@@ -2186,6 +2465,11 @@ final class AppSession {
             SchoologyActivity(id:"demo-update-1",authorName:"Sofia Rivera",authorID:"demo-teacher",avatarURL:nil,body:"Welcome to our **cell biology unit**! This week we’ll explore how cells transport materials and maintain balance.",created:date(-1),contextLabel:"Biology",attachments:[],imageURLs:[],likes:18,comments:3,commentRealm:"sections",commentRealmID:"demo-biology",isLiked:false),
             SchoologyActivity(id:"demo-update-2",authorName:"Jordan Lee",authorID:"demo-jordan",avatarURL:nil,body:"Our Science Club experiment is ready for Friday. Remember to bring your observation notes!",created:date(-2),contextLabel:"Science Club",attachments:[],imageURLs:[],likes:9,comments:2,commentRealm:"groups",commentRealmID:"demo-science",isLiked:true)
         ]
+        let sampleComment = SchoologyComment(id:"demo-comment-1",parentID:nil,authorID:"demo-teacher",
+            authorName:"Sofia Rivera",avatarURL:nil,body:"Bring your observations to our next class discussion.",
+            created:date(-1),likes:2,isLiked:false,isDeleted:false,attachments:[])
+        demoCommentsByEntity=["demo-update-1":[sampleComment],"demo-assignment-1":[sampleComment],
+            "demo-discussion":[sampleComment],"demo-event-3":[sampleComment]]
         upcomingEvents=[
             SchoologyUpcomingEvent(id:"demo-event-1",title:"Cell Structure Lab",type:"assignment",start:date(2),end:"",allDay:true,realm:"sections",realmID:"demo-biology",sectionID:"demo-biology",groupID:nil,schoolID:"demo-school",userID:nil,assignmentID:"demo-assignment-1",discussionID:nil,externalToolID:nil,webURL:nil),
             SchoologyUpcomingEvent(id:"demo-event-2",title:"Quadratic Functions",type:"assignment",start:date(4),end:"",allDay:true,realm:"sections",realmID:"demo-algebra",sectionID:"demo-algebra",groupID:nil,schoolID:"demo-school",userID:nil,assignmentID:"demo-assignment-3",discussionID:nil,externalToolID:nil,webURL:nil),
