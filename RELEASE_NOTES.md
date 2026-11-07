@@ -1,5 +1,20 @@
 # Release notes
 
+## [2026.10.0-port.76]
+
+### Apple-silicon Mac testing
+- Keep ordinary iOS/iPadOS TestFlight uploads focused on the iPad app; Apple-silicon Mac testing uses the TestFlight tester-group compatibility setting.
+- Add a separate optional Ad Hoc workflow to export the iPad app for a registered Apple-silicon Mac without TestFlight.
+- Make experimental Mac Catalyst TestFlight upload opt-in and independent from iOS TestFlight.
+- Fix the Catalyst preview to build the dedicated Catalyst target instead of overriding the iOS target's platform support.
+
+### Brand mark
+- Nudge the ClassWire C glyph a tiny additional amount to the left in generated app icons and the SwiftUI sign-in mark.
+
+### Build
+- Increment the app build number to 76.
+
+
 ## [2026.10.0-port.75]
 
 ### App Review and demo

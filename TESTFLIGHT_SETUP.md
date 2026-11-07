@@ -1,12 +1,12 @@
 # TestFlight and App Store Connect setup for ClassWire
 
-The iOS/iPadOS TestFlight workflow is separate from the existing registered-device Ad Hoc installer and Developer ID macOS release. The existing native macOS app remains a separate Developer ID distribution target.
+The iOS/iPadOS TestFlight workflow is separate from the existing registered-device Ad Hoc installer and Developer ID macOS release. The iPad app can also run on Apple-silicon Macs without Catalyst; TestFlight supports this when enabled for a tester group. The experimental Mac Catalyst TestFlight build is a separate, optional workflow. The existing native macOS app remains a separate Developer ID distribution target.
 
 ## 1. App Store Connect app record
 
 Create one ClassWire app record with these values:
 
-- **Platforms:** select both **iOS** and **macOS** if you want to reserve the record for a future universal purchase.
+- **Platforms:** select **iOS** for the current release. Do not add the **macOS** platform until you are ready to submit a separate Mac Catalyst or native macOS App Store build. Making the iPad app available on Apple-silicon Macs is an iOS app availability setting and does not require adding the macOS platform.
 - **Name:** ClassWire
 - **Primary language:** English (U.S.)
 - **Bundle ID:** `com.schoologytauri.app`
@@ -20,11 +20,21 @@ Both platforms in one record share the same Apple app identifier, SKU, and bundl
 
 The current project has two separate targets: the iOS/iPadOS app and the existing native macOS app. The iOS target currently has Mac Catalyst disabled. The existing macOS target is a native macOS app distributed with Developer ID and notarization; it is not a Mac Catalyst build and must remain unchanged.
 
-A Mac Catalyst App Store version needs its own platform build/archive and Mac App Store Connect signing workflow, using the same bundle ID for a universal purchase. However, you can preview the current iPad UI as Catalyst without changing the native macOS target or maintaining a second source implementation: use the manual **Build a temporary Mac Catalyst preview** workflow input. It temporarily overrides SUPPORTS_MACCATALYST for the existing iOS target, builds an unsigned .app, and uploads it as a GitHub artifact. This preview is for visual inspection only; it is not a signed Mac App Store build. Do not upload the existing Developer ID DMG as the macOS App Store build.
+The iPad app can run unmodified on Apple-silicon Macs as **Designed for iPad**; this is not Mac Catalyst and does not require a separate macOS platform build.
 
-Apple does not provide TestFlight distribution for macOS builds. The iOS/iPadOS build can use TestFlight; a Catalyst Mac build needs to be tested and distributed through the Mac App Store workflow or another supported Mac distribution/testing route.
+#### Make the iPad app available on the Mac App Store
 
-Adding macOS now lets you explore the platform setup, but be aware: after App Review approves at least two platform versions, the record becomes a universal purchase and Apple says you can no longer remove an individual platform from it. Before any macOS build is uploaded, Apple allows an eligible platform entry to be removed while the app record is still editable.
+In App Store Connect → ClassWire → **Pricing and Availability** → **Apple Silicon Mac Availability**, select **Make this app available** and save. This offers the existing iPad app to compatible Apple-silicon Mac users; it does not create or upload a Catalyst/macOS target. The same iOS app code, frameworks, resources, and runtime are used. Apple calculates the minimum macOS version from the build's minimum OS settings unless you choose a higher minimum. This availability choice applies at the app level across versions.
+
+You do not need to enable public Mac App Store availability just to test with TestFlight. For TestFlight, upload the ordinary iOS/iPadOS TestFlight build, then open TestFlight → select a tester group → Settings → enable **Test iPhone and iPad apps on Apple silicon Macs**. This is a separate group-level switch. Apple documents both settings in its [Mac availability guide](https://developer.apple.com/help/app-store-connect/manage-your-apps-availability/manage-availability-of-iphone-and-ipad-apps-on-macs-with-apple-silicon) and [Mac TestFlight guide](https://developer.apple.com/help/app-store-connect/test-a-beta-version/test-iphone-and-ipad-apps-on-macs-with-apple-silicon/).
+
+When running as an iPad app on Mac, ClassWire keeps its iPad-style interface and controls rather than becoming a Mac-idiom Catalyst app. macOS still supplies a default menu bar, pointer/trackpad/keyboard input, window resizing and full-screen support, Mac-style scroll bars, copy and paste, and drag and drop. Check the actual layout, pointer/keyboard focus, file access, and any hardware-dependent flows on a real Apple-silicon Mac before making it publicly available. If a separate macOS app is eventually approved and released for the same app record, Apple says it replaces the iPad app for Mac users.
+
+For testing without TestFlight, use the manual **Build iPad app for Apple-silicon Mac (Ad Hoc, no TestFlight)** workflow input. Register the Mac's UDID in the Apple Developer account, include it in an iOS Ad Hoc provisioning profile for `com.schoologytauri.app`, then enter that exact UDID when dispatching the workflow. It exports a signed IPA as a GitHub Actions artifact; on the registered Apple-silicon Mac, download the IPA and double-click it to install. This uses the existing iOS Apple Distribution certificate and does not need the four Mac App Store certificate secrets.
+
+The experimental Mac Catalyst TestFlight build is now a separate optional workflow input, **Build optional experimental Mac Catalyst TestFlight beta**. It is not run when you select the ordinary iOS TestFlight option. It still requires the separate macOS platform and Mac App Store signing assets. The unsigned Catalyst preview is also separate and uses the dedicated `Schoology-Catalyst` target. Do not upload the existing Developer ID DMG as the macOS App Store build.
+
+For the current plan, leave the macOS platform unadded. You can distribute and test the iPad app on Apple-silicon Macs through the iOS app record. Add the macOS platform only when you intentionally begin a separate Mac Catalyst or native macOS App Store release. Once App Review approves multiple platforms as a universal purchase, Apple says you can no longer remove an individual platform from that record.
 
 ## 2. App Store description
 
@@ -62,10 +72,22 @@ Do not add credentials to workflow YAML, source code, release notes, or this doc
 1. Open the repository's **Actions** tab.
 2. Select **Build and release ClassWire SwiftUI**.
 3. Choose **Run workflow** on the `main` branch.
-4. Check **Build and upload only the iOS TestFlight package (skips macOS and Ad Hoc)**.
-5. Leave **Build and publish only the iOS Ad Hoc package** unchecked, then run the workflow.
+4. Check **Build and upload the iOS/iPadOS TestFlight app**.
+5. Leave the optional Catalyst TestFlight and Ad Hoc-only options unchecked, then run the workflow.
 
-When TestFlight is checked, the macOS, Ad Hoc IPA, and GitHub Release jobs are skipped. The dedicated TestFlight job archives, exports, validates, and uploads the App Store Connect IPA. Apple processing is asynchronous; a successful upload does not mean the build is already visible or approved.
+When this option is checked, the normal macOS, Ad Hoc IPA, and GitHub Release jobs are skipped. Only the iOS/iPadOS TestFlight job uploads the iOS build. To test it on an Apple-silicon Mac, enable the tester-group setting described above. Apple processing is asynchronous; a successful upload does not mean the build is already visible or approved.
+
+### Test the iPad app on an Apple-silicon Mac without TestFlight
+
+1. Find the Mac's **Provisioning UDID** in **System Settings → General → About → System Report → Hardware** (or open System Information and select Hardware).
+2. Register the Mac's UDID in **Apple Developer → Certificates, Identifiers & Profiles → Devices**, selecting the Mac platform.
+3. Add that Mac to an iOS Ad Hoc provisioning profile for `com.schoologytauri.app`, then regenerate/download the profile.
+4. In GitHub Actions → **Run workflow**, check **Build iPad app for Apple-silicon Mac (Ad Hoc, no TestFlight)**.
+5. Enter the exact Provisioning UDID in **apple_silicon_mac_udid**. Optionally enter the exact Ad Hoc profile UUID if you have multiple profiles.
+6. Run the workflow and download the **ClassWire-Apple-Silicon-Mac-AdHoc** artifact.
+7. Transfer the IPA to the registered Apple-silicon Mac and double-click it to install. Follow macOS's first-launch security prompt if shown.
+
+This is a registered-device install, not an App Store/TestFlight build. The Mac UDID must be present in the embedded Ad Hoc profile.
 
 ## 6. Reviewer sign-in and Apple's beta review
 
@@ -104,6 +126,11 @@ If you cannot provide a functioning Schoology demo account, contact Apple about 
 - [Mac Catalyst overview](https://developer.apple.com/documentation/uikit/mac-catalyst)
 - [Distribute a Mac app built with Mac Catalyst](https://help.apple.com/xcode/mac/current/en.lproj/deva1159eef6.html)
 - [TestFlight overview](https://developer.apple.com/testflight/)
+- [Test iPhone and iPad apps on Macs with Apple silicon](https://developer.apple.com/help/app-store-connect/test-a-beta-version/test-iphone-and-ipad-apps-on-macs-with-apple-silicon/)
+- [Register a single device](https://developer.apple.com/help/account/devices/register-a-single-device)
+- [Locate device identifiers](https://developer.apple.com/documentation/xcode/locating-device-identifiers)
+- [Make iPhone and iPad apps available on Apple-silicon Macs](https://developer.apple.com/help/app-store-connect/manage-your-apps-availability/manage-availability-of-iphone-and-ipad-apps-on-macs-with-apple-silicon)
+- [Run iOS apps in macOS and distribute them with Ad Hoc or Development signing](https://developer.apple.com/documentation/apple-silicon/running-your-ios-apps-in-macos)
 - [Provide TestFlight test information](https://developer.apple.com/help/app-store-connect/test-a-beta-version/provide-test-information)
 - [Upload builds](https://developer.apple.com/help/app-store-connect/manage-builds/upload-builds)
 - [Create an App Store Connect provisioning profile](https://developer.apple.com/help/account/provisioning-profiles/create-an-app-store-provisioning-profile)

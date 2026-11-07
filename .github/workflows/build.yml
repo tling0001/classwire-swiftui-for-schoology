@@ -6,12 +6,27 @@ on:
   workflow_dispatch:
     inputs:
       testflight_only:
-        description: Upload iOS TestFlight and experimental Mac Catalyst builds (requires the macOS App Store platform/profile)
+        description: Build and upload the iOS/iPadOS TestFlight app (enable Apple-silicon Mac testing in the TestFlight group settings)
         required: false
         type: boolean
         default: false
+      catalyst_testflight_only:
+        description: Optional experimental Mac Catalyst TestFlight build (requires macOS platform and Mac App Store signing assets)
+        required: false
+        type: boolean
+        default: false
+      designed_for_ipad_mac_adhoc_only:
+        description: Build the iPad app for Apple-silicon Mac testing without TestFlight (requires a registered Mac UDID in the Ad Hoc profile)
+        required: false
+        type: boolean
+        default: false
+      apple_silicon_mac_udid:
+        description: UDID of the registered Apple-silicon Mac included in the iOS Ad Hoc provisioning profile
+        required: false
+        type: string
+        default: ''
       catalyst_preview_only:
-        description: Build a temporary Mac Catalyst preview from the iPad app (no changes to the native Mac app; no signing or store upload)
+        description: Build an unsigned Mac Catalyst preview from the separate Catalyst target (no signing or store upload)
         required: false
         type: boolean
         default: false
@@ -35,7 +50,7 @@ concurrency:
 
 jobs:
   build-macos:
-    if: ${{ inputs.ios_adhoc_only != true && inputs.testflight_only != true && inputs.catalyst_preview_only != true }}
+    if: ${{ inputs.ios_adhoc_only != true && inputs.testflight_only != true && inputs.catalyst_testflight_only != true && inputs.designed_for_ipad_mac_adhoc_only != true && inputs.catalyst_preview_only != true }}
     name: Build, sign and notarize macOS
     runs-on: xcode-27
     steps:
@@ -186,7 +201,7 @@ jobs:
           retention-days: 14
 
   build-ios:
-    if: ${{ inputs.testflight_only != true && inputs.catalyst_preview_only != true }}
+    if: ${{ inputs.testflight_only != true && inputs.catalyst_testflight_only != true && inputs.designed_for_ipad_mac_adhoc_only != true && inputs.catalyst_preview_only != true }}
     name: Build signed iOS Ad Hoc IPA
     runs-on: xcode-27
     steps:
@@ -372,9 +387,165 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+
+  build-mac-designed-adhoc:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.designed_for_ipad_mac_adhoc_only == true }}
+    name: Build iPad app for Apple-silicon Mac (Ad Hoc, no TestFlight)
+    runs-on: xcode-27
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode 27.2 and verify iOS SDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo xcode-select --switch /Applications/Xcode_27.2.app/Contents/Developer
+          xcodebuild -version
+          IOS_SDK="$(xcrun --sdk iphoneos --show-sdk-version)"
+          [[ "$IOS_SDK" == "27.2" ]] || { echo "Expected iOS SDK 27.2, found $IOS_SDK" >&2; exit 1; }
+      - name: Prepare ClassWire app icons
+        run: swift Scripts/prepare-app-icons.swift
+      - name: Read release version
+        id: version
+        shell: bash
+        run: |
+          VERSION="$(tr -d '[:space:]' < VERSION)"
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+-port\.[0-9]+$ ]] || { echo "Invalid VERSION: $VERSION" >&2; exit 1; }
+          echo "value=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "marketing=${VERSION%-port.*}" >> "$GITHUB_OUTPUT"
+          echo "build=${VERSION##*-port.}" >> "$GITHUB_OUTPUT"
+      - name: Verify iOS Ad Hoc signing configuration
+        shell: bash
+        env:
+          IOS_CERTIFICATE_P12_BASE64: ${{ secrets.IOS_CERTIFICATE_P12_BASE64 }}
+          IOS_CERTIFICATE_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
+          APPSTORE_API_PRIVATE_KEY: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
+          APPSTORE_API_KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID || vars.APPSTORE_API_KEY_ID }}
+          APPSTORE_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID || vars.APPSTORE_ISSUER_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID || vars.APPLE_TEAM_ID }}
+          APPLE_SILICON_MAC_UDID: ${{ inputs.apple_silicon_mac_udid }}
+        run: |
+          set -euo pipefail
+          for name in IOS_CERTIFICATE_P12_BASE64 IOS_CERTIFICATE_PASSWORD APPSTORE_API_PRIVATE_KEY APPSTORE_API_KEY_ID APPSTORE_ISSUER_ID APPLE_TEAM_ID APPLE_SILICON_MAC_UDID; do
+            if [ -z "${!name:-}" ]; then echo "Required value $name is missing." >&2; exit 1; fi
+          done
+          if [[ ! "$APPLE_SILICON_MAC_UDID" =~ ^[A-Fa-f0-9-]{20,40}$ ]]; then
+            echo "The Apple-silicon Mac UDID does not look valid. Copy the device identifier from Xcode or Apple Developer." >&2
+            exit 1
+          fi
+      - name: Import Apple Distribution certificate
+        uses: apple-actions/import-codesign-certs@v3
+        with:
+          p12-file-base64: ${{ secrets.IOS_CERTIFICATE_P12_BASE64 }}
+          p12-password: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Generate Xcode project
+        run: xcodegen generate
+      - name: Download Apple Ad Hoc provisioning profiles
+        uses: Apple-Actions/download-provisioning-profiles@v7.0.0
+        with:
+          bundle-id: com.schoologytauri.app
+          profile-type: IOS_APP_ADHOC
+          issuer-id: ${{ secrets.APPSTORE_ISSUER_ID || vars.APPSTORE_ISSUER_ID }}
+          api-key-id: ${{ secrets.APPSTORE_API_KEY_ID || vars.APPSTORE_API_KEY_ID }}
+          api-private-key: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
+      - name: Select and validate Ad Hoc profile for this Mac
+        id: profile
+        shell: bash
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID || vars.APPLE_TEAM_ID }}
+          APPLE_SILICON_MAC_UDID: ${{ inputs.apple_silicon_mac_udid }}
+          REQUESTED_PROFILE_UUID: ${{ inputs.ios_adhoc_profile_uuid }}
+        run: |
+          set -euo pipefail
+          REQUESTED_UUID="${REQUESTED_PROFILE_UUID:-}"
+          mkdir -p "$RUNNER_TEMP/mac-profile-checks"
+          SELECTED=""
+          for directory in "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles" "$HOME/Library/MobileDevice/Provisioning Profiles"; do
+            [ -d "$directory" ] || continue
+            for candidate in "$directory"/*.mobileprovision; do
+              [ -f "$candidate" ] || continue
+              plist="$RUNNER_TEMP/mac-profile-checks/profile.plist"
+              security cms -D -i "$candidate" > "$plist" 2>/dev/null || continue
+              app_id="$(/usr/libexec/PlistBuddy -c 'Print :Entitlements:application-identifier' "$plist" 2>/dev/null || true)"
+              devices="$(/usr/libexec/PlistBuddy -c 'Print :ProvisionedDevices' "$plist" 2>/dev/null || true)"
+              team="$(/usr/libexec/PlistBuddy -c 'Print :TeamIdentifier:0' "$plist" 2>/dev/null || true)"
+              uuid="$(/usr/libexec/PlistBuddy -c 'Print :UUID' "$plist" 2>/dev/null || true)"
+              if [[ "$app_id" == "$APPLE_TEAM_ID.com.schoologytauri.app" && -n "$devices" && "$team" == "$APPLE_TEAM_ID" && ( -z "$REQUESTED_UUID" || "$uuid" == "$REQUESTED_UUID" ) ]] && grep -Fq "$APPLE_SILICON_MAC_UDID" <<<"$devices"; then
+                SELECTED="$candidate"; break 2
+              fi
+            done
+          done
+          test -n "$SELECTED" || {
+            echo "::error::No downloaded iOS Ad Hoc profile for com.schoologytauri.app contains this Mac's UDID. Register the Mac in Apple Developer, include it in an iOS Ad Hoc profile, regenerate/download that profile, and retry." >&2
+            exit 1
+          }
+          cp "$SELECTED" "$RUNNER_TEMP/ClassWire-Mac-AdHoc.mobileprovision"
+          security cms -D -i "$RUNNER_TEMP/ClassWire-Mac-AdHoc.mobileprovision" > "$RUNNER_TEMP/ClassWire-Mac-AdHoc-profile.plist"
+          PROFILE_NAME="$(/usr/libexec/PlistBuddy -c 'Print :Name' "$RUNNER_TEMP/ClassWire-Mac-AdHoc-profile.plist")"
+          echo "name=$PROFILE_NAME" >> "$GITHUB_OUTPUT"
+          echo "Validated Ad Hoc profile '$PROFILE_NAME' includes the requested Apple-silicon Mac."
+      - name: Archive the iPad app for Apple-silicon Mac distribution
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID || vars.APPLE_TEAM_ID }}
+          PROFILE_NAME: ${{ steps.profile.outputs.name }}
+          MARKETING_VERSION: ${{ steps.version.outputs.marketing }}
+          CURRENT_PROJECT_VERSION: ${{ steps.version.outputs.build }}
+        run: |
+          set -euo pipefail
+          xcodebuild -project Schoology.xcodeproj -scheme Schoology-iOS -configuration Release \
+            -destination 'generic/platform=iOS' -archivePath "$RUNNER_TEMP/ClassWire-DesignedForiPad.xcarchive" \
+            CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="Apple Distribution" \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" PROVISIONING_PROFILE_SPECIFIER="$PROFILE_NAME" \
+            MARKETING_VERSION="$MARKETING_VERSION" CURRENT_PROJECT_VERSION="$CURRENT_PROJECT_VERSION" archive
+      - name: Export and validate Mac-installable Ad Hoc IPA
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID || vars.APPLE_TEAM_ID }}
+          PROFILE_NAME: ${{ steps.profile.outputs.name }}
+          APPLE_SILICON_MAC_UDID: ${{ inputs.apple_silicon_mac_udid }}
+        run: |
+          set -euo pipefail
+          python3 - "$RUNNER_TEMP/Mac-DesignedForiPad-ExportOptions.plist" "$APPLE_TEAM_ID" "$PROFILE_NAME" <<'PY'
+          import plistlib, sys
+          path, team, profile = sys.argv[1:]
+          options = {"method":"ad-hoc","destination":"export","signingStyle":"manual","teamID":team,"signingCertificate":"Apple Distribution","provisioningProfiles":{"com.schoologytauri.app":profile},"stripSwiftSymbols":True}
+          with open(path, "wb") as stream:
+              plistlib.dump(options, stream)
+          PY
+          xcodebuild -exportArchive -archivePath "$RUNNER_TEMP/ClassWire-DesignedForiPad.xcarchive" \
+            -exportPath "$RUNNER_TEMP/Mac-DesignedForiPad-export" -exportOptionsPlist "$RUNNER_TEMP/Mac-DesignedForiPad-ExportOptions.plist"
+          IPA="$(find "$RUNNER_TEMP/Mac-DesignedForiPad-export" -maxdepth 2 -type f -name '*.ipa' -print -quit)"
+          test -n "$IPA" && test -s "$IPA" || { find "$RUNNER_TEMP/Mac-DesignedForiPad-export" -maxdepth 3 -print; exit 1; }
+          mkdir -p "$RUNNER_TEMP/mac-ipa-validation"
+          ditto -x -k "$IPA" "$RUNNER_TEMP/mac-ipa-validation"
+          APP="$(find "$RUNNER_TEMP/mac-ipa-validation/Payload" -maxdepth 2 -type d -name '*.app' -print -quit)"
+          test -n "$APP"
+          APP_ID="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Info.plist")"
+          test "$APP_ID" = "com.schoologytauri.app"
+          security cms -D -i "$APP/embedded.mobileprovision" > "$RUNNER_TEMP/mac-embedded-profile.plist"
+          DEVICES="$(/usr/libexec/PlistBuddy -c 'Print :ProvisionedDevices' "$RUNNER_TEMP/mac-embedded-profile.plist")"
+          grep -Fq "$APPLE_SILICON_MAC_UDID" <<<"$DEVICES" || { echo "Exported IPA profile does not include the requested Mac UDID." >&2; exit 1; }
+          VERSION="$(tr -d '[:space:]' < VERSION)"
+          mkdir -p mac-designed-for-ipad-assets
+          cp "$IPA" "mac-designed-for-ipad-assets/ClassWire-$VERSION-Apple-Silicon-Mac-AdHoc.ipa"
+          cat > mac-designed-for-ipad-assets/README.txt <<EOF
+          ClassWire — iPad app for Apple-silicon Mac (Ad Hoc)
+          This is the existing iPad app, not Mac Catalyst.
+          The IPA is signed for the registered Apple-silicon Mac whose UDID was supplied to the workflow.
+          On that Mac, download the IPA and double-click it to install. If macOS blocks the first launch, follow the system prompt in Privacy & Security.
+          This package is for registered-device testing only. It is not a TestFlight or App Store upload.
+          EOF
+      - name: Upload Apple-silicon Mac Ad Hoc package
+        uses: actions/upload-artifact@v4
+        with:
+          name: ClassWire-Apple-Silicon-Mac-AdHoc
+          path: mac-designed-for-ipad-assets/*
+          if-no-files-found: error
+          retention-days: 14
+
   build-testflight:
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.testflight_only == true && inputs.catalyst_preview_only != true }}
-    name: Build and upload iOS TestFlight beta
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.testflight_only == true && inputs.catalyst_preview_only != true && inputs.designed_for_ipad_mac_adhoc_only != true }}
+    name: Build and upload iOS/iPadOS TestFlight beta
     runs-on: xcode-27
     steps:
       - uses: actions/checkout@v4
@@ -530,8 +701,8 @@ jobs:
           retention-days: 14
 
   build-catalyst-testflight:
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.testflight_only == true && inputs.catalyst_preview_only != true }}
-    name: Build and upload experimental Mac Catalyst TestFlight beta
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.catalyst_testflight_only == true && inputs.catalyst_preview_only != true }}
+    name: Optional experimental Mac Catalyst TestFlight beta
     runs-on: xcode-27
     steps:
       - uses: actions/checkout@v4
@@ -692,19 +863,18 @@ jobs:
         run: brew install xcodegen
       - name: Generate Xcode project
         run: xcodegen generate
-      - name: Build iOS target as Mac Catalyst without modifying project settings
+      - name: Build the dedicated Mac Catalyst target
         shell: bash
         run: |
           set -euo pipefail
           DERIVED_DATA="$RUNNER_TEMP/ClassWire-Catalyst-DerivedData"
-          xcodebuild -project Schoology.xcodeproj -scheme Schoology-iOS -configuration Release \
+          xcodebuild -project Schoology.xcodeproj -scheme Schoology-Catalyst -configuration Release \
             -destination 'generic/platform=macOS,variant=Mac Catalyst' \
-            -derivedDataPath "$DERIVED_DATA" \
-            SUPPORTS_MACCATALYST=YES CODE_SIGNING_ALLOWED=NO build
-          APP="$(find "$DERIVED_DATA/Build/Products" -maxdepth 3 -type d -name 'ClassWire.app' -print -quit)"
+            -derivedDataPath "$DERIVED_DATA" CODE_SIGNING_ALLOWED=NO build
+          APP="$(find "$DERIVED_DATA/Build/Products" -maxdepth 4 -type d -name 'ClassWire.app' -print -quit)"
           test -n "$APP" && test -d "$APP" || {
-            echo "The Catalyst build completed without the expected ClassWire.app bundle." >&2
-            find "$DERIVED_DATA/Build/Products" -maxdepth 4 -print
+            echo "The dedicated Catalyst target built without the expected ClassWire.app bundle." >&2
+            find "$DERIVED_DATA/Build/Products" -maxdepth 5 -print
             exit 1
           }
           ditto -c -k --sequesterRsrc --keepParent "$APP" "$RUNNER_TEMP/ClassWire-Mac-Catalyst-Preview.zip"
