@@ -1,5 +1,20 @@
 # Release notes
 
+## [2026.10.0-port.72]
+
+### ClassWire identity
+- Slightly reduce the C glyph from 78% to 75% of its base vector size in generated iOS/macOS app icons and the SwiftUI sign-in brand mark.
+
+### App Store preparation
+- Set the planned App Store Connect SKU to CLASSWIRE-IOS-001 and document the iOS + macOS platform record setup for a future universal purchase.
+- Clarify that the existing native macOS Developer ID app is unchanged and is not the Mac Catalyst App Store build.
+- Replace the inaccurate App Store description draft with a plain-language summary of implemented ClassWire functionality.
+- Add a sample Schoology review-account checklist without embedding or fabricating credentials.
+
+### Build
+- Increment the iOS and macOS bundle build number to 72.
+
+
 ## [2026.10.0-port.71]
 
 ### ClassWire identity

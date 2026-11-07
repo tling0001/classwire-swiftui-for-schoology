@@ -1,14 +1,25 @@
-# ClassWire for Students
+ClassWire is a native companion app for students who use Schoology. It brings course activity, grades, assignments, messages, and learning resources into a focused interface for iPhone, iPad, and Mac.
 
-ClassWire is a beautiful, performance-driven student grade tracker and dashboard built natively for your Schoology courses. Designed explicitly to escape bloated web portals, ClassWire processes your course trends, upcoming assignments, and test scores directly on your device inside a lightning-fast interface.
+Stay up to date
+- See recent activity from your courses and school community.
+- Review upcoming assignments, quizzes, discussions, and events.
+- Browse courses, groups, and school information.
 
-### Features
-* **Native Speed:** Built purely in SwiftUI for fluid transitions and clean system behaviors.
-* **Grade Simulator:** Run "what-if" score calculations instantly to see how upcoming tests impact your final average.
-* **Assignment Feed:** Track upcoming deadlines and recently graded homework at a glance.
-* **Performance Insights:** Visualize your academic trends across the quarter over clean data graphs.
-* **Student-First Architecture:** No heavy analytics tracking, external database syncs, or distractions.
+Keep track of coursework
+- View course materials, pages, and nested resource folders.
+- Review gradebook information, overall grades, and assignment feedback when provided by your school.
+- Open assignment details and submit supported work, including text and file submissions.
 
----
+Communicate
+- Read and compose Schoology messages.
+- Follow activity posts, read comments, reply, and like posts.
+- View notifications and manage supported notification preferences.
 
-ClassWire is an independent third-party client. ClassWire is not affiliated with, authorized, maintained, sponsored, or endorsed by PowerSchool Group LLC, Schoology, or any of their affiliates or subsidiaries. All registered trademarks and product names belong to their original owners.
+Work with files
+- Browse personal, shared, and group resources.
+- View and download supported attachments.
+- Preview documents and images, and play compatible audio and video files using the system media player.
+
+ClassWire connects to your existing Schoology account. Available content and actions depend on the permissions and features enabled by your school and Schoology account. Some specialized Schoology content types and workflows may not be supported.
+
+ClassWire is an independent third-party application. It is not affiliated with, authorized, maintained, sponsored, or endorsed by PowerSchool Group LLC, Schoology, or any of their affiliates or subsidiaries. Schoology and related names are trademarks of their respective owners.
