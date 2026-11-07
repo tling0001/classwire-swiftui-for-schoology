@@ -666,6 +666,26 @@ jobs:
           test -n "$APP"
           APP_ID="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Info.plist")"
           test "$APP_ID" = "com.schoologytauri.app" || { echo "Unexpected bundle identifier: $APP_ID" >&2; exit 1; }
+          python3 - "$APP/Info.plist" <<'PY'
+          import plistlib, sys
+          with open(sys.argv[1], "rb") as stream:
+              info = plistlib.load(stream)
+          required = {
+              "UIInterfaceOrientationPortrait",
+              "UIInterfaceOrientationPortraitUpsideDown",
+              "UIInterfaceOrientationLandscapeLeft",
+              "UIInterfaceOrientationLandscapeRight",
+          }
+          for key in ("UISupportedInterfaceOrientations", "UISupportedInterfaceOrientations~ipad"):
+              actual = set(info.get(key, []))
+              missing = required - actual
+              if missing:
+                  raise SystemExit(f"Exported Info.plist is missing {key} values: {', '.join(sorted(missing))}")
+          iphone = set(info.get("UISupportedInterfaceOrientations~iphone", []))
+          if "UIInterfaceOrientationPortraitUpsideDown" in iphone:
+              raise SystemExit("The iPhone orientation override must not enable upside-down portrait.")
+          print("Validated all four iPad orientations and the iPhone-specific orientation override.")
+          PY
           test -s "$APP/Assets.car" || { echo "The exported app is missing its compiled asset catalog." >&2; exit 1; }
           ICON_NAME="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIcons:CFBundlePrimaryIcon:CFBundleIconName' "$APP/Info.plist" 2>/dev/null || true)"
           test "$ICON_NAME" = "AppIcon" || { echo "The exported app is missing AppIcon primary-icon metadata (found: $ICON_NAME)." >&2; exit 1; }

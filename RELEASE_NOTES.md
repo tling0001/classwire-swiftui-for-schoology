@@ -1,5 +1,19 @@
 # Release notes
 
+## [2026.10.0-port.77]
+
+### Messages
+- Move Reply into the conversation detail's own navigation toolbar so it remains visible on compact iPhone navigation and in the iPad split-pane detail.
+- Keep Reply disabled until the thread has loaded a valid recipient, and refresh that context after pull-to-refresh.
+
+### iOS/iPadOS distribution
+- Declare all four supported orientations for iPad multitasking in the generated Info.plist for the iOS and Catalyst targets.
+- Keep iPhone orientation support limited to portrait and the two landscape orientations.
+
+### Build
+- Increment the iOS and macOS bundle build number to 77.
+
+
 ## [2026.10.0-port.76]
 
 ### Apple-silicon Mac testing

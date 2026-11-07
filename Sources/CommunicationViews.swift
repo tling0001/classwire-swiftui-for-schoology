@@ -33,7 +33,7 @@ struct MessagesView: View {
                     Divider()
                     Group {
                         if let selectedMessage {
-                            MessageThreadView(message: selectedMessage, folder: folder, refreshToken: threadRefreshToken) { replyContext = $0 }
+                            MessageThreadView(message: selectedMessage, folder: folder, refreshToken: threadRefreshToken, onReply: { if let replyContext { presentedComposer = .reply(replyContext) } }) { replyContext = $0 }
                                 .id(selectedMessage.id + folder.rawValue)
                         } else {
                             ContentUnavailableView("Select a message", systemImage: "envelope", description: Text("Choose a message to read its conversation."))
@@ -44,12 +44,12 @@ struct MessagesView: View {
             } else {
                 messageList
                     .navigationDestination(item: $selectedMessage) { message in
-                        MessageThreadView(message: message, folder: folder, refreshToken: threadRefreshToken) { replyContext = $0 }
+                        MessageThreadView(message: message, folder: folder, refreshToken: threadRefreshToken, onReply: { if let replyContext { presentedComposer = .reply(replyContext) } }) { replyContext = $0 }
                     }
             }
         }
         .toolbar {
-            ToolbarItem(placement: .primaryAction) {
+            ToolbarItem(placement: .secondaryAction) {
                 Button {
                     Task { await loadFolder(force: true) }
                 } label: {
@@ -61,14 +61,6 @@ struct MessagesView: View {
             }
             ToolbarItem(placement: .primaryAction) {
                 Button("Compose Message", systemImage: "square.and.pencil") { presentedComposer = .newMessage }
-            }
-            if selectedMessage != nil {
-                ToolbarItem(placement: .primaryAction) {
-                    Button("Reply", systemImage: "arrowshape.turn.up.left") {
-                        if let replyContext { presentedComposer = .reply(replyContext) }
-                    }
-                    .disabled(replyContext == nil)
-                }
             }
         }
         .sheet(item: $presentedComposer) { presentation in
@@ -189,8 +181,10 @@ private struct MessageThreadView: View {
     let message: SchoologyMessage
     let folder: SchoologyMessageFolder
     let refreshToken: Int
+    let onReply: () -> Void
     let onReplyContextChange: (SchoologyMessageComposerView.ReplyContext?) -> Void
     @State private var thread: [SchoologyMessage] = []
+    @State private var replyContext: SchoologyMessageComposerView.ReplyContext?
     @State private var isLoading = true
     @State private var error: String?
 
@@ -246,17 +240,27 @@ private struct MessageThreadView: View {
                     let loaded = await session.loadMessageThread(message, folder: folder)
                     thread = loaded
                     error = loaded.isEmpty ? (session.errorMessage ?? "No conversation content was returned.") : nil
-                    onReplyContextChange(makeReplyContext(from: loaded))
+                    let updatedReplyContext = makeReplyContext(from: loaded)
+                    replyContext = updatedReplyContext
+                    onReplyContextChange(updatedReplyContext)
                 }
             }
         }
         .navigationTitle(message.subject)
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button("Reply", systemImage: "arrowshape.turn.up.left", action: onReply)
+                    .disabled(replyContext == nil)
+            }
+        }
         .task(id: "\(message.id):\(folder.rawValue):\(refreshToken)") {
             isLoading = true
             let loaded = await session.loadMessageThread(message, folder: folder)
             thread = loaded
             error = loaded.isEmpty ? (session.errorMessage ?? "No conversation content was returned.") : nil
-            onReplyContextChange(makeReplyContext(from: loaded))
+            let updatedReplyContext = makeReplyContext(from: loaded)
+            replyContext = updatedReplyContext
+            onReplyContextChange(updatedReplyContext)
             isLoading = false
         }
     }
