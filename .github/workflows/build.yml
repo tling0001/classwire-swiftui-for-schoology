@@ -637,12 +637,16 @@ jobs:
           PROFILE_NAME: ${{ steps.profile.outputs.name }}
           MARKETING_VERSION: ${{ steps.version.outputs.marketing }}
           CURRENT_PROJECT_VERSION: ${{ steps.version.outputs.build }}
+          CLASSWIRE_DISTRIBUTION_CHANNEL: testflight
         run: |
           set -euo pipefail
+          [[ "$CLASSWIRE_DISTRIBUTION_CHANNEL" == "testflight" ]]
           xcodebuild -project Schoology.xcodeproj -scheme Schoology-iOS -configuration Release \
             -destination 'generic/platform=iOS' -archivePath "$RUNNER_TEMP/ClassWire-TestFlight.xcarchive" \
             CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="Apple Distribution" \
             DEVELOPMENT_TEAM="$APPLE_TEAM_ID" PROVISIONING_PROFILE_SPECIFIER="$PROFILE_NAME" \
+            SWIFT_ACTIVE_COMPILATION_CONDITIONS='$(inherited) CLASSWIRE_TESTFLIGHT' \
+            INFOPLIST_KEY_ClassWireDistributionChannel="$CLASSWIRE_DISTRIBUTION_CHANNEL" \
             MARKETING_VERSION="$MARKETING_VERSION" CURRENT_PROJECT_VERSION="$CURRENT_PROJECT_VERSION" archive
       - name: Export and validate TestFlight IPA
         env:

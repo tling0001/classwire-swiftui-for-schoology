@@ -1,19 +1,25 @@
 # Release notes
 
-## [2026.10.0-port.80]
+## [2026.10.0-port.81]
 
-### Offline demo interactions
-- Simulate update posting, group updates, discussions, events, albums, and resource sharing in local demo state.
-- Add local comment and like behavior across updates, discussions, assignments, and events.
-- Support fictional message recipient search, composing, sending, replying, and conversation refresh without Schoology requests.
-- Simulate text and file assignment submissions, keep demo revisions locally, and make demo uploads downloadable from a temporary local folder.
-- Add offline resource-app import selection, a sample course app, and local HTML previews for external launch experiences.
-- Route school, course, group, notification-document, and resource detail requests to sample content while demo mode is active.
-- Preserve local demo state across screen refreshes during the active demo session; no demo action is sent to Schoology.
+### Adaptive navigation
+- Use a selection-driven NavigationSplitView sidebar on iPad and macOS so choosing a course or group replaces the selected detail.
+- Replace nested profile List(selection:) tab pickers with explicit, accessible tab buttons so the course and group middle panes reliably follow the selected section.
+- Keep sidebar route changes synchronized with the app destination on every supported platform.
+
+### Offline demo workflows
+- Add a student/teacher preview switch to demo mode and make teacher grade edits persist locally, including score, overall comment, and student visibility.
+- Allow a discussion created in a demo group to include a locally stored file attachment that appears in its discussion detail.
+- Add local photo importing to demo albums and retain imported photos for the active demo session.
+- Bundle a genuine one-page PDF study guide so document preview and download workflows work fully offline.
+- Keep demo uploads local; no attachment, photo, grade, or discussion is sent to Schoology.
+
+### TestFlight
+- Compile TestFlight builds with the CLASSWIRE_TESTFLIGHT condition and a TestFlight distribution marker.
+- Hide the Software Update section in TestFlight Settings and skip startup self-update checks in TestFlight builds.
 
 ### Build
-- Increment the iOS and macOS bundle build number to 80.
-
+- Increment the iOS and macOS bundle build number to 81.
 
 
 ## [2026.10.0-port.79]

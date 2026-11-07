@@ -117,13 +117,16 @@ struct SchoologyCourseProfileView: View {
         return HStack(spacing: 0) {
             VStack(spacing: 0) {
                 SchoologyProfileHeroImage(url: course.profileURL, fallbackSymbol: "book.closed.fill").padding(12)
-                List(selection: Binding<SchoologyCourseTab?>(get: { tab }, set: { if let selected = $0 { tab = selected } })) {
-                    ForEach([SchoologyCourseTab.materials, .updates, .grades, .members, .courseApps]) { item in
-                        Label(item.rawValue, systemImage: courseTabSymbol(item)).tag(item)
+                ScrollView {
+                    VStack(spacing: 4) {
+                        ForEach([SchoologyCourseTab.materials, .updates, .grades, .members, .courseApps]) { item in
+                            courseTabButton(item)
+                        }
                     }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 10)
                 }
-                .listStyle(.sidebar)
-                .scrollContentBackground(.hidden)
+                .scrollIndicators(.visible)
             }
             .frame(width: sidebarWidth)
             .background(.regularMaterial)
@@ -183,6 +186,7 @@ struct SchoologyCourseProfileView: View {
             Label(item.rawValue, systemImage: courseTabSymbol(item))
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(10)
+                .frame(minHeight: 44)
                 .background(tab == item ? SchoologyStyle.blue.opacity(0.14) : .clear,
                             in: RoundedRectangle(cornerRadius: 9))
         }

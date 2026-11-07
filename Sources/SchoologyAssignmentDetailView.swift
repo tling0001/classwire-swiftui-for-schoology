@@ -75,7 +75,7 @@ struct SchoologyAssignmentDetailView: View {
                 }
             }
         }
-        .task(id: assignmentID) { await load() }
+        .task(id: "\(assignmentID)-\(session.demoIsTeacher)") { await load() }
         .refreshable { await load() }
     }
 

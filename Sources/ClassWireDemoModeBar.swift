@@ -1,5 +1,6 @@
 import SwiftUI
 struct ClassWireDemoModeBar: View {
+    @Environment(AppSession.self) private var session
     let onExit: () -> Void
     var body: some View {
         HStack(spacing: 12) {
@@ -11,6 +12,23 @@ struct ClassWireDemoModeBar: View {
             } icon: { Image(systemName: "checkmark.seal.fill").foregroundStyle(.secondary) }
             .accessibilityElement(children: .combine)
             Spacer(minLength: 8)
+            Menu {
+                Button {
+                    session.demoIsTeacher = false
+                } label: {
+                    Label("Student", systemImage: session.demoIsTeacher ? "person" : "checkmark.circle.fill")
+                }
+                Button {
+                    session.demoIsTeacher = true
+                } label: {
+                    Label("Teacher", systemImage: session.demoIsTeacher ? "checkmark.circle.fill" : "person.crop.rectangle")
+                }
+            } label: {
+                Label(session.demoIsTeacher ? "Teacher" : "Student", systemImage: "person.crop.circle")
+            }
+            .accessibilityLabel("Demo preview role")
+            .accessibilityHint("Switch between student and teacher demo views.")
+            .frame(minWidth: 44, minHeight: 44)
             Button("Exit Demo", systemImage: "rectangle.portrait.and.arrow.right", action: onExit)
                 .font(.subheadline.weight(.medium)).buttonStyle(.borderless)
                 .frame(minWidth: 44, minHeight: 44)

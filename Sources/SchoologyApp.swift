@@ -24,7 +24,9 @@ struct SchoologyApp: App {
                     if !session.isDemoMode {
                         SchoologyPushNotifications.configure(session)
                     }
+                    #if !CLASSWIRE_TESTFLIGHT
                     await updateService.checkForUpdates()
+                    #endif
                     if !session.isDemoMode {
                         await SchoologyPushNotifications.registerIfAuthorized()
                     }

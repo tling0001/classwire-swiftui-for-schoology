@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 enum GroupProfileAction: String, Identifiable {
     case update, discussion, event, album, resource
@@ -27,6 +28,10 @@ struct GroupProfileActionSheet: View {
     @State private var allDay = true
     @State private var isSubmitting = false
     @State private var errorMessage: String?
+    @State private var showingDiscussionFileImporter = false
+    @State private var discussionAttachmentData: Data?
+    @State private var discussionAttachmentName = ""
+    @State private var discussionAttachmentMIME = ""
 
     var body: some View {
         NavigationStack {
@@ -39,6 +44,23 @@ struct GroupProfileActionSheet: View {
                     Section("Discussion") {
                         TextField("Title", text: $title)
                         TextField("Description", text: $bodyText, axis: .vertical).lineLimit(4...8)
+                        if session.isDemoMode {
+                            Button {
+                                showingDiscussionFileImporter = true
+                            } label: {
+                                Label(discussionAttachmentName.isEmpty ? "Attach a file" : discussionAttachmentName,
+                                      systemImage: "paperclip")
+                            }
+                            if !discussionAttachmentName.isEmpty {
+                                Button("Remove attachment", role: .destructive) {
+                                    discussionAttachmentData = nil
+                                    discussionAttachmentName = ""
+                                    discussionAttachmentMIME = ""
+                                }
+                            }
+                            Text("Attachments are stored only in this demo session.")
+                                .font(.footnote).foregroundStyle(.secondary)
+                        }
                     }
                 } else if action == .event {
                     Section("Event") {
@@ -74,6 +96,18 @@ struct GroupProfileActionSheet: View {
             .interactiveDismissDisabled(isSubmitting)
         }
         .presentationDetents([.medium, .large])
+        .fileImporter(isPresented: $showingDiscussionFileImporter, allowedContentTypes: [.item], allowsMultipleSelection: false) { result in
+            do {
+                guard let url = try result.get().first else { return }
+                let accessed = url.startAccessingSecurityScopedResource()
+                defer { if accessed { url.stopAccessingSecurityScopedResource() } }
+                discussionAttachmentData = try Data(contentsOf: url)
+                discussionAttachmentName = url.lastPathComponent
+                discussionAttachmentMIME = UTType(filenameExtension: url.pathExtension)?.preferredMIMEType ?? "application/octet-stream"
+            } catch {
+                errorMessage = "Could not read the attachment: \(error.localizedDescription)"
+            }
+        }
     }
 
     private var canSubmit: Bool {
@@ -94,7 +128,9 @@ struct GroupProfileActionSheet: View {
             case .update:
                 try await session.createGroupUpdate(groupID: groupID, body: bodyText.trimmingCharacters(in: .whitespacesAndNewlines))
             case .discussion:
-                try await session.createGroupDiscussion(groupID: groupID, title: title, body: bodyText)
+                try await session.createGroupDiscussion(groupID: groupID, title: title, body: bodyText,
+                    attachmentData: discussionAttachmentData, attachmentFilename: discussionAttachmentName,
+                    attachmentMIME: discussionAttachmentMIME)
             case .event:
                 try await session.createGroupEvent(groupID: groupID, title: title, description: bodyText, start: eventDate, allDay: allDay)
             case .album:

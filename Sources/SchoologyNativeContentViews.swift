@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 import WebKit
 
 struct SchoologyDiscussionDetailView: View {
@@ -249,6 +250,7 @@ struct SchoologyAlbumDetailView: View {
     @State private var media: [SchoologyProfileItem] = []
     @State private var loading = true
     @State private var error: String?
+    @State private var showingPhotoImporter = false
 
     var body: some View {
         ScrollView {
@@ -259,7 +261,13 @@ struct SchoologyAlbumDetailView: View {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 180), spacing: 12)], spacing: 12) {
                     ForEach(media) { item in
                         VStack(alignment: .leading, spacing: 6) {
-                            if let url = item.url {
+                            if let url = item.url, url.path.hasPrefix("/ClassWireDemo/") {
+                                SchoologyAttachmentPreviewButton(
+                                    attachment: SchoologyAttachment(title: item.fileName.isEmpty ? item.title : item.fileName, url: url),
+                                    automaticallyPresent: true
+                                )
+                                .frame(maxWidth: .infinity).frame(height: 180)
+                            } else if let url = item.url {
                                 AuthenticatedSchoologyImage(url: url, contentMode: .fit)
                                     .frame(maxWidth: .infinity).frame(height: 180).clipped()
                             } else {
@@ -272,11 +280,37 @@ struct SchoologyAlbumDetailView: View {
             }
         }
         .navigationTitle(title)
+        .toolbar {
+            if session.isDemoMode {
+                ToolbarItem(placement: .primaryAction) {
+                    Button("Add Photo", systemImage: "plus") { showingPhotoImporter = true }
+                }
+            }
+        }
+        .fileImporter(isPresented: $showingPhotoImporter, allowedContentTypes: [.image], allowsMultipleSelection: false) { result in
+            Task { await importPhoto(result) }
+        }
         .task(id: albumID) {
             loading = true; error = nil
             do { media = try await session.loadGroupAlbum(groupID: groupID, albumID: albumID) }
             catch { self.error = error.localizedDescription }
             loading = false
+        }
+    }
+
+    @MainActor
+    private func importPhoto(_ result: Result<[URL], Error>) async {
+        do {
+            guard let url = try result.get().first else { return }
+            let accessed = url.startAccessingSecurityScopedResource()
+            defer { if accessed { url.stopAccessingSecurityScopedResource() } }
+            let data = try Data(contentsOf: url)
+            let mime = UTType(filenameExtension: url.pathExtension)?.preferredMIMEType ?? "image/jpeg"
+            let photo = try session.addDemoAlbumPhoto(groupID: groupID, albumID: albumID, data: data,
+                filename: url.lastPathComponent, mime: mime)
+            media.insert(photo, at: 0)
+        } catch {
+            self.error = "Could not add photo: \(error.localizedDescription)"
         }
     }
 }

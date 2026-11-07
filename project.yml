@@ -9,7 +9,7 @@ settings:
   base:
     SWIFT_VERSION: "6.0"
     MARKETING_VERSION: "2026.10.0"
-    CURRENT_PROJECT_VERSION: "80"
+    CURRENT_PROJECT_VERSION: "81"
     PRODUCT_NAME: ClassWire
     INFOPLIST_KEY_CFBundleDisplayName: ClassWire
     GENERATE_INFOPLIST_FILE: YES
@@ -21,6 +21,8 @@ targets:
     sources:
       - path: Sources
       - path: Resources/Assets.xcassets
+        buildPhase: resources
+      - path: Resources/DemoMedia
         buildPhase: resources
     settings:
       base:
@@ -68,6 +70,8 @@ targets:
       - path: Sources
       - path: Resources/Assets.xcassets
         buildPhase: resources
+      - path: Resources/DemoMedia
+        buildPhase: resources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.schoologytauri.app
@@ -109,6 +113,8 @@ targets:
     sources:
       - path: Sources
       - path: Resources/Assets.xcassets
+        buildPhase: resources
+      - path: Resources/DemoMedia
         buildPhase: resources
     settings:
       base:

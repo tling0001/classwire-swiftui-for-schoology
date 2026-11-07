@@ -77,13 +77,16 @@ struct GroupProfileView: View {
                 HStack(spacing: 0) {
                     VStack(spacing: 0) {
                         SchoologyProfileHeroImage(url: profile.group.pictureURL, fallbackSymbol: "person.3.fill").padding(12)
-                        List(selection: Binding<ProfileTab?>(get: { tab }, set: { if let selected = $0 { tab = selected } })) {
-                            ForEach([ProfileTab.updates, .members, .upcoming, .discussions, .albums, .resources]) { item in
-                                Label(item.rawValue, systemImage: item.symbol).tag(item)
+                        ScrollView {
+                            VStack(spacing: 4) {
+                                ForEach([ProfileTab.updates, .members, .upcoming, .discussions, .albums, .resources]) { item in
+                                    tabButton(item)
+                                }
                             }
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 10)
                         }
-                        .listStyle(.sidebar)
-                        .scrollContentBackground(.hidden)
+                        .scrollIndicators(.visible)
                     }
                     .frame(width: sidebarWidth)
                     .background(.regularMaterial)
@@ -140,7 +143,7 @@ struct GroupProfileView: View {
             withAnimation(reduceMotion ? nil : .snappy(duration: 0.2)) { tab = item }
         } label: {
             Label(item.rawValue, systemImage: item.symbol).frame(maxWidth: .infinity, alignment: .leading)
-                .padding(10).background(tab == item ? SchoologyStyle.blue.opacity(0.14) : .clear, in: RoundedRectangle(cornerRadius: 9))
+                .padding(10).frame(minHeight: 44).background(tab == item ? SchoologyStyle.blue.opacity(0.14) : .clear, in: RoundedRectangle(cornerRadius: 9))
         }.buttonStyle(.plain).foregroundStyle(tab == item ? SchoologyStyle.blue : .primary)
     }
 
@@ -346,13 +349,26 @@ struct SchoolProfileView: View {
                 HStack(spacing: 0) {
                     VStack(spacing: 0) {
                         SchoologyProfileHeroImage(url: profile.school.pictureURL, fallbackSymbol: "building.2.crop.circle").padding(12)
-                        List(selection: Binding<ProfileTab?>(get: { tab }, set: { if let selected = $0 { tab = selected } })) {
-                            ForEach([ProfileTab.updates, .info, .upcoming, .resources, .discussions]) { item in
-                                Label(item.rawValue, systemImage: item.symbol).tag(item)
+                        ScrollView {
+                            VStack(spacing: 4) {
+                                ForEach([ProfileTab.updates, .info, .upcoming, .resources, .discussions]) { item in
+                                    Button {
+                                        tab = item
+                                    } label: {
+                                        Label(item.rawValue, systemImage: item.symbol)
+                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                            .padding(10)
+                                            .background(tab == item ? SchoologyStyle.blue.opacity(0.14) : .clear, in: RoundedRectangle(cornerRadius: 9))
+                                    }
+                                    .buttonStyle(.plain)
+                                    .foregroundStyle(tab == item ? SchoologyStyle.blue : .primary)
+                                    .accessibilityAddTraits(tab == item ? .isSelected : [])
+                                }
                             }
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 10)
                         }
-                        .listStyle(.sidebar)
-                        .scrollContentBackground(.hidden)
+                        .scrollIndicators(.visible)
                     }
                     .frame(width: sidebarWidth)
                     .background(.regularMaterial)

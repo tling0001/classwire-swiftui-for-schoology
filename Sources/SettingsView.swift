@@ -32,6 +32,7 @@ struct SettingsView: View {
 
             SchoologyNotificationSettingsSection()
 
+            #if !CLASSWIRE_TESTFLIGHT
             Section("Software Update") {
                 LabeledContent("Current version", value: AppVersion.current)
                 Button("Check for Updates", systemImage: "arrow.clockwise") {
@@ -127,6 +128,7 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                 }
             }
+            #endif
 
             Section("Account") {
                 NavigationLink {
