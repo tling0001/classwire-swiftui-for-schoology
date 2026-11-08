@@ -23,57 +23,34 @@ struct RootView: View {
 
     var body: some View {
         Group {
-            if session.isSignedIn {
-                NavigationSplitView(preferredCompactColumn: $preferredCompactColumn) {
-                    SchoologySidebar(selection: $selectedRoute)
-                        #if os(macOS)
-                        .navigationSplitViewColumnWidth(min: 250, ideal: 285, max: 360)
-                        #endif
-                } detail: {
-                    NavigationStack(path: $detailPath) {
-                        selectedRoot(for: selectedRoute)
-                            .id(selectedRoute)
-                            .navigationDestination(for: SchoologyNavigationPath.self) { item in
-                                switch item {
-                                case .person(let userID):
-                                    SchoologyPersonProfileView(userID: userID)
-                                }
-                            }
-                    }
+            #if os(iOS)
+            VStack(spacing: 0) {
+                if session.isDemoMode {
+                    ClassWireDemoModeBar(onExit: session.exitDemoMode)
                 }
-                .navigationSplitViewStyle(.balanced)
-                .task {
-                    selectedRoute = .destination(session.destination)
-                    #if os(iOS)
-                    if session.isSignedIn && !session.isDemoMode { SchoologyBackgroundRefresh.schedule() }
-                    #endif
+
+                if shouldShowUpdateBanner, let version = updates.latestVersion {
+                    SchoologyUpdateBanner(
+                        version: version,
+                        isInstalling: updates.isInstallingUpdate,
+                        errorMessage: updates.installErrorMessage,
+                        installationNotice: updates.installationNotice,
+                        onInstall: { Task { try? await updates.installUpdate() } },
+                        onLater: { dismissedUpdateVersion = version }
+                    )
                 }
-                #if os(macOS)
-                .onChange(of: selectedRoute) { _, route in
-                    detailPath.removeAll()
-                    if case .destination(let destination) = route {
-                        session.destination = destination
-                    }
-                }
-                .onChange(of: session.destination) { _, destination in
-                    let route = SchoologySidebarSelection.destination(destination)
-                    if selectedRoute != route { selectedRoute = route }
-                }
-                #endif
-                .onChange(of: session.pendingPersonProfileID) { _, userID in
-                    guard let userID else { return }
-                    detailPath.append(.person(userID))
-                    session.pendingPersonProfileID = nil
-                }
-            } else {
-                SignInView()
+
+                rootNavigationContent
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            #else
+            rootNavigationContent
+            #endif
         }
         .onOpenURL(perform: handleIncomingURL)
         .animation(reduceMotion ? nil : .snappy(duration: 0.24), value: session.isSignedIn)
-        #if os(iOS)
-        .classWireDemoModeBar()
-        #endif
+        #if os(macOS)
         .safeAreaInset(edge: .top, spacing: 0) {
             if shouldShowUpdateBanner, let version = updates.latestVersion {
                 SchoologyUpdateBanner(
@@ -86,6 +63,7 @@ struct RootView: View {
                 )
             }
         }
+        #endif
         .toolbar {
             #if os(macOS)
             if session.isDemoMode {
@@ -100,6 +78,55 @@ struct RootView: View {
                 SchoologyBackgroundRefresh.schedule()
             }
             #endif
+        }
+    }
+
+    @ViewBuilder
+    private var rootNavigationContent: some View {
+        if session.isSignedIn {
+            NavigationSplitView(preferredCompactColumn: $preferredCompactColumn) {
+                SchoologySidebar(selection: $selectedRoute)
+                    #if os(macOS)
+                    .navigationSplitViewColumnWidth(min: 250, ideal: 285, max: 360)
+                    #endif
+            } detail: {
+                NavigationStack(path: $detailPath) {
+                    selectedRoot(for: selectedRoute)
+                        .id(selectedRoute)
+                        .navigationDestination(for: SchoologyNavigationPath.self) { item in
+                            switch item {
+                            case .person(let userID):
+                                SchoologyPersonProfileView(userID: userID)
+                            }
+                        }
+                }
+            }
+            .navigationSplitViewStyle(.balanced)
+            .task {
+                selectedRoute = .destination(session.destination)
+                #if os(iOS)
+                if session.isSignedIn && !session.isDemoMode { SchoologyBackgroundRefresh.schedule() }
+                #endif
+            }
+            #if os(macOS)
+            .onChange(of: selectedRoute) { _, route in
+                detailPath.removeAll()
+                if case .destination(let destination) = route {
+                    session.destination = destination
+                }
+            }
+            .onChange(of: session.destination) { _, destination in
+                let route = SchoologySidebarSelection.destination(destination)
+                if selectedRoute != route { selectedRoute = route }
+            }
+            #endif
+            .onChange(of: session.pendingPersonProfileID) { _, userID in
+                guard let userID else { return }
+                detailPath.append(.person(userID))
+                session.pendingPersonProfileID = nil
+            }
+        } else {
+            SignInView()
         }
     }
 

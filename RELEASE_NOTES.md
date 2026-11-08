@@ -1,5 +1,16 @@
 # Release notes
 
+## [2026.10.0-port.99]
+
+### Demo mode layout
+- Place the iPhone demo-mode controls in the app's actual vertical layout, before the NavigationSplitView, instead of attaching them as a top safe-area decoration.
+- Move the iOS update notice into the same outer layout so neither banner is layered over the navigation bar or destination content.
+- Preserve the macOS navigation and update-banner presentation.
+
+### Build
+- Increment the iOS and macOS bundle build number to 99.
+
+
 ## [2026.10.0-port.98]
 
 ### Demo mode layout
