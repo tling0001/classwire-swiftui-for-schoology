@@ -13,6 +13,7 @@ private enum SchoologyNavigationPath: Hashable {
 struct RootView: View {
     @Environment(AppSession.self) private var session
     @Environment(AppUpdateService.self) private var updates
+    @Environment(\.openURL) private var openURL
     @AppStorage("schoology.update.dismissedVersion") private var dismissedUpdateVersion = ""
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.scenePhase) private var scenePhase
@@ -68,6 +69,7 @@ struct RootView: View {
                 SignInView()
             }
         }
+        .onOpenURL(perform: handleIncomingURL)
         .animation(reduceMotion ? nil : .snappy(duration: 0.24), value: session.isSignedIn)
         .safeAreaInset(edge: .top, spacing: 0) {
             if shouldShowUpdateBanner, let version = updates.latestVersion {
@@ -101,6 +103,16 @@ struct RootView: View {
             }
             #endif
         }
+    }
+
+    private func handleIncomingURL(_ url: URL) {
+        // AuthenticationServices owns the schoology://external_login_callback URL.
+        // Do not send that callback to the browser or interpret its OAuth parameters here.
+        guard !SchoologyDeepLinkRouter.isAuthenticationCallback(url),
+              let destination = SchoologyDeepLinkRouter.externalLinkDestination(from: url) else {
+            return
+        }
+        openURL(destination)
     }
 
     private var shouldShowUpdateBanner: Bool {

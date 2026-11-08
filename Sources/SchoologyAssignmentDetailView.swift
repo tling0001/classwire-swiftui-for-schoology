@@ -140,9 +140,6 @@ struct SchoologyAssignmentDetailView: View {
     private func infoPane(context: SchoologyAssignmentContext) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                if !context.attachments.isEmpty {
-                    SchoologyAttachmentsDisclosure(attachments: context.attachments)
-                }
                 VStack(alignment: .leading, spacing: 10) {
                     Text(context.assignment.title).font(.title2.bold())
                     if !context.assignment.subtitle.isEmpty {
@@ -151,6 +148,9 @@ struct SchoologyAssignmentDetailView: View {
                     if !context.maxPoints.isEmpty {
                         Label("\(SchoologyGradeValueFormatter.display(context.maxPoints)) points", systemImage: "chart.bar")
                             .font(.subheadline).foregroundStyle(.secondary)
+                    }
+                    if !context.attachments.isEmpty {
+                        SchoologyAttachmentsDisclosure(attachments: context.attachments)
                     }
                     SchoologyRichTextText(context.richDescription.isEmpty ? "No assignment description." : context.richDescription, minimumFontSize: richTextMinimumFontSize)
                         .textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)

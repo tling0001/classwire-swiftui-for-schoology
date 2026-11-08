@@ -1,5 +1,19 @@
 # Release notes
 
+## [2026.10.0-port.89]
+
+### Deep links
+- Handle the Classic Chrome-link handoff format, `schoology://link?url=...`, by validating and opening its HTTP or HTTPS destination with the system URL handler.
+- Leave `schoology://external_login_callback` to AuthenticationServices so OAuth callbacks are not mistaken for ordinary links.
+- Ignore malformed, unsupported, or non-web custom destinations rather than opening arbitrary URL schemes.
+
+### Assignment information
+- Move the View Attachments disclosure below the assignment title, due date, and points, and above the description.
+
+### Build
+- Increment the iOS and macOS bundle build number to 89.
+
+
 ## [2026.10.0-port.88]
 
 ### Classic updates and text submissions
