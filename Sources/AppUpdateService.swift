@@ -143,7 +143,7 @@ final class AppUpdateService {
             #else
             let suffix = ".dmg"
             #endif
-            guard let asset = release.assets.first(where: { $0.name.hasSuffix(suffix) }) else {
+            guard let asset = release.assets.first(where: { $0.name.hasPrefix("ClassWire_") && $0.name.hasSuffix(suffix) }) else {
                 throw NSError(domain: "ClassWireClassicSwitcher", code: 2,
                               userInfo: [NSLocalizedDescriptionKey: "The latest Classic release does not include a macOS installer for this Mac's architecture."])
             }
@@ -151,7 +151,7 @@ final class AppUpdateService {
             classicAssetSize = asset.size
             classicAssetDigest = asset.digest
             #else
-            guard let asset = release.assets.first(where: { $0.name.hasSuffix("-iOS-AdHoc.plist") }) else {
+            guard let asset = release.assets.first(where: { $0.name.hasPrefix("ClassWire-") && $0.name.hasSuffix("-iOS-AdHoc.plist") }) else {
                 throw NSError(domain: "ClassWireClassicSwitcher", code: 3,
                               userInfo: [NSLocalizedDescriptionKey: "The latest Classic release does not include an iOS Ad Hoc installation manifest."])
             }

@@ -75,6 +75,15 @@ struct SchoologyTextSubmissionComposerView: View {
                 }
             }
         }
+        #if os(iOS)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if #available(iOS 26.0, *), isSubmissionFocused {
+                formattingBar
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+            }
+        }
+        #endif
     }
 
     @ViewBuilder
@@ -82,22 +91,34 @@ struct SchoologyTextSubmissionComposerView: View {
         if #available(iOS 26.0, macOS 26.0, *) {
             VStack(alignment: .leading, spacing: 10) {
                 richTextEditor
-                SchoologySubmissionFormattingBar(
-                    text: $formattedText,
-                    selection: $formattedSelection,
-                    onInsertLink: {
-                        linkText = ""
-                        linkAddress = ""
-                        isShowingLinkPrompt = true
-                    }
-                )
-                .frame(maxWidth: .infinity, alignment: .center)
+                #if os(iOS)
+                if !isSubmissionFocused {
+                    formattingBar
+                        .frame(maxWidth: .infinity, alignment: .center)
+                }
+                #else
+                formattingBar
+                    .frame(maxWidth: .infinity, alignment: .center)
+                #endif
             }
         } else {
             TextEditor(text: $text)
                 .frame(minHeight: 220)
                 .accessibilityLabel("Enter your submission")
         }
+    }
+
+    @available(iOS 26.0, macOS 26.0, *)
+    private var formattingBar: some View {
+        SchoologySubmissionFormattingBar(
+            text: $formattedText,
+            selection: $formattedSelection,
+            onInsertLink: {
+                linkText = ""
+                linkAddress = ""
+                isShowingLinkPrompt = true
+            }
+        )
     }
 
     @available(iOS 26.0, macOS 26.0, *)

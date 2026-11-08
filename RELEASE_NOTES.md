@@ -1,5 +1,15 @@
 # Release notes
 
+## [2026.10.0-port.88]
+
+### Classic updates and text submissions
+- Select only ClassWire-named assets when checking for a new Classic macOS or iOS release, while continuing to publish Schoology-named aliases.
+- Move the rich-text formatting bar above the software keyboard while editing on iPhone; keep it below the editor when the keyboard is closed.
+
+### Build
+- Increment the iOS and macOS bundle build number to 88.
+
+
 ## [2026.10.0-port.87]
 
 ### App updates and releases
