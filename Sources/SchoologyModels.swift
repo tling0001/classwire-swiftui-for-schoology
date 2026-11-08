@@ -71,8 +71,12 @@ struct SchoologyAttachment: Identifiable, Hashable, Sendable {
                           "href", "web_url", "webUrl", "launch_url", "launchUrl"]
         if linkFields.contains(where: { item[$0] != nil }) { return true }
 
-        let fileFields = ["file_download_url", "fileDownloadURL", "download_path",
-                          "downloadPath", "download_url", "downloadUrl", "filename", "fileName"]
+        let fileFields = [
+            "file_download_url", "fileDownloadURL", "download_path", "downloadPath",
+            "download_url", "downloadUrl", "resolveDownloadUrl", "resolve_download_url",
+            "file_converted_download_url", "fileConvertedDownloadURL",
+            "converted_download_path", "convertedDownloadPath", "filename", "fileName"
+        ]
         guard !fileFields.contains(where: { item[$0] != nil }),
               let rawURL = item["url"] as? String,
               let url = URL(string: rawURL) else { return false }

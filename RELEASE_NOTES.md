@@ -1,5 +1,16 @@
 # Release notes
 
+## [2026.10.0-port.83]
+
+### Assignment submission attachments
+- Use one shared revision-attachment decoder for student and teacher submission histories.
+- Preserve the original Schoology file URL exclusively for Download and keep the converted preview URL separate for View.
+- Recognize the same original and converted URL field variants as the desktop attachment flow, preventing assignment submissions from previewing the uploaded original when Schoology provides a converted copy.
+- Do not silently treat a converted-only response as the original downloadable file.
+
+### Build
+- Increment the iOS and macOS bundle build number to 83.
+
 ## [2026.10.0-port.82]
 
 ### iPhone and iPad navigation

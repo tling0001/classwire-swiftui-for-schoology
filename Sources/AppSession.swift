@@ -1559,25 +1559,6 @@ final class AppSession {
             let value = record["comment"] ?? record["teacher_comment"] ?? record["teacherComment"]
             return SchoologyValue.plainText(SchoologyValue.string((value as? [String: Any])?["comment"] ?? (value as? [String: Any])?["body"] ?? value))
         }
-        func revisions(from payload: [String: Any]) -> [SchoologyAssignmentRevision] {
-            let nested = payload["data"] as? [String: Any]
-            let raw = payload["revision"] ?? payload["revisions"] ?? nested?["revision"] ?? nested?["revisions"]
-            return SchoologyValue.list(raw, keys: ["revision", "revisions", "items"]).map { row in
-                let attachments = SchoologyValue.list(row["attachments"] ?? row["attachment"], keys: ["files", "file", "attachments", "items"]).compactMap { file -> SchoologyAttachment? in
-                    guard let url = SchoologyValue.url(file["file_download_url"] ?? file["fileDownloadURL"] ?? file["download_path"] ?? file["downloadPath"] ?? file["url"]) else { return nil }
-                    return SchoologyAttachment(
-                        title: SchoologyValue.string(file["filename"] ?? file["fileName"] ?? file["title"], fallback: url.lastPathComponent),
-                        url: url,
-                        isLink: SchoologyAttachment.isLinkRecord(file)
-                    )
-                }
-                return SchoologyAssignmentRevision(id: SchoologyValue.string(row["revision_id"] ?? row["revisionId"] ?? row["id"], fallback: "0"),
-                    created: SchoologyValue.string(row["created"] ?? row["timestamp"]),
-                    body: SchoologyValue.plainText(SchoologyValue.string(row["body"] ?? row["message"])),
-                    status: SchoologyValue.bool(row["draft"]) ? "Draft" : (SchoologyValue.bool(row["late"]) ? "Late" : "On time"),
-                    attachments: attachments)
-            }.sorted { (Int($0.id) ?? 0) > (Int($1.id) ?? 0) }
-        }
         if context.isTeacher {
             async let enrollmentsRequest = api.get("sections/\(sectionID)/enrollments", auth: auth, params: ["enrollment_status": "1", "limit": "200"])
             async let gradesRequest = api.get("sections/\(sectionID)/grades", auth: auth, params: ["assignment_id": context.gradeItemID, "limit": "200"])
@@ -1613,7 +1594,7 @@ final class AppSession {
         let grade = SchoologyValue.list(Self.object(gradeData), keys: ["grade", "grades", "items"]).first ?? [:]
         let root = submissionData.map(Self.object) ?? [:]
         return SchoologyAssignmentSubmissionSummary(grade: SchoologyValue.string(grade["grade"] ?? grade["calculated_grade"], fallback: "—"),
-            teacherComment: commentText(grade), revisions: revisions(from: root), students: [])
+            teacherComment: commentText(grade), revisions: decodeAssignmentRevisions(from: root), students: [])
     }
 
     func submitAssignmentText(sectionID: String, gradeItemID: String, text: String, draft: Bool) async throws {
@@ -1677,26 +1658,38 @@ final class AppSession {
             commentVisible: SchoologyValue.bool(row["comment_status"] ?? row["commentStatus"]))
     }
 
-    func loadTeacherAssignmentRevisions(sectionID: String, gradeItemID: String, userID: String) async throws -> [SchoologyAssignmentRevision] {
-        if isDemoMode { return demoAssignmentRevisions[gradeItemID] ?? [] }
-        guard let auth else { throw SchoologyAPIError.notSignedIn }
-        let data = try await api.get(
-            "sections/\(sectionID)/submissions/\(gradeItemID)/\(userID)",
-            auth: auth,
-            params: ["with_attachments": "TRUE", "all_revisions": "TRUE", "start": "0", "limit": "200"]
-        )
-        let root = Self.object(data)
-        let nested = root["data"] as? [String: Any]
-        let rawRevisions = root["revision"] ?? root["revisions"] ?? nested?["revision"] ?? nested?["revisions"]
+    /// Decodes revision files using the same original/converted URL contract used by the
+    /// desktop attachment flow: `url` is always the uploaded original; `viewURL`
+    /// is the Schoology-generated preview copy when one is available.
+    private func decodeAssignmentRevisions(from payload: [String: Any]) -> [SchoologyAssignmentRevision] {
+        let nested = payload["data"] as? [String: Any]
+        let rawRevisions = payload["revision"] ?? payload["revisions"] ?? nested?["revision"] ?? nested?["revisions"]
         return SchoologyValue.list(rawRevisions, keys: ["revision", "revisions", "items"]).map { row in
             let files = SchoologyValue.list(row["attachments"] ?? row["attachment"], keys: ["files", "file", "attachments", "items"])
             let attachments = files.compactMap { file -> SchoologyAttachment? in
-                guard let url = SchoologyValue.url(file["file_download_url"] ?? file["fileDownloadURL"] ?? file["download_path"] ?? file["downloadPath"] ?? file["url"]) else { return nil }
-                let converted = SchoologyValue.url(file["file_converted_download_url"] ?? file["fileConvertedDownloadURL"] ?? file["converted_download_path"] ?? file["convertedDownloadPath"])
+                // Never substitute the converted copy for the original download URL.
+                let originalURL = SchoologyValue.url(
+                    file["file_download_url"] ?? file["fileDownloadURL"] ??
+                    file["download_path"] ?? file["downloadPath"] ??
+                    file["download_url"] ?? file["downloadUrl"] ??
+                    file["resolveDownloadUrl"] ?? file["resolve_download_url"] ??
+                    file["url"]
+                )
+                guard let originalURL else { return nil }
+
+                let convertedURL = SchoologyValue.url(
+                    file["file_converted_download_url"] ?? file["fileConvertedDownloadURL"] ??
+                    file["converted_download_path"] ?? file["convertedDownloadPath"]
+                )
+                let filename = SchoologyValue.string(
+                    file["filename"] ?? file["fileName"] ?? file["file_title"] ??
+                    file["fileTitle"] ?? file["title"],
+                    fallback: originalURL.lastPathComponent
+                )
                 return SchoologyAttachment(
-                    title: SchoologyValue.string(file["filename"] ?? file["fileName"] ?? file["title"], fallback: url.lastPathComponent),
-                    url: url,
-                    viewURL: converted,
+                    title: filename,
+                    url: originalURL,
+                    viewURL: convertedURL,
                     isLink: SchoologyAttachment.isLinkRecord(file)
                 )
             }
@@ -1708,6 +1701,17 @@ final class AppSession {
                 attachments: attachments
             )
         }.sorted { (Int($0.id) ?? 0) > (Int($1.id) ?? 0) }
+    }
+
+    func loadTeacherAssignmentRevisions(sectionID: String, gradeItemID: String, userID: String) async throws -> [SchoologyAssignmentRevision] {
+        if isDemoMode { return demoAssignmentRevisions[gradeItemID] ?? [] }
+        guard let auth else { throw SchoologyAPIError.notSignedIn }
+        let data = try await api.get(
+            "sections/\(sectionID)/submissions/\(gradeItemID)/\(userID)",
+            auth: auth,
+            params: ["with_attachments": "TRUE", "all_revisions": "TRUE", "start": "0", "limit": "200"]
+        )
+        return decodeAssignmentRevisions(from: Self.object(data))
     }
 
     func updateTeacherAssignmentGrade(sectionID: String, assignmentID: String, enrollmentID: String, grade: String, comment: String, commentVisible: Bool) async throws {
