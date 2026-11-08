@@ -4,6 +4,7 @@ import UniformTypeIdentifiers
 struct SchoologyUpdateComposerView: View {
     @Environment(AppSession.self) private var session
     @Environment(\.dismiss) private var dismiss
+    @FocusState private var bodyFocused: Bool
     let destinations: [SchoologyUpdateDestination]
     let onPosted: () -> Void
 
@@ -40,6 +41,7 @@ struct SchoologyUpdateComposerView: View {
                 Section("Update") {
                     TextField("Write an update…", text: $bodyText, axis: .vertical)
                         .lineLimit(4...12)
+                        .focused($bodyFocused)
                 }
 
                 Section("Attachments") {
@@ -61,8 +63,17 @@ struct SchoologyUpdateComposerView: View {
                     Button("Cancel") { dismiss() }.disabled(isPosting || isUploading)
                 }
                 ToolbarItem(placement: .confirmationAction) {
+                    #if os(iOS)
+                    if bodyFocused {
+                        SchoologyKeyboardDoneToolbarButton { bodyFocused = false }
+                    } else {
+                        Button("Post", systemImage: "paperplane.fill", action: post)
+                            .disabled(isPosting || isUploading || selectedDestination == nil || bodyText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    }
+                    #else
                     Button("Post", systemImage: "paperplane.fill", action: post)
                         .disabled(isPosting || isUploading || selectedDestination == nil || bodyText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    #endif
                 }
             }
             .fileImporter(isPresented: $showingFileImporter, allowedContentTypes: [.item], allowsMultipleSelection: true, onCompletion: importFiles)

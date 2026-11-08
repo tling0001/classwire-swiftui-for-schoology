@@ -11,6 +11,8 @@ struct SchoologyMessageComposerView: View {
 
     @Environment(AppSession.self) private var session
     @Environment(\.dismiss) private var dismiss
+    private enum FocusedField: Hashable { case recipientSearch, subject, message }
+    @FocusState private var focusedField: FocusedField?
     let onSent: () -> Void
     let reply: ReplyContext?
 
@@ -43,6 +45,7 @@ struct SchoologyMessageComposerView: View {
                 } else {
                     Section("To") {
                         TextField("Search recipients", text: $recipientQuery)
+                            .focused($focusedField, equals: .recipientSearch)
                         ForEach(selectedRecipients) { recipient in
                             HStack {
                                 Text(recipient.name)
@@ -66,9 +69,13 @@ struct SchoologyMessageComposerView: View {
                     }
                 }
                 Section("Message") {
-                    if reply == nil { TextField("Subject", text: $subject) }
+                    if reply == nil {
+                        TextField("Subject", text: $subject)
+                            .focused($focusedField, equals: .subject)
+                    }
                     ZStack(alignment: .topLeading) {
                         TextEditor(text: $message)
+                            .focused($focusedField, equals: .message)
                             .scrollContentBackground(.hidden)
                             .frame(minHeight: 132)
                         if message.isEmpty {
@@ -97,8 +104,17 @@ struct SchoologyMessageComposerView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() }.disabled(isSending || isUploading) }
                 ToolbarItem(placement: .confirmationAction) {
+                    #if os(iOS)
+                    if focusedField != nil {
+                        SchoologyKeyboardDoneToolbarButton { focusedField = nil }
+                    } else {
+                        Button("Send", systemImage: "paperplane.fill", action: send)
+                            .disabled(isSending || isUploading || selectedRecipients.isEmpty || (reply == nil && subject.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) || message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    }
+                    #else
                     Button("Send", systemImage: "paperplane.fill", action: send)
                         .disabled(isSending || isUploading || selectedRecipients.isEmpty || (reply == nil && subject.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) || message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    #endif
                 }
             }
             .fileImporter(isPresented: $showingFileImporter, allowedContentTypes: [.item], allowsMultipleSelection: true, onCompletion: importFiles)

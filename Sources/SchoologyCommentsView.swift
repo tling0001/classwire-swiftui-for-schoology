@@ -126,11 +126,23 @@ struct SchoologyCommentsView: View {
                     .lineLimit(1...4)
                     .focused($composerFocused)
                     .onSubmit { Task { await submit() } }
+                #if os(iOS)
+                if composerFocused {
+                    SchoologyKeyboardDoneToolbarButton { composerFocused = false }
+                } else {
+                    Button("Post", systemImage: "paperplane.fill") {
+                        Task { await submit() }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(isSubmitting || draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+                #else
                 Button("Post", systemImage: "paperplane.fill") {
                     Task { await submit() }
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(isSubmitting || draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                #endif
             }
         }
         .padding(12)

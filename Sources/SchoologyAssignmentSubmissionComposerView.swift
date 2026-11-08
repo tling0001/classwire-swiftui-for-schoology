@@ -5,6 +5,7 @@ import UniformTypeIdentifiers
 struct SchoologyAssignmentSubmissionComposerView: View {
     @Environment(AppSession.self) private var session
     @Environment(\.dismiss) private var dismiss
+    @FocusState private var commentFocused: Bool
     let sectionID: String
     let assignmentID: String
     let onSubmitted: () -> Void
@@ -79,6 +80,7 @@ struct SchoologyAssignmentSubmissionComposerView: View {
                 Section("Comment (Optional)") {
                     TextField("Add a comment…", text: $comment, axis: .vertical)
                         .lineLimit(2...5)
+                        .focused($commentFocused)
                 }
                 if isSubmitting && !selectedFiles.isEmpty {
                     Section("Upload Progress") {
@@ -99,11 +101,21 @@ struct SchoologyAssignmentSubmissionComposerView: View {
                     Button("Cancel") { dismiss() }.disabled(isSubmitting)
                 }
                 ToolbarItem(placement: .confirmationAction) {
+                    #if os(iOS)
+                    if commentFocused {
+                        SchoologyKeyboardDoneToolbarButton { commentFocused = false }
+                    } else if submissionCreated {
+                        Button("Done") { dismiss() }
+                    } else {
+                        Button("Submit", systemImage: "paperplane.fill") { Task { await submit() } }.disabled(!hasAttachments || isSubmitting)
+                    }
+                    #else
                     if submissionCreated {
                         Button("Done") { dismiss() }
                     } else {
                         Button("Submit", systemImage: "paperplane.fill") { Task { await submit() } }.disabled(!hasAttachments || isSubmitting)
                     }
+                    #endif
                 }
             }
         }
@@ -138,6 +150,7 @@ struct SchoologyAssignmentSubmissionComposerView: View {
     @MainActor
     private func submit() async {
         guard hasAttachments, !isSubmitting else { return }
+        commentFocused = false
         isSubmitting = true
         errorMessage = nil
         completedUploadCount = uploadedFileIDs.count

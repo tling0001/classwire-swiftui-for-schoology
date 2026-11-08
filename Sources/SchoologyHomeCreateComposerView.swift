@@ -4,6 +4,8 @@ import UniformTypeIdentifiers
 struct SchoologyHomeCreateComposerView: View {
     @Environment(AppSession.self) private var session
     @Environment(\.dismiss) private var dismiss
+    private enum FocusedField: Hashable { case title, description, maxPoints, factor }
+    @FocusState private var focusedField: FocusedField?
     let destinations: [SchoologyHomeCreateDestination]
     let action: SchoologyHomeCreateAction
     let onCreated: () -> Void
@@ -45,8 +47,8 @@ struct SchoologyHomeCreateComposerView: View {
                     else { ContentUnavailableView("No available destinations", systemImage: "lock", description: Text("No loaded course or group is currently available for creating this item.")) }
                 }
                 Section(action == .discussion ? "Discussion" : "Event") {
-                    TextField("Title", text: $title)
-                    TextField("Description", text: $bodyText, axis: .vertical).lineLimit(4...10)
+                    TextField("Title", text: $title).focused($focusedField, equals: .title)
+                    TextField("Description", text: $bodyText, axis: .vertical).lineLimit(4...10).focused($focusedField, equals: .description)
                 }
                 if action == .discussion {
                     Section("Discussion options") {
@@ -55,8 +57,8 @@ struct SchoologyHomeCreateComposerView: View {
                         if hasDueDate { DatePicker("Due", selection: $dueDate) }
                         Toggle("Enable Grading", isOn: $graded)
                         if graded {
-                            TextField("Maximum points", text: $maxPoints)
-                            TextField("Factor", text: $factor)
+                            TextField("Maximum points", text: $maxPoints).focused($focusedField, equals: .maxPoints)
+                            TextField("Factor", text: $factor).focused($focusedField, equals: .factor)
                         }
                     }
                 } else {
@@ -83,8 +85,17 @@ struct SchoologyHomeCreateComposerView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() }.disabled(isSubmitting || isUploading) }
                 ToolbarItem(placement: .confirmationAction) {
+                    #if os(iOS)
+                    if focusedField != nil {
+                        SchoologyKeyboardDoneToolbarButton { focusedField = nil }
+                    } else {
+                        Button("Create", systemImage: "paperplane.fill") { Task { await submit() } }
+                            .disabled(!canSubmit || isSubmitting || isUploading)
+                    }
+                    #else
                     Button("Create", systemImage: "paperplane.fill") { Task { await submit() } }
                         .disabled(!canSubmit || isSubmitting || isUploading)
+                    #endif
                 }
             }
             .fileImporter(isPresented: $showingFileImporter, allowedContentTypes: [.item], allowsMultipleSelection: true, onCompletion: importFiles)
@@ -135,6 +146,7 @@ struct SchoologyHomeCreateComposerView: View {
 
     @MainActor private func submit() async {
         guard canSubmit, let destination else { return }
+        focusedField = nil
         isSubmitting = true; errorMessage = nil
         defer { isSubmitting = false }
         do {

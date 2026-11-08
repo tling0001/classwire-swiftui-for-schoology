@@ -1,5 +1,19 @@
 # Release notes
 
+## [2026.10.0-port.90]
+
+### Composer keyboard controls
+- Replace each iOS composer’s trailing action with a prominent blue checkmark while a text field is focused; tapping it dismisses the keyboard without submitting or discarding the draft.
+- Apply the same keyboard-dismissal affordance to update, event/discussion, message, text/file assignment submission, and shared comment composers.
+- Keep each composer’s normal Post, Send, Create, or Submit action available after editing ends; preserve the existing macOS toolbar actions.
+
+### Event and discussion information
+- Align event and discussion information cards with the assignment detail layout: title and date first, attachments next, and description afterward.
+- Keep event attachments inside the rounded information card, matching assignments and discussions.
+
+### Build
+- Increment the iOS and macOS bundle build number to 90.
+
 ## [2026.10.0-port.89]
 
 ### Deep links

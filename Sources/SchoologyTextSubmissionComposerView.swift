@@ -4,7 +4,8 @@ struct SchoologyTextSubmissionComposerView: View {
     @Environment(AppSession.self) private var session
     @Environment(\.dismiss) private var dismiss
     @Environment(\.fontResolutionContext) private var fontResolutionContext
-    @FocusState private var isSubmissionFocused: Bool
+    private enum FocusedField: Hashable { case submission, comment }
+    @FocusState private var focusedField: FocusedField?
 
     let sectionID: String
     let context: SchoologyAssignmentContext
@@ -50,6 +51,7 @@ struct SchoologyTextSubmissionComposerView: View {
                 Section("Comment (Optional)") {
                     TextField("Add a comment…", text: $comment, axis: .vertical)
                         .lineLimit(2...5)
+                        .focused($focusedField, equals: .comment)
                 }
                 if let error {
                     Section {
@@ -66,18 +68,29 @@ struct SchoologyTextSubmissionComposerView: View {
                     Button("Cancel") { dismiss() }.disabled(isSubmitting)
                 }
                 ToolbarItem(placement: .confirmationAction) {
+                    #if os(iOS)
+                    if focusedField != nil {
+                        SchoologyKeyboardDoneToolbarButton { focusedField = nil }
+                    } else if submissionCreated {
+                        Button("Done") { dismiss() }
+                    } else {
+                        Button("Submit", systemImage: "paperplane.fill", action: submit)
+                            .disabled(isSubmitting || submissionText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    }
+                    #else
                     if submissionCreated {
                         Button("Done") { dismiss() }
                     } else {
                         Button("Submit", systemImage: "paperplane.fill", action: submit)
                             .disabled(isSubmitting || submissionText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     }
+                    #endif
                 }
             }
         }
         #if os(iOS)
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            if #available(iOS 26.0, *), isSubmissionFocused {
+            if #available(iOS 26.0, *), focusedField == .submission {
                 formattingBar
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
@@ -92,7 +105,7 @@ struct SchoologyTextSubmissionComposerView: View {
             VStack(alignment: .leading, spacing: 10) {
                 richTextEditor
                 #if os(iOS)
-                if !isSubmissionFocused {
+                if focusedField != .submission {
                     formattingBar
                         .frame(maxWidth: .infinity, alignment: .center)
                 }
@@ -127,12 +140,12 @@ struct SchoologyTextSubmissionComposerView: View {
         TextEditor(text: $formattedText, selection: $formattedSelection)
             .frame(minHeight: 220)
             .textInputFormattingControlVisibility(.hidden, for: .default)
-            .focused($isSubmissionFocused)
+            .focused($focusedField, equals: .submission)
             .accessibilityLabel("Enter your submission")
         #else
         TextEditor(text: $formattedText, selection: $formattedSelection)
             .frame(minHeight: 220)
-            .focused($isSubmissionFocused)
+            .focused($focusedField, equals: .submission)
             .accessibilityLabel("Enter your submission")
         #endif
     }

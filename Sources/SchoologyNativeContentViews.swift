@@ -87,9 +87,6 @@ struct SchoologyDiscussionDetailView: View {
                     if !discussion.subtitle.isEmpty {
                         Label(discussion.subtitle, systemImage: "calendar").font(.subheadline).foregroundStyle(.secondary)
                     }
-                    SchoologyRichTextText(discussion.body.isEmpty ? "No discussion content." : discussion.body, minimumFontSize: richTextMinimumFontSize)
-                        .textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .leading)
                     if let url = discussion.url {
                         if !discussion.fileName.isEmpty || !discussion.fileMIME.isEmpty || !url.pathExtension.isEmpty {
                             SchoologyAttachmentsDisclosure(attachments: [
@@ -103,6 +100,9 @@ struct SchoologyDiscussionDetailView: View {
                             Link(destination: url) { Label("Open attachment", systemImage: "paperclip") }
                         }
                     }
+                    SchoologyRichTextText(discussion.body.isEmpty ? "No discussion content." : discussion.body, minimumFontSize: richTextMinimumFontSize)
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .padding(16)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -199,14 +199,14 @@ struct SchoologyEventDetailView: View {
                     } else if !context.event.subtitle.isEmpty {
                         Label(context.event.subtitle, systemImage: "calendar").font(.subheadline).foregroundStyle(.secondary)
                     }
+                    if !context.attachments.isEmpty {
+                        SchoologyAttachmentsDisclosure(attachments: context.attachments)
+                    }
                     SchoologyRichTextText(context.richDescription.isEmpty ? "No event description." : context.richDescription, minimumFontSize: richTextMinimumFontSize)
                         .textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .padding(16).frame(maxWidth: .infinity, alignment: .leading)
                 .background(.background, in: RoundedRectangle(cornerRadius: 14))
-                if !context.attachments.isEmpty {
-                    SchoologyAttachmentsDisclosure(attachments: context.attachments)
-                }
             }.padding().frame(maxWidth: 900).frame(maxWidth: .infinity)
         }
     }
