@@ -142,20 +142,20 @@ struct ClassWireDemoView: View {
                         }
                     }
             }
-        }
-        .safeAreaInset(edge: .top, spacing: 0) {
-            HStack(spacing: 8) {
-                Image(systemName: "checkmark.seal.fill")
-                Text("DEMO MODE").font(.caption.bold())
-                Spacer()
-                Text("Sample data · Local interactions")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+            .safeAreaInset(edge: .top, spacing: 0) {
+                HStack(spacing: 8) {
+                    Image(systemName: "checkmark.seal.fill")
+                    Text("DEMO MODE").font(.caption.bold())
+                    Spacer()
+                    Text("Sample data · Local interactions")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+                .background(.bar)
+                .accessibilityElement(children: .combine)
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 8)
-            .background(.bar)
-            .accessibilityElement(children: .combine)
         }
         .alert("About this demo", isPresented: $showingDemoInformation) {
             Button("Continue", role: .cancel) { }

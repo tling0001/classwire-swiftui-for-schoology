@@ -1,5 +1,26 @@
 # Release notes
 
+## [2026.10.0-port.91]
+
+### Date and time labels
+- Use the same Schoology-style timestamp presentation for activity posts and message conversation details as comments: relative labels for the most recent 24 hours, then a localized absolute date and time for older entries.
+- Keep the Messages inbox list's existing compact relative timestamp treatment.
+
+### Comments composer
+- Move the iOS keyboard Done checkmark above the comment field, aligned to the trailing edge, so it no longer replaces or overlaps the Post button.
+- Keep Post visible beside the comment field while editing.
+
+### School discussions
+- Open the School Discussions fallback inside ClassWire's shared authenticated WebKit view, using the existing Schoology web-session cookie bootstrap.
+- Respect the selected Schoology region when choosing the school web host.
+
+### Demo mode layout
+- Attach demo banners to the active navigation content stack so SwiftUI reserves the banner space in the scrolling content area on iPhone.
+- Keep the demo controls and sample-data notice accessible without covering the last rows of content.
+
+### Build
+- Increment the iOS and macOS bundle build number to 91.
+
 ## [2026.10.0-port.90]
 
 ### Composer keyboard controls

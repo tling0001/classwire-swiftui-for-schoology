@@ -487,8 +487,12 @@ struct SchoolProfileView: View {
                                             systemImage: "lock",
                                             description: Text("ClassWire cannot list school discussions for this account through the API.")
                                         )
-                                        if let url = URL(string: "https://app.schoology.com/school/\(schoolID)/discussions") {
-                                            Link("Open School Discussions", destination: url)
+                                        if let url = schoolDiscussionsURL {
+                                            NavigationLink {
+                                                SchoologyEmbeddedWebView(url: url, title: "School Discussions")
+                                            } label: {
+                                                Label("Open School Discussions", systemImage: "arrow.up.right")
+                                            }
                                         }
                                     }
                                 } else if discussions.isEmpty {
@@ -528,6 +532,11 @@ struct SchoolProfileView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+    }
+
+    private var schoolDiscussionsURL: URL? {
+        let host = session.canadianServer ? "app.schoologyca.com" : "app.schoology.com"
+        return URL(string: "https://\(host)/school/\(schoolID)/discussions")
     }
 
     private var currentIsEmpty: Bool {

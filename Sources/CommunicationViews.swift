@@ -213,7 +213,9 @@ private struct MessageThreadView: View {
                                         Text(item.personName.isEmpty ? "ClassWire" : item.personName)
                                             .font(.subheadline.weight(.semibold))
                                         if let date = SchoologyValue.date(item.created) {
-                                            Text(date, style: .relative).font(.caption2).foregroundStyle(.secondary)
+                                            Text(SchoologyValue.postDateLabel(date))
+                                                .font(.caption2)
+                                                .foregroundStyle(.secondary)
                                         }
                                     }
                                     Spacer()

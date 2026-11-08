@@ -315,7 +315,7 @@ private struct SchoologyActivityCard: View {
                 }
                 Spacer(minLength: 8)
                 if let date = activity.createdDate {
-                    Text(date, style: .relative)
+                    Text(SchoologyValue.postDateLabel(date))
                         .font(.caption).foregroundStyle(.tertiary)
                 }
             }

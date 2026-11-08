@@ -40,6 +40,11 @@ struct RootView: View {
                                 }
                             }
                     }
+                    #if os(iOS)
+                    .safeAreaInset(edge: .bottom, spacing: 0) {
+                        if session.isDemoMode { ClassWireDemoModeBar(onExit: session.exitDemoMode) }
+                    }
+                    #endif
                 }
                 .navigationSplitViewStyle(.balanced)
                 .task {
@@ -83,11 +88,6 @@ struct RootView: View {
                 )
             }
         }
-        #if os(iOS)
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            if session.isDemoMode { ClassWireDemoModeBar(onExit: session.exitDemoMode) }
-        }
-        #endif
         .toolbar {
             #if os(macOS)
             if session.isDemoMode {

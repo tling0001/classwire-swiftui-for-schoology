@@ -121,28 +121,24 @@ struct SchoologyCommentsView: View {
                     .font(.caption)
                 }
             }
+            #if os(iOS)
+            if composerFocused {
+                HStack {
+                    Spacer()
+                    SchoologyKeyboardDoneToolbarButton { composerFocused = false }
+                }
+            }
+            #endif
             HStack(alignment: .bottom, spacing: 10) {
                 TextField("Write a comment…", text: $draft, axis: .vertical)
                     .lineLimit(1...4)
                     .focused($composerFocused)
                     .onSubmit { Task { await submit() } }
-                #if os(iOS)
-                if composerFocused {
-                    SchoologyKeyboardDoneToolbarButton { composerFocused = false }
-                } else {
-                    Button("Post", systemImage: "paperplane.fill") {
-                        Task { await submit() }
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(isSubmitting || draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                }
-                #else
                 Button("Post", systemImage: "paperplane.fill") {
                     Task { await submit() }
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(isSubmitting || draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                #endif
             }
         }
         .padding(12)
