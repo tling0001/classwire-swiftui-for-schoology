@@ -390,22 +390,43 @@ enum SchoologyValue {
     }
 
     static func date(_ value: String) -> Date? {
+        let value = value.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !value.isEmpty else { return nil }
         if let seconds = Double(value), seconds > 0 {
             return Date(timeIntervalSince1970: seconds > 10_000_000_000 ? seconds / 1_000 : seconds)
         }
+
         let iso = ISO8601DateFormatter()
         if let date = iso.date(from: value) { return date }
         iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         if let date = iso.date(from: value) { return date }
-        for format in ["yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd'T'HH:mm:ss", "yyyy-MM-dd"] {
+
+        // Schoology's legacy assignment/discussion due values use a local
+        // date-time string without an offset (for example, 2026-11-08 13:30:00).
+        // Parse these as local wall-clock times, matching the desktop/Android
+        // client behavior rather than treating them as UTC.
+        for format in [
+            "yyyy-MM-dd HH:mm:ss",
+            "yyyy-MM-dd'T'HH:mm:ss",
+            "yyyy-MM-dd hh:mm:ss",
+            "yyyy-MM-dd"
+        ] {
             let formatter = DateFormatter()
             formatter.locale = Locale(identifier: "en_US_POSIX")
             formatter.timeZone = TimeZone.current
+            formatter.isLenient = false
             formatter.dateFormat = format
             if let date = formatter.date(from: value) { return date }
         }
         return nil
+    }
+
+    /// Formats Schoology due values using the same absolute date-and-time
+    /// presentation as the desktop client, while respecting the user's locale.
+    static func schoologyDateLabel(_ value: String) -> String {
+        guard !value.isEmpty else { return "" }
+        guard let date = date(value) else { return value }
+        return date.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day().year().hour().minute())
     }
 
     static func postDateLabel(_ date: Date) -> String {

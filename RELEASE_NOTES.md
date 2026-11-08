@@ -1,5 +1,16 @@
 # Release notes
 
+## [2026.10.0-port.95]
+
+### Assignment and discussion due dates
+- Parse Schoology legacy local date-time values, ISO-8601 timestamps, and Unix timestamps consistently.
+- Display assignment and discussion due dates as localized absolute date-and-time labels instead of raw API strings.
+- Apply the same date presentation to gradebook assignment rows while preserving role labels and non-due metadata.
+
+### Build
+- Increment the iOS and macOS bundle build number to 95.
+
+
 ## [2026.10.0-port.94]
 
 ### Demo navigation and Settings

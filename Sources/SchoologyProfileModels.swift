@@ -78,11 +78,17 @@ struct SchoologyProfileItem: Identifiable, Sendable {
             let fileName = SchoologyValue.string(file["filename"] ?? file["fileName"] ?? item["filename"] ?? item["fileName"], fallback: rawTitle)
             let fileMIME = SchoologyValue.string(file["filemime"] ?? file["fileMIME"] ?? file["mime"] ?? item["filemime"] ?? item["fileMIME"])
             let school = (person["school"] as? [String: Any]) ?? [:]
+            let rawDueDate = SchoologyValue.string(item["due"] ?? item["due_date"] ?? item["dueDate"])
+            let subtitle = !roleText.isEmpty
+                ? roleText
+                : !rawDueDate.isEmpty
+                    ? SchoologyValue.schoologyDateLabel(rawDueDate)
+                    : SchoologyValue.string(item["created"] ?? item["timestamp"] ?? item["photo_count"])
             return Self(
                 id: SchoologyValue.string(rawID, fallback: String(index)),
                 title: rawTitle.isEmpty ? (displayName.isEmpty ? "ClassWire" : displayName) : rawTitle,
                 body: SchoologyValue.plainText(SchoologyValue.string(item["body"] ?? item["description"] ?? item["folder_description"] ?? item["folderDescription"] ?? item["message"] ?? person["bio"] ?? person["about"])),
-                subtitle: SchoologyValue.string(roleText.isEmpty ? (item["due"] ?? item["due_date"] ?? item["dueDate"] ?? item["created"] ?? item["timestamp"] ?? item["photo_count"]) : roleText),
+                subtitle: subtitle,
                 url: SchoologyValue.url(person["profile_url"] ?? person["profileUrl"] ?? item["link"] ?? item["url"] ?? item["web_url"] ?? item["webUrl"] ?? file["file_download_url"] ?? file["fileDownloadURL"] ?? file["download_path"] ?? file["downloadPath"] ?? item["file_download_url"] ?? item["download_path"] ?? item["photo_url"] ?? item["photoUrl"] ?? item["original_url"] ?? item["originalUrl"]),
                 isAdmin: isAdmin,
                 kind: normalizedKind,

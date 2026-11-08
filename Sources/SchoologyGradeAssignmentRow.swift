@@ -22,7 +22,7 @@ struct SchoologyGradeAssignmentRow: View {
                     .fixedSize()
             }
             if !assignment.due.isEmpty {
-                Text("Due " + assignment.due)
+                Text("Due " + SchoologyValue.schoologyDateLabel(assignment.due))
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
