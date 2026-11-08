@@ -1,5 +1,16 @@
 # Release notes
 
+## [2026.10.0-port.86]
+
+### App updates and releases
+- Keep publishing both ClassWire and Schoology named macOS and iOS release assets.
+- Validate that all Schoology-named iOS installer, manifest, and QR aliases are present before publishing.
+- Let in-app updates use the ClassWire asset names first and fall back to the matching Schoology-named macOS installer or iOS manifest.
+
+### Build
+- Increment the iOS and macOS bundle build number to 86.
+
+
 ## [2026.10.0-port.85]
 
 ### Text submissions

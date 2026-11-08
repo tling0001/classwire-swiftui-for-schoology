@@ -964,7 +964,9 @@ jobs:
             test -s "release-assets/Schoology-$VERSION-macOS.dmg" || { echo "Missing the legacy macOS update alias." >&2; exit 1; }
           fi
           if [ "$HAS_IOS" = "true" ]; then
-            test -s "release-assets/Schoology-$VERSION-iOS-AdHoc.plist" || { echo "Missing the legacy iOS update alias." >&2; exit 1; }
+            test -s "release-assets/Schoology-$VERSION-iOS-AdHoc.ipa" || { echo "Missing the legacy iOS installer alias." >&2; exit 1; }
+            test -s "release-assets/Schoology-$VERSION-iOS-AdHoc.plist" || { echo "Missing the legacy iOS update manifest alias." >&2; exit 1; }
+            test -s "release-assets/Schoology-$VERSION-iOS-Install-QR.png" || { echo "Missing the legacy iOS install QR alias." >&2; exit 1; }
           fi
 
           if [ "$HAS_MACOS" != "true" ] && [ "$HAS_IOS" != "true" ]; then

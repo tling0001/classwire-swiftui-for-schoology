@@ -194,9 +194,13 @@ final class AppUpdateService {
             releaseURL = release.htmlURL
             macOSDownloadURL = release.assets.first {
                 $0.name == "ClassWire-\(release.tagName)-macOS.dmg"
+            }?.browserDownloadURL ?? release.assets.first {
+                $0.name == "Schoology-\(release.tagName)-macOS.dmg"
             }?.browserDownloadURL
             iOSManifestURL = release.assets.first {
                 $0.name == "ClassWire-\(release.tagName)-iOS-AdHoc.plist"
+            }?.browserDownloadURL ?? release.assets.first {
+                $0.name == "Schoology-\(release.tagName)-iOS-AdHoc.plist"
             }?.browserDownloadURL
             lastChecked = Date()
 
