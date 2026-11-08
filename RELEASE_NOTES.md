@@ -1,5 +1,15 @@
 # Release notes
 
+## [2026.10.0-port.87]
+
+### App updates and releases
+- Have in-app updates select only the new ClassWire-named macOS installer and iOS manifest.
+- Continue publishing the Schoology-named release aliases for existing users and older install flows.
+
+### Build
+- Increment the iOS and macOS bundle build number to 87.
+
+
 ## [2026.10.0-port.86]
 
 ### App updates and releases
