@@ -253,7 +253,7 @@ private struct SchoologyAttachmentActionRow: View {
         errorMessage = nil
         defer { isLoadingView = false }
         do {
-            let downloadedURL = try await session.downloadAttachment(attachment, forViewing: true)
+            let downloadedURL = try await session.downloadAttachmentForViewing(attachment)
             if attachment.isPlayableMedia {
                 mediaURL = downloadedURL
                 isMediaPresented = true
@@ -290,7 +290,7 @@ private struct SchoologyAttachmentActionRow: View {
         errorMessage = nil
         defer { isLoadingDownload = false }
         do {
-            let downloadedURL = try await session.downloadAttachment(attachment)
+            let downloadedURL = try await session.downloadOriginalAttachment(attachment)
             exportDocument = SchoologyAttachmentDocument(data: try Data(contentsOf: downloadedURL))
             exportFilename = safeFilename
             isExportPresented = true
@@ -312,7 +312,7 @@ private struct SchoologyAttachmentActionRow: View {
             isSavingDownload = false
         }
         do {
-            let downloadedURL = try await session.downloadAttachment(attachment)
+            let downloadedURL = try await session.downloadOriginalAttachment(attachment)
             if FileManager.default.fileExists(atPath: destination.path) {
                 try FileManager.default.removeItem(at: destination)
             }

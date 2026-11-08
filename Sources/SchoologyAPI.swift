@@ -453,7 +453,7 @@ actor SchoologyAPI {
     }
 
 
-    func attachmentData(_ url: URL, auth: SchoologyAuth, cookies: [SchoologyWebCookie]) async throws -> (Data, String) {
+    func attachmentData(_ url: URL, auth: SchoologyAuth, cookies: [SchoologyWebCookie], allowHTMLAttachment: Bool = false) async throws -> (Data, String) {
         guard url.scheme?.lowercased() == "https", url.host != nil else { throw SchoologyAPIError.invalidResponse }
         let session = URLSession(configuration: .ephemeral)
         let redirectDelegate = NoRedirectDelegate()
@@ -504,12 +504,65 @@ actor SchoologyAPI {
                 throw SchoologyAPIError.invalidResponse
             }
             let mimeType = http.value(forHTTPHeaderField: "Content-Type") ?? "application/octet-stream"
-            if mimeType.lowercased().contains("text/html") {
-                throw SchoologyAPIError.attachment("ClassWire received an HTML page instead of the attachment. The file session may have expired. Try signing in again.")
+            if Self.isHTMLResponse(data, mimeType: mimeType) {
+                if Self.isExpiredSchoologySessionPage(data, finalURL: currentURL, requestedURL: url, wasRedirected: redirectCount > 0) {
+                    throw SchoologyAPIError.attachment("The Schoology file session expired. Sign in again and retry the download.")
+                }
+                let disposition = http.value(forHTTPHeaderField: "Content-Disposition") ?? ""
+                guard allowHTMLAttachment || Self.dispositionNamesHTMLFile(disposition) else {
+                    throw SchoologyAPIError.attachment("ClassWire received an HTML page instead of the requested attachment. The file may be unavailable or your session may have expired.")
+                }
             }
             return (data, mimeType)
         }
         throw SchoologyAPIError.invalidResponse
+    }
+
+    private static func isHTMLResponse(_ data: Data, mimeType: String) -> Bool {
+        if mimeType.lowercased().contains("text/html") { return true }
+        let prefix = String(decoding: data.prefix(1_024), as: UTF8.self)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+        return prefix.hasPrefix("<!doctype html") || prefix.hasPrefix("<html") ||
+            prefix.hasPrefix("<head") || prefix.hasPrefix("<form")
+    }
+
+    private static func dispositionNamesHTMLFile(_ value: String) -> Bool {
+        for component in value.split(separator: ";").dropFirst() {
+            let pair = component.split(separator: "=", maxSplits: 1, omittingEmptySubsequences: false)
+            guard pair.count == 2, pair[0].trimmingCharacters(in: .whitespaces).lowercased().hasPrefix("filename") else { continue }
+            let rawName = pair[1].trimmingCharacters(in: CharacterSet(charactersIn: " \"'"))
+            let filename = rawName.removingPercentEncoding ?? rawName
+            if ["html", "htm"].contains(URL(fileURLWithPath: filename).pathExtension.lowercased()) {
+                return true
+            }
+        }
+        return false
+    }
+
+    private static func isExpiredSchoologySessionPage(
+        _ data: Data,
+        finalURL: URL,
+        requestedURL: URL,
+        wasRedirected: Bool
+    ) -> Bool {
+        let html = String(decoding: data.prefix(1_000_000), as: UTF8.self).lowercased()
+        let pathParts = finalURL.path.lowercased().split(separator: "/").map(String.init)
+        let isAuthenticationPath = pathParts.contains { ["login", "log-in", "signin", "sign-in", "authenticate"].contains($0) }
+        let changedDestination = finalURL.host?.caseInsensitiveCompare(requestedURL.host ?? "") != .orderedSame ||
+            finalURL.path != requestedURL.path
+        let hasPasswordField = html.range(
+            of: #"<input\b[^>]*type\s*=\s*["']?password"#,
+            options: .regularExpression
+        ) != nil
+        let hasSchoologySignInCopy = html.contains("schoology") &&
+            (html.contains("sign in") || html.contains("log in") || html.contains("log into"))
+        let expiredCopy = html.contains("your session has expired") ||
+            html.contains("this session has expired") ||
+            html.contains("session expired")
+        if wasRedirected && changedDestination && isAuthenticationPath { return true }
+        if expiredCopy && (hasPasswordField || isAuthenticationPath || wasRedirected) { return true }
+        return wasRedirected && hasPasswordField && hasSchoologySignInCopy
     }
 
     private func requestToken() async throws -> SchoologyAuth {

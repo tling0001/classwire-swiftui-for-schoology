@@ -1,5 +1,15 @@
 # Release notes
 
+## [2026.10.0-port.84]
+
+### Assignment submissions
+- Make the Download action request only the original uploaded attachment; reserve converted files for View.
+- Allow legitimate HTML attachments to download while rejecting sign-in and expired-session pages returned as HTML.
+- Add native bold, italic, underline, and link formatting to the text-submission editor on iOS 26 and macOS 26, with a plain SwiftUI text editor fallback on earlier supported versions.
+
+### Build
+- Increment the iOS and macOS bundle build number to 84.
+
 ## [2026.10.0-port.83]
 
 ### Assignment submission attachments

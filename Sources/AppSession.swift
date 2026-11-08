@@ -768,7 +768,15 @@ final class AppSession {
     }
 
 
-    func downloadAttachment(_ attachment: SchoologyAttachment, forViewing: Bool = false) async throws -> URL {
+    func downloadOriginalAttachment(_ attachment: SchoologyAttachment) async throws -> URL {
+        try await downloadAttachment(attachment, forViewing: false)
+    }
+
+    func downloadAttachmentForViewing(_ attachment: SchoologyAttachment) async throws -> URL {
+        try await downloadAttachment(attachment, forViewing: true)
+    }
+
+    private func downloadAttachment(_ attachment: SchoologyAttachment, forViewing: Bool) async throws -> URL {
         if isDemoMode {
             if attachment.url.isFileURL, FileManager.default.fileExists(atPath: attachment.url.path) {
                 return attachment.url
@@ -788,7 +796,14 @@ final class AppSession {
         let sourceURL = forViewing ? (attachment.viewURL ?? attachment.url) : attachment.url
         // File downloads may require the authenticated web session from /v1/sessionstart.
         let cookies = try await api.webSessionCookies(auth: auth)
-        let (data, mimeType) = try await api.attachmentData(sourceURL, auth: auth, cookies: cookies)
+        let isHTMLAttachment = ["html", "htm"].contains(attachment.fileExtension)
+        let allowHTMLAttachment = isHTMLAttachment && (!forViewing || attachment.viewURL == nil)
+        let (data, mimeType) = try await api.attachmentData(
+            sourceURL,
+            auth: auth,
+            cookies: cookies,
+            allowHTMLAttachment: allowHTMLAttachment
+        )
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("SchoologyAttachments", isDirectory: true)
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
