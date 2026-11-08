@@ -35,8 +35,8 @@ struct ClassWireDemoModeBar: View {
                 .accessibilityHint("Returns to the sign-in screen or your saved account.")
         }
         .padding(.horizontal, 16).padding(.vertical, 5)
-        .background { Rectangle().fill(.bar).ignoresSafeArea(edges: .bottom) }
-        .overlay(alignment: .top) { Rectangle().fill(.quaternary).frame(height: 0.5) }
+        .background { Rectangle().fill(.bar) }
+        .overlay(alignment: .bottom) { Rectangle().fill(.quaternary).frame(height: 0.5) }
     }
 }
 
@@ -50,13 +50,13 @@ struct ClassWireDemoModeBarModifier: ViewModifier {
     func body(content: Content) -> some View {
         #if os(iOS)
         if #available(iOS 26.0, *) {
-            content.safeAreaBar(edge: .bottom, spacing: 0) {
+            content.safeAreaBar(edge: .top, spacing: 0) {
                 if session.isDemoMode {
                     ClassWireDemoModeBar(onExit: session.exitDemoMode)
                 }
             }
         } else {
-            content.safeAreaInset(edge: .bottom, spacing: 0) {
+            content.safeAreaInset(edge: .top, spacing: 0) {
                 if session.isDemoMode {
                     ClassWireDemoModeBar(onExit: session.exitDemoMode)
                 }

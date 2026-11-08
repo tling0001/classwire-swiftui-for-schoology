@@ -1,5 +1,16 @@
 # Release notes
 
+## [2026.10.0-port.98]
+
+### Demo mode layout
+- Move the iOS demo-mode controls from the bottom edge to a top safe-area bar above the navigation and title bar, preserving visibility across destinations while restoring the full bottom scrolling area.
+- Use `safeAreaBar(edge: .top)` on iOS 26 and later and a top `safeAreaInset` fallback on iOS 18–25.
+- Remove the bottom-edge background extension and place the subtle separator at the bottom of the top bar.
+
+### Build
+- Increment the iOS and macOS bundle build number to 98.
+
+
 ## [2026.10.0-port.97]
 
 ### Demo mode navigation
