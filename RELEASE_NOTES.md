@@ -1,5 +1,19 @@
 # Release notes
 
+## [2026.10.0-port.92]
+
+### Comments keyboard behavior
+- Remove the extra keyboard Done/checkmark control from the shared comments composer.
+- Dismiss the software keyboard when tapping outside the comment field in the thread, and allow interactive keyboard dismissal while scrolling.
+- Keep the Post action available beside the comment field.
+
+### Demo mode banner
+- Attach the signed-in demo-mode bar directly to the selected root content rather than the NavigationStack container, so it remains visible in the compact iPhone navigation layout while reserving space for scrollable content.
+- Attach the standalone demo preview banner to its active detail content and keep its label legible at compact widths.
+
+### Build
+- Increment the iOS and macOS bundle build number to 92.
+
 ## [2026.10.0-port.91]
 
 ### Date and time labels

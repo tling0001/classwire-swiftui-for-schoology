@@ -100,6 +100,8 @@ struct SchoologyCommentsView: View {
             .frame(maxWidth: 850)
             .frame(maxWidth: .infinity)
         }
+        .scrollDismissesKeyboard(.interactively)
+        .simultaneousGesture(TapGesture().onEnded { composerFocused = false })
         .safeAreaInset(edge: .bottom) { composer }
     }
 
@@ -121,20 +123,13 @@ struct SchoologyCommentsView: View {
                     .font(.caption)
                 }
             }
-            #if os(iOS)
-            if composerFocused {
-                HStack {
-                    Spacer()
-                    SchoologyKeyboardDoneToolbarButton { composerFocused = false }
-                }
-            }
-            #endif
             HStack(alignment: .bottom, spacing: 10) {
                 TextField("Write a comment…", text: $draft, axis: .vertical)
                     .lineLimit(1...4)
                     .focused($composerFocused)
                     .onSubmit { Task { await submit() } }
                 Button("Post", systemImage: "paperplane.fill") {
+                    composerFocused = false
                     Task { await submit() }
                 }
                 .buttonStyle(.borderedProminent)

@@ -133,6 +133,24 @@ struct ClassWireDemoView: View {
         } detail: {
             NavigationStack {
                 detail
+                    #if os(iOS)
+                    .safeAreaInset(edge: .top, spacing: 0) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "checkmark.seal.fill")
+                            Text("DEMO MODE").font(.caption.bold())
+                            Spacer(minLength: 6)
+                            Text("Sample data · Local interactions")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.85)
+                        }
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(.bar)
+                        .accessibilityElement(children: .combine)
+                    }
+                    #endif
                     .navigationTitle(selection?.rawValue ?? "Home")
                     .toolbar {
                         ToolbarItem(placement: .primaryAction) {
@@ -141,20 +159,6 @@ struct ClassWireDemoView: View {
                             }
                         }
                     }
-            }
-            .safeAreaInset(edge: .top, spacing: 0) {
-                HStack(spacing: 8) {
-                    Image(systemName: "checkmark.seal.fill")
-                    Text("DEMO MODE").font(.caption.bold())
-                    Spacer()
-                    Text("Sample data · Local interactions")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 8)
-                .background(.bar)
-                .accessibilityElement(children: .combine)
             }
         }
         .alert("About this demo", isPresented: $showingDemoInformation) {
