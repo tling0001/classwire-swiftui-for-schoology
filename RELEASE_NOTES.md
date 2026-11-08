@@ -1,5 +1,15 @@
 # Release notes
 
+## [2026.10.0-port.97]
+
+### Demo mode navigation
+- Attach the iOS demo-mode bar to the outer app-content shell instead of the NavigationSplitView detail hierarchy, so it remains visible across compact iPhone sidebar navigation and pushed destinations.
+- Use SwiftUI's safe-area bar API on iOS 26 and later, with the safeAreaInset fallback for iOS 18–25 so the bar reserves space instead of covering page content.
+
+### Build
+- Increment the iOS and macOS bundle build number to 97.
+
+
 ## [2026.10.0-port.96]
 
 ### Build fix

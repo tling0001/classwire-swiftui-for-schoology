@@ -42,11 +42,6 @@ struct RootView: View {
                     }
                 }
                 .navigationSplitViewStyle(.balanced)
-                #if os(iOS)
-                .safeAreaInset(edge: .bottom, spacing: 0) {
-                    if session.isDemoMode { ClassWireDemoModeBar(onExit: session.exitDemoMode) }
-                }
-                #endif
                 .task {
                     selectedRoute = .destination(session.destination)
                     #if os(iOS)
@@ -76,6 +71,9 @@ struct RootView: View {
         }
         .onOpenURL(perform: handleIncomingURL)
         .animation(reduceMotion ? nil : .snappy(duration: 0.24), value: session.isSignedIn)
+        #if os(iOS)
+        .classWireDemoModeBar()
+        #endif
         .safeAreaInset(edge: .top, spacing: 0) {
             if shouldShowUpdateBanner, let version = updates.latestVersion {
                 SchoologyUpdateBanner(

@@ -39,3 +39,37 @@ struct ClassWireDemoModeBar: View {
         .overlay(alignment: .top) { Rectangle().fill(.quaternary).frame(height: 0.5) }
     }
 }
+
+/// Keeps the demo-mode controls attached to the app shell rather than to a
+/// particular NavigationSplitView column. This makes the bar persist while
+/// compact iPhone navigation pushes sidebar destinations.
+struct ClassWireDemoModeBarModifier: ViewModifier {
+    @Environment(AppSession.self) private var session
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        #if os(iOS)
+        if #available(iOS 26.0, *) {
+            content.safeAreaBar(edge: .bottom, spacing: 0) {
+                if session.isDemoMode {
+                    ClassWireDemoModeBar(onExit: session.exitDemoMode)
+                }
+            }
+        } else {
+            content.safeAreaInset(edge: .bottom, spacing: 0) {
+                if session.isDemoMode {
+                    ClassWireDemoModeBar(onExit: session.exitDemoMode)
+                }
+            }
+        }
+        #else
+        content
+        #endif
+    }
+}
+
+extension View {
+    func classWireDemoModeBar() -> some View {
+        modifier(ClassWireDemoModeBarModifier())
+    }
+}
