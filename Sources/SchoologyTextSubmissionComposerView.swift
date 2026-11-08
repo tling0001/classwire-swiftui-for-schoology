@@ -127,8 +127,6 @@ struct SchoologyTextSubmissionComposerView: View {
             text: $formattedText,
             selection: $formattedSelection,
             onInsertLink: {
-                linkText = ""
-                linkAddress = ""
                 isShowingLinkPrompt = true
             }
         )

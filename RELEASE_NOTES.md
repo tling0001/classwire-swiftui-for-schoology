@@ -1,5 +1,15 @@
 # Release notes
 
+## [2026.10.0-port.96]
+
+### Build fix
+- Fix the text-submission formatting bar's Insert Link action by presenting the existing shared link sheet directly.
+- Remove stale references to link-entry state that belongs to the shared sheet, fixing the Swift compile errors that blocked both iOS and macOS archives.
+
+### Build
+- Increment the iOS and macOS bundle build number to 96.
+
+
 ## [2026.10.0-port.95]
 
 ### Assignment and discussion due dates
