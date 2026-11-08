@@ -33,11 +33,6 @@ struct RootView: View {
                     NavigationStack(path: $detailPath) {
                         selectedRoot(for: selectedRoute)
                             .id(selectedRoute)
-                            #if os(iOS)
-                            .safeAreaInset(edge: .bottom, spacing: 0) {
-                                if session.isDemoMode { ClassWireDemoModeBar(onExit: session.exitDemoMode) }
-                            }
-                            #endif
                             .navigationDestination(for: SchoologyNavigationPath.self) { item in
                                 switch item {
                                 case .person(let userID):
@@ -45,6 +40,11 @@ struct RootView: View {
                                 }
                             }
                     }
+                    #if os(iOS)
+                    .safeAreaInset(edge: .bottom, spacing: 0) {
+                        if session.isDemoMode { ClassWireDemoModeBar(onExit: session.exitDemoMode) }
+                    }
+                    #endif
                 }
                 .navigationSplitViewStyle(.balanced)
                 .task {

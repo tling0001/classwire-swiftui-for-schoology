@@ -1,5 +1,15 @@
 # Release notes
 
+## [2026.10.0-port.93]
+
+### Demo banner navigation persistence
+- Attach the iOS demo-mode bar to the NavigationStack container itself, rather than only its root destination.
+- Keep the demo notice, role selector, and Exit Demo action visible while navigating to destinations pushed from the sidebar, including course and group profiles.
+- Reserve the bar's space across the full navigation stack so destination content and scrolling remain unobstructed.
+
+### Build
+- Increment the iOS and macOS bundle build number to 93.
+
 ## [2026.10.0-port.92]
 
 ### Comments keyboard behavior
