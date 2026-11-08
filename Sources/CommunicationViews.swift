@@ -49,7 +49,7 @@ struct MessagesView: View {
             }
         }
         .toolbar {
-            ToolbarItem(placement: .secondaryAction) {
+            ToolbarItem(placement: .primaryAction) {
                 Button {
                     Task { await loadFolder(force: true) }
                 } label: {

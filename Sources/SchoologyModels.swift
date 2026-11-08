@@ -75,7 +75,9 @@ struct SchoologyAttachment: Identifiable, Hashable, Sendable {
             "file_download_url", "fileDownloadURL", "download_path", "downloadPath",
             "download_url", "downloadUrl", "resolveDownloadUrl", "resolve_download_url",
             "file_converted_download_url", "fileConvertedDownloadURL",
-            "converted_download_path", "convertedDownloadPath", "filename", "fileName"
+            "converted_download_path", "convertedDownloadPath",
+            "download_url", "downloadUrl", "resolveDownloadUrl", "resolve_download_url",
+            "filename", "fileName"
         ]
         guard !fileFields.contains(where: { item[$0] != nil }),
               let rawURL = item["url"] as? String,
@@ -505,17 +507,30 @@ struct SchoologyMessage: Identifiable, Hashable, Sendable {
             // across every message in a thread.
             let rawID = item["id"] ?? item["message_id"] ?? item["messageId"] else { return nil }
             let attachmentRoot = item["attachments"] ?? item["attachment"] ?? [:]
-            let attachmentItems = SchoologyValue.list(attachmentRoot, keys: ["files", "file", "links", "link", "embeds", "embed", "items"])
+            let attachmentItems = SchoologyValue.list(
+                attachmentRoot,
+                keys: ["files", "file", "file-attachment", "links", "link", "embeds", "embed",
+                       "attachments", "attachment", "items", "list", "data", "response"]
+            )
             let attachments = attachmentItems.compactMap { attachment -> SchoologyAttachment? in
                 guard let url = SchoologyValue.url(
                     attachment["linkURL"] ?? attachment["linkUrl"] ?? attachment["href"] ??
-                    attachment["url"] ?? attachment["file_download_url"] ?? attachment["download_path"]
+                    attachment["file_download_url"] ?? attachment["fileDownloadURL"] ??
+                    attachment["download_path"] ?? attachment["downloadPath"] ??
+                    attachment["download_url"] ?? attachment["downloadUrl"] ??
+                    attachment["resolveDownloadUrl"] ?? attachment["resolve_download_url"] ??
+                    attachment["url"]
                 ) else { return nil }
                 let conversion = SchoologyValue.string(attachment["converted_status"] ?? attachment["convertedStatus"] ?? attachment["file_converted_status"] ?? attachment["fileConvertedStatus"]).lowercased()
                 let converted = SchoologyValue.url(attachment["file_converted_download_url"] ?? attachment["fileConvertedDownloadURL"] ?? attachment["converted_download_path"] ?? attachment["convertedDownloadPath"])
                 let viewURL = ["success", "converted", "1"].contains(conversion) ? converted : nil
                 return SchoologyAttachment(
-                    title: SchoologyValue.string(attachment["title"] ?? attachment["filename"] ?? attachment["fileName"], fallback: url.lastPathComponent),
+                    title: SchoologyValue.string(
+                        attachment["filename"] ?? attachment["fileName"] ??
+                        attachment["file_title"] ?? attachment["fileTitle"] ??
+                        attachment["title"] ?? attachment["linkTitle"],
+                        fallback: url.lastPathComponent
+                    ),
                     url: url, viewURL: viewURL,
                     isLink: SchoologyAttachment.isLinkRecord(attachment)
                 )

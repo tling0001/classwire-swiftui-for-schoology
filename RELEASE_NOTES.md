@@ -1,5 +1,19 @@
 # Release notes
 
+## [2026.10.0-port.85]
+
+### Text submissions
+- Keep rich-text formatting controls visible below the editor, including when the keyboard is dismissed, and present them with Liquid Glass.
+- Insert hyperlinks using separate text and link fields.
+
+### Messages
+- Put Refresh beside Compose in the Messages app bar.
+- Prefer original message attachment filename metadata so attachment rows, preview actions, and saved files retain their names.
+
+### Build
+- Increment the iOS and macOS bundle build number to 85.
+
+
 ## [2026.10.0-port.84]
 
 ### Assignment submissions

@@ -36,13 +36,13 @@ struct SchoologySubmissionFormattingBar: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Insert Link")
-            .accessibilityHint("Adds a link to selected text or to text you type next.")
+            .accessibilityHint("Adds linked text using the label and link you enter.")
             Spacer(minLength: 0)
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.regularMaterial)
+        .glassEffect(.regular, in: Capsule())
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Text formatting")
     }

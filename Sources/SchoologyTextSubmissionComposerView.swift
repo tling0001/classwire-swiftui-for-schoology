@@ -17,6 +17,7 @@ struct SchoologyTextSubmissionComposerView: View {
     @State private var comment = ""
     @State private var submissionCreated = false
     @State private var isShowingLinkPrompt = false
+    @State private var linkText = ""
     @State private var linkAddress = ""
 
     @State private var formattedText = AttributedString("")
@@ -57,24 +58,8 @@ struct SchoologyTextSubmissionComposerView: View {
                 }
             }
             .navigationTitle("Text Submission")
-            .safeAreaInset(edge: .bottom, spacing: 0) {
-                if #available(iOS 26.0, macOS 26.0, *), isSubmissionFocused {
-                    SchoologySubmissionFormattingBar(
-                        text: $formattedText,
-                        selection: $formattedSelection,
-                        onInsertLink: {
-                            linkAddress = ""
-                            isShowingLinkPrompt = true
-                        }
-                    )
-                }
-            }
-            .alert("Add Link", isPresented: $isShowingLinkPrompt) {
-                TextField("https://example.com", text: $linkAddress)
-                Button("Add Link", action: applyLink)
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text("Adds a link to the selected text or to text you type next.")
+            .sheet(isPresented: $isShowingLinkPrompt) {
+                linkPrompt
             }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -95,7 +80,19 @@ struct SchoologyTextSubmissionComposerView: View {
     @ViewBuilder
     private var submissionEditor: some View {
         if #available(iOS 26.0, macOS 26.0, *) {
-            richTextEditor
+            VStack(alignment: .leading, spacing: 10) {
+                richTextEditor
+                SchoologySubmissionFormattingBar(
+                    text: $formattedText,
+                    selection: $formattedSelection,
+                    onInsertLink: {
+                        linkText = ""
+                        linkAddress = ""
+                        isShowingLinkPrompt = true
+                    }
+                )
+                .frame(maxWidth: .infinity, alignment: .center)
+            }
         } else {
             TextEditor(text: $text)
                 .frame(minHeight: 220)
@@ -119,9 +116,43 @@ struct SchoologyTextSubmissionComposerView: View {
         #endif
     }
 
+    private var linkPrompt: some View {
+        NavigationStack {
+            Form {
+                TextField("Text", text: $linkText)
+                #if os(iOS)
+                    .textInputAutocapitalization(.sentences)
+                #endif
+                TextField("Link", text: $linkAddress)
+                #if os(iOS)
+                    .textContentType(.URL)
+                    .keyboardType(.URL)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                #endif
+            }
+            .navigationTitle("Add Link")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { isShowingLinkPrompt = false }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Insert") { applyLink() }
+                        .disabled(linkText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+                                  linkAddress.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+        }
+        #if os(macOS)
+        .frame(minWidth: 360, idealWidth: 420)
+        .schoologyFittedSheet()
+        #endif
+    }
+
     private func applyLink() {
+        let label = linkText.trimmingCharacters(in: .whitespacesAndNewlines)
         var value = linkAddress.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !value.isEmpty else { return }
+        guard !label.isEmpty, !value.isEmpty else { return }
         if !value.contains("://") && !value.lowercased().hasPrefix("mailto:") {
             value = "https://" + value
         }
@@ -131,11 +162,11 @@ struct SchoologyTextSubmissionComposerView: View {
             error = "Enter a valid web or email link."
             return
         }
-        if #available(iOS 26.0, macOS 26.0, *) {
-            formattedText.transformAttributes(in: &formattedSelection) { attributes in
-                attributes.link = url
-            }
-        }
+        guard #available(iOS 26.0, macOS 26.0, *) else { return }
+        var linkedText = AttributedString(label)
+        linkedText.link = url
+        formattedText.replaceSelection(&formattedSelection, with: linkedText)
+        isShowingLinkPrompt = false
     }
 
     private func submit() {
