@@ -4,12 +4,17 @@ import UniformTypeIdentifiers
 struct SchoologyUpdateComposerView: View {
     @Environment(AppSession.self) private var session
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.fontResolutionContext) private var fontResolutionContext
     @FocusState private var bodyFocused: Bool
     let destinations: [SchoologyUpdateDestination]
     let onPosted: () -> Void
 
     @State private var selectedDestinationID = ""
     @State private var bodyText = ""
+    @State private var formattedBody = AttributedString("")
+    @available(iOS 26.0, macOS 26.0, *)
+    @State private var formattedSelection = AttributedTextSelection()
+    @State private var isShowingLinkPrompt = false
     @State private var fileIDs: [String] = []
     @State private var resourceIDs: [String] = []
     @State private var attachmentNames: [String] = []
@@ -21,6 +26,12 @@ struct SchoologyUpdateComposerView: View {
 
     private var selectedDestination: SchoologyUpdateDestination? {
         destinations.first(where: { $0.id == selectedDestinationID }) ?? destinations.first
+    }
+    private var composedBody: String {
+        if #available(iOS 26.0, macOS 26.0, *) {
+            return session.isDemoMode ? String(formattedBody.characters) : SchoologySubmissionHTML.encode(formattedBody, fontContext: fontResolutionContext)
+        }
+        return bodyText
     }
 
     var body: some View {
@@ -39,9 +50,34 @@ struct SchoologyUpdateComposerView: View {
                 }
 
                 Section("Update") {
-                    TextField("Write an update…", text: $bodyText, axis: .vertical)
-                        .lineLimit(4...12)
-                        .focused($bodyFocused)
+                    VStack(alignment: .leading, spacing: 8) {
+                        if #available(iOS 26.0, macOS 26.0, *) {
+                            ZStack(alignment: .topLeading) {
+                                TextEditor(text: $formattedBody, selection: $formattedSelection)
+                                    .frame(minHeight: 132)
+                                    .textInputFormattingControlVisibility(.hidden, for: .default)
+                                    .scrollContentBackground(.hidden)
+                                    .focused($bodyFocused)
+                                if formattedBody.characters.isEmpty {
+                                    Text("Write an update…")
+                                        .foregroundStyle(.tertiary)
+                                        .padding(.top, 8)
+                                        .padding(.leading, 5)
+                                        .allowsHitTesting(false)
+                                }
+                            }
+                            .accessibilityLabel("Write an update")
+                            #if os(iOS)
+                            if !bodyFocused { formattingBar }
+                            #else
+                            formattingBar
+                            #endif
+                        } else {
+                            TextField("Write an update…", text: $bodyText, axis: .vertical)
+                                .lineLimit(4...12)
+                                .focused($bodyFocused)
+                        }
+                    }
                 }
 
                 Section("Attachments") {
@@ -68,11 +104,11 @@ struct SchoologyUpdateComposerView: View {
                         SchoologyKeyboardDoneToolbarButton { bodyFocused = false }
                     } else {
                         Button("Post", systemImage: "paperplane.fill", action: post)
-                            .disabled(isPosting || isUploading || selectedDestination == nil || bodyText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                            .disabled(isPosting || isUploading || selectedDestination == nil || composedBody.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     }
                     #else
                     Button("Post", systemImage: "paperplane.fill", action: post)
-                        .disabled(isPosting || isUploading || selectedDestination == nil || bodyText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        .disabled(isPosting || isUploading || selectedDestination == nil || composedBody.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     #endif
                 }
             }
@@ -89,6 +125,21 @@ struct SchoologyUpdateComposerView: View {
                 if selectedDestinationID.isEmpty { selectedDestinationID = destinations.first?.id ?? "" }
             }
         }
+        .sheet(isPresented: $isShowingLinkPrompt) {
+            if #available(iOS 26.0, macOS 26.0, *) {
+                SchoologyInsertLinkSheet(text: $formattedBody, selection: $formattedSelection) { message in error = message }
+            }
+        }
+        #if os(iOS)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if #available(iOS 26.0, *), bodyFocused { formattingBar.padding(.horizontal, 12).padding(.vertical, 8) }
+        }
+        #endif
+    }
+
+    @available(iOS 26.0, macOS 26.0, *)
+    private var formattingBar: some View {
+        SchoologySubmissionFormattingBar(text: $formattedBody, selection: $formattedSelection) { isShowingLinkPrompt = true }
     }
 
     private func importFiles(_ result: Result<[URL], Error>) {
@@ -124,7 +175,7 @@ struct SchoologyUpdateComposerView: View {
         error = nil
         Task {
             do {
-                try await session.postUpdate(destination: selectedDestination, body: bodyText, fileIDs: fileIDs, resourceIDs: resourceIDs)
+                try await session.postUpdate(destination: selectedDestination, body: composedBody, fileIDs: fileIDs, resourceIDs: resourceIDs)
                 onPosted()
                 dismiss()
             } catch {

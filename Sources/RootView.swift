@@ -40,13 +40,13 @@ struct RootView: View {
                                 }
                             }
                     }
-                    #if os(iOS)
-                    .safeAreaInset(edge: .bottom, spacing: 0) {
-                        if session.isDemoMode { ClassWireDemoModeBar(onExit: session.exitDemoMode) }
-                    }
-                    #endif
                 }
                 .navigationSplitViewStyle(.balanced)
+                #if os(iOS)
+                .safeAreaInset(edge: .bottom, spacing: 0) {
+                    if session.isDemoMode { ClassWireDemoModeBar(onExit: session.exitDemoMode) }
+                }
+                #endif
                 .task {
                     selectedRoute = .destination(session.destination)
                     #if os(iOS)

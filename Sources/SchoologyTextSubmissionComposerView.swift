@@ -18,8 +18,6 @@ struct SchoologyTextSubmissionComposerView: View {
     @State private var comment = ""
     @State private var submissionCreated = false
     @State private var isShowingLinkPrompt = false
-    @State private var linkText = ""
-    @State private var linkAddress = ""
 
     @State private var formattedText = AttributedString("")
     @available(iOS 26.0, macOS 26.0, *)
@@ -61,7 +59,9 @@ struct SchoologyTextSubmissionComposerView: View {
             }
             .navigationTitle("Text Submission")
             .sheet(isPresented: $isShowingLinkPrompt) {
-                linkPrompt
+                if #available(iOS 26.0, macOS 26.0, *) {
+                    SchoologyInsertLinkSheet(text: $formattedText, selection: $formattedSelection) { message in error = message }
+                }
             }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -148,59 +148,6 @@ struct SchoologyTextSubmissionComposerView: View {
             .focused($focusedField, equals: .submission)
             .accessibilityLabel("Enter your submission")
         #endif
-    }
-
-    private var linkPrompt: some View {
-        NavigationStack {
-            Form {
-                TextField("Text", text: $linkText)
-                #if os(iOS)
-                    .textInputAutocapitalization(.sentences)
-                #endif
-                TextField("Link", text: $linkAddress)
-                #if os(iOS)
-                    .textContentType(.URL)
-                    .keyboardType(.URL)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                #endif
-            }
-            .navigationTitle("Add Link")
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { isShowingLinkPrompt = false }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Insert") { applyLink() }
-                        .disabled(linkText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
-                                  linkAddress.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                }
-            }
-        }
-        #if os(macOS)
-        .frame(minWidth: 360, idealWidth: 420)
-        .schoologyFittedSheet()
-        #endif
-    }
-
-    private func applyLink() {
-        let label = linkText.trimmingCharacters(in: .whitespacesAndNewlines)
-        var value = linkAddress.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !label.isEmpty, !value.isEmpty else { return }
-        if !value.contains("://") && !value.lowercased().hasPrefix("mailto:") {
-            value = "https://" + value
-        }
-        guard let url = URL(string: value),
-              ["https", "http", "mailto"].contains(url.scheme?.lowercased() ?? ""),
-              url.scheme?.lowercased() == "mailto" || url.host != nil else {
-            error = "Enter a valid web or email link."
-            return
-        }
-        guard #available(iOS 26.0, macOS 26.0, *) else { return }
-        var linkedText = AttributedString(label)
-        linkedText.link = url
-        formattedText.replaceSelection(&formattedSelection, with: linkedText)
-        isShowingLinkPrompt = false
     }
 
     private func submit() {

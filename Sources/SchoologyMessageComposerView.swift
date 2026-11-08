@@ -11,6 +11,7 @@ struct SchoologyMessageComposerView: View {
 
     @Environment(AppSession.self) private var session
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.fontResolutionContext) private var fontResolutionContext
     private enum FocusedField: Hashable { case recipientSearch, subject, message }
     @FocusState private var focusedField: FocusedField?
     let onSent: () -> Void
@@ -29,6 +30,10 @@ struct SchoologyMessageComposerView: View {
     @State private var selectedRecipients: [SchoologyMessageRecipient] = []
     @State private var subject = ""
     @State private var message = ""
+    @State private var formattedMessage = AttributedString("")
+    @available(iOS 26.0, macOS 26.0, *)
+    @State private var formattedSelection = AttributedTextSelection()
+    @State private var isShowingLinkPrompt = false
     @State private var isSending = false
     @State private var isUploading = false
     @State private var showingFileImporter = false
@@ -37,6 +42,17 @@ struct SchoologyMessageComposerView: View {
     @State private var resourceIDs: [String] = []
     @State private var attachmentNames: [String] = []
     @State private var error: String?
+    private var messageText: String {
+        if #available(iOS 26.0, macOS 26.0, *) { return String(formattedMessage.characters) }
+        return message
+    }
+    private var messageBody: String {
+        if #available(iOS 26.0, macOS 26.0, *) {
+            return session.isDemoMode ? String(formattedMessage.characters) : SchoologySubmissionHTML.encode(formattedMessage, fontContext: fontResolutionContext)
+        }
+        return message
+    }
+
     var body: some View {
         NavigationStack {
             Form {
@@ -73,20 +89,31 @@ struct SchoologyMessageComposerView: View {
                         TextField("Subject", text: $subject)
                             .focused($focusedField, equals: .subject)
                     }
-                    ZStack(alignment: .topLeading) {
-                        TextEditor(text: $message)
-                            .focused($focusedField, equals: .message)
-                            .scrollContentBackground(.hidden)
-                            .frame(minHeight: 132)
-                        if message.isEmpty {
-                            Text("Write a message…")
-                                .foregroundStyle(.tertiary)
-                                .padding(.top, 8)
-                                .padding(.leading, 5)
-                                .allowsHitTesting(false)
+                    VStack(alignment: .leading, spacing: 8) {
+                        ZStack(alignment: .topLeading) {
+                            if #available(iOS 26.0, macOS 26.0, *) {
+                                TextEditor(text: $formattedMessage, selection: $formattedSelection)
+                                    .textInputFormattingControlVisibility(.hidden, for: .default)
+                                    .focused($focusedField, equals: .message)
+                                    .scrollContentBackground(.hidden)
+                                    .frame(minHeight: 132)
+                            } else {
+                                TextEditor(text: $message)
+                                    .focused($focusedField, equals: .message)
+                                    .scrollContentBackground(.hidden)
+                                    .frame(minHeight: 132)
+                            }
+                            if messageText.isEmpty {
+                                Text("Write a message…")
+                                    .foregroundStyle(.tertiary)
+                                    .padding(.top, 8)
+                                    .padding(.leading, 5)
+                                    .allowsHitTesting(false)
+                            }
                         }
+                        .frame(maxWidth: .infinity, minHeight: 132, alignment: .topLeading)
+                        if #available(iOS 26.0, macOS 26.0, *), focusedField != .message { formattingBar }
                     }
-                    .frame(maxWidth: .infinity, minHeight: 132, alignment: .topLeading)
                 }
                 Section("Attachments") {
                     Button("Attach File", systemImage: "paperclip") { showingFileImporter = true }
@@ -109,11 +136,11 @@ struct SchoologyMessageComposerView: View {
                         SchoologyKeyboardDoneToolbarButton { focusedField = nil }
                     } else {
                         Button("Send", systemImage: "paperplane.fill", action: send)
-                            .disabled(isSending || isUploading || selectedRecipients.isEmpty || (reply == nil && subject.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) || message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                            .disabled(isSending || isUploading || selectedRecipients.isEmpty || (reply == nil && subject.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) || messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     }
                     #else
                     Button("Send", systemImage: "paperplane.fill", action: send)
-                        .disabled(isSending || isUploading || selectedRecipients.isEmpty || (reply == nil && subject.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) || message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        .disabled(isSending || isUploading || selectedRecipients.isEmpty || (reply == nil && subject.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) || messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     #endif
                 }
             }
@@ -142,7 +169,23 @@ struct SchoologyMessageComposerView: View {
                 }
             }
         }
+        .sheet(isPresented: $isShowingLinkPrompt) {
+            if #available(iOS 26.0, macOS 26.0, *) {
+                SchoologyInsertLinkSheet(text: $formattedMessage, selection: $formattedSelection) { message in error = message }
+            }
+        }
+        #if os(iOS)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if #available(iOS 26.0, *), focusedField == .message { formattingBar.padding(.horizontal, 12).padding(.vertical, 8) }
+        }
+        #endif
     }
+
+    @available(iOS 26.0, macOS 26.0, *)
+    private var formattingBar: some View {
+        SchoologySubmissionFormattingBar(text: $formattedMessage, selection: $formattedSelection) { isShowingLinkPrompt = true }
+    }
+
     private func importFiles(_ result: Result<[URL], Error>) {
         switch result {
         case .failure(let failure):
@@ -177,9 +220,9 @@ struct SchoologyMessageComposerView: View {
         Task {
             do {
                 if let reply {
-                    try await session.replyToMessage(messageID: reply.messageID, recipientID: reply.recipientID, subject: reply.subject, message: message, fileIDs: fileIDs, resourceIDs: resourceIDs)
+                    try await session.replyToMessage(messageID: reply.messageID, recipientID: reply.recipientID, subject: reply.subject, message: messageBody, fileIDs: fileIDs, resourceIDs: resourceIDs)
                 } else {
-                    try await session.sendMessage(recipientIDs: selectedRecipients.map(\.id), subject: subject, message: message, fileIDs: fileIDs, resourceIDs: resourceIDs)
+                    try await session.sendMessage(recipientIDs: selectedRecipients.map(\.id), subject: subject, message: messageBody, fileIDs: fileIDs, resourceIDs: resourceIDs)
                 }
                 onSent()
                 dismiss()

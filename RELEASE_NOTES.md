@@ -1,5 +1,21 @@
 # Release notes
 
+## [2026.10.0-port.94]
+
+### Demo navigation and Settings
+- Move the iOS demo-mode banner to the outer NavigationSplitView so it remains attached when compact iPhone navigation collapses and pushes sidebar destinations.
+- Remove the extra outer padding and desktop-width constraint from the iPhone Settings Form while preserving the macOS window layout.
+
+### Rich-text composers
+- Add the shared bold, italic, underline, and link toolbar to discussion, event, update, and new/reply message composers on iOS 26 and macOS 26.
+- Serialize formatted content as HTML for Schoology discussion bodies, event descriptions, updates, and messages; retain plain text in demo mode.
+- Reuse the validated link insertion sheet across text submissions and the additional composers.
+- Keep the existing iOS 18 and macOS 14 deployment targets; older systems retain their existing plain-text editor fallback.
+
+### Build
+- Increment the iOS and macOS bundle build number to 94.
+
+
 ## [2026.10.0-port.93]
 
 ### Demo banner navigation persistence

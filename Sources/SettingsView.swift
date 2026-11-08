@@ -149,8 +149,12 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
+        #if os(macOS)
         .padding()
         .frame(maxWidth: 720)
+        #else
+        .frame(maxWidth: .infinity)
+        #endif
         .confirmationDialog("Switch to ClassWire Classic?", isPresented: $showingClassicConfirmation, titleVisibility: .visible) {
             Button("Replace with ClassWire Classic", role: .destructive) {
                 #if os(macOS)
