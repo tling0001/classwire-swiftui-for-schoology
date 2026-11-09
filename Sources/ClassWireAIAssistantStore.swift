@@ -23,6 +23,12 @@ final class ClassWireAIAssistantStore {
     var errorMessage: String?
     var pendingAction: ClassWireAIPendingAction?
     var hasSavedProviderKey = false
+    var googleAccountEmail = UserDefaults.standard.string(forKey: "classwire.ai.google.email") ?? ""
+    var googleProjects: [GoogleCloudProject] = []
+    var selectedGoogleProjectID = ""
+    var googleStatus = ""
+    var isConnectingGoogle = false
+    var isCreatingGeminiKey = false
 
     var activeConversation: ClassWireAIConversation? {
         conversations.first { $0.id == activeConversationID }
@@ -62,6 +68,73 @@ final class ClassWireAIAssistantStore {
     func removeProviderKey() {
         ClassWireAIKeychainStore.delete(provider: provider)
         hasSavedProviderKey = false
+    }
+
+    func connectGoogle() async {
+        guard !isConnectingGoogle else { return }
+        isConnectingGoogle = true
+        googleStatus = "Opening Google's secure sign-in…"
+        defer { isConnectingGoogle = false }
+        do {
+            let account = try await ClassWireGoogleCloudService.shared.connect()
+            googleAccountEmail = account.email
+            googleProjects = account.projects
+            selectedGoogleProjectID = account.projects.first?.projectID ?? ""
+            UserDefaults.standard.set(account.email, forKey: "classwire.ai.google.email")
+            if let projectError = account.projectError {
+                googleStatus = "Google connected, but project discovery failed: \\(projectError)"
+            } else {
+                googleStatus = account.projects.isEmpty
+                    ? "Google connected. No active projects were found for this account."
+                    : "Connected. Choose a project to create or reuse your Gemini key."
+            }
+        } catch {
+            googleStatus = error.localizedDescription
+        }
+    }
+
+    func refreshGoogleProjects() async {
+        guard ClassWireAIKeychainStore.loadGoogleRefreshToken() != nil else {
+            googleStatus = "Connect your Google account to load projects."
+            return
+        }
+        isConnectingGoogle = true
+        defer { isConnectingGoogle = false }
+        do {
+            googleProjects = try await ClassWireGoogleCloudService.shared.listProjects()
+            if !googleProjects.contains(where: { $0.projectID == selectedGoogleProjectID }) {
+                selectedGoogleProjectID = googleProjects.first?.projectID ?? ""
+            }
+            googleStatus = googleProjects.isEmpty
+                ? "No active projects were found for this Google account."
+                : "Loaded \\(googleProjects.count) active Google Cloud project(s)."
+        } catch {
+            googleStatus = error.localizedDescription
+        }
+    }
+
+    func createGeminiKey(projectID: String) async {
+        guard !isCreatingGeminiKey else { return }
+        isCreatingGeminiKey = true
+        defer { isCreatingGeminiKey = false }
+        googleStatus = "Enabling APIs and preparing the Gemini-only key…"
+        do {
+            let key = try await ClassWireGoogleCloudService.shared.createOrReuseGeminiKey(projectID: projectID)
+            try ClassWireAIKeychainStore.save(key, provider: .gemini)
+            hasSavedProviderKey = true
+            googleStatus = "Gemini API key created or reused and saved securely in Keychain."
+        } catch {
+            googleStatus = error.localizedDescription
+        }
+    }
+
+    func disconnectGoogle() {
+        ClassWireAIKeychainStore.deleteGoogleRefreshToken()
+        UserDefaults.standard.removeObject(forKey: "classwire.ai.google.email")
+        googleAccountEmail = ""
+        googleProjects = []
+        selectedGoogleProjectID = ""
+        googleStatus = "Google account disconnected. Your saved Gemini API key remains in Keychain until you remove it."
     }
 
     func createConversation() {

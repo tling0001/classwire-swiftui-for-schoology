@@ -1,5 +1,20 @@
 # Release notes
 
+## [2026.10.0-port.102]
+
+### Native Google Cloud and Gemini setup
+- Add Google OAuth authorization for iOS, iPadOS, and macOS using the registered iOS OAuth client, PKCE, and Apple's system authentication session.
+- Store Google refresh tokens in Keychain; no OAuth client secret is embedded.
+- Search active Google Cloud projects, enable the required services, create or reuse the dedicated ClassWire Gemini service account, and create or reuse a Gemini-only authorization key. Project discovery errors remain visible without losing the Google sign-in.
+- Store the generated Gemini API key in Keychain and retain manual key entry as a fallback.
+
+### SwiftUI build fixes
+- Replace the unsupported accessibility live-region modifier with a supported accessible status label.
+- Split the AI settings form into smaller computed views to avoid Swift compiler type-check timeouts.
+
+### Build
+- Increment the iOS and macOS bundle build number to 102.
+
 ## [2026.10.0-port.101]
 
 ### iPad course, group, and school profiles
