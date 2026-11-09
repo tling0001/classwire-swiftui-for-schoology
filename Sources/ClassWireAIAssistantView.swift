@@ -326,7 +326,7 @@ struct ClassWireAIAssistantView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .accessibilityLiveRegion(.polite)
+                .accessibilityLabel("Status: \(store.status)")
         }
     }
 

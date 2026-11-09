@@ -1,5 +1,20 @@
 # Release notes
 
+## [2026.10.0-port.103]
+
+### Google OAuth and SwiftUI archive fixes
+- Add the missing Google refresh-token Keychain read, write, and delete operations used by the native Cloud setup.
+- Use the modern authentication-session callback API where supported and retain the compatible macOS 14.0 initializer fallback.
+- Register Google's reversed-client-ID callback URL scheme for the iOS, Catalyst, and native macOS targets.
+- Replace the unsupported accessibility live-region modifier with a supported status label and correct the Google project status string interpolation.
+
+### Apple-silicon Mac iPad-app testing
+- Keep the native macOS target and its signing/build configuration unchanged.
+- Preserve the dedicated Ad Hoc workflow that exports the iPad app for a registered Apple-silicon Mac; no iOS-to-Mac opt-out flag was present in the iOS target's build settings or generated Info.plist configuration.
+
+### Build
+- Increment the iOS and macOS bundle build number to 103.
+
 ## [2026.10.0-port.102]
 
 ### Native Google Cloud and Gemini setup

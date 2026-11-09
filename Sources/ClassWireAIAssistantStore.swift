@@ -82,7 +82,7 @@ final class ClassWireAIAssistantStore {
             selectedGoogleProjectID = account.projects.first?.projectID ?? ""
             UserDefaults.standard.set(account.email, forKey: "classwire.ai.google.email")
             if let projectError = account.projectError {
-                googleStatus = "Google connected, but project discovery failed: \\(projectError)"
+                googleStatus = "Google connected, but project discovery failed: \(projectError)"
             } else {
                 googleStatus = account.projects.isEmpty
                     ? "Google connected. No active projects were found for this account."
@@ -107,7 +107,7 @@ final class ClassWireAIAssistantStore {
             }
             googleStatus = googleProjects.isEmpty
                 ? "No active projects were found for this Google account."
-                : "Loaded \\(googleProjects.count) active Google Cloud project(s)."
+                : "Loaded \(googleProjects.count) active Google Cloud project(s)."
         } catch {
             googleStatus = error.localizedDescription
         }

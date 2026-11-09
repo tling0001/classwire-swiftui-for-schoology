@@ -231,7 +231,7 @@ final class ClassWireGoogleCloudService: NSObject, ASWebAuthenticationPresentati
 
     private func authenticate(_ url: URL) async throws -> URL {
         try await withCheckedThrowingContinuation { continuation in
-            let session = ASWebAuthenticationSession(url: url, callback: .customScheme(callbackScheme)) { callbackURL, error in
+            let completionHandler: (URL?, Error?) -> Void = { callbackURL, error in
                 Task { @MainActor in
                     self.activeSession = nil
                     if let error {
@@ -243,6 +243,28 @@ final class ClassWireGoogleCloudService: NSObject, ASWebAuthenticationPresentati
                     }
                 }
             }
+            let session: ASWebAuthenticationSession
+            #if os(macOS)
+            if #available(macOS 14.4, *) {
+                session = ASWebAuthenticationSession(
+                    url: url,
+                    callback: .customScheme(callbackScheme),
+                    completionHandler: completionHandler
+                )
+            } else {
+                session = ASWebAuthenticationSession(
+                    url: url,
+                    callbackURLScheme: callbackScheme,
+                    completionHandler: completionHandler
+                )
+            }
+            #else
+            session = ASWebAuthenticationSession(
+                url: url,
+                callback: .customScheme(callbackScheme),
+                completionHandler: completionHandler
+            )
+            #endif
             session.presentationContextProvider = self
             session.prefersEphemeralWebBrowserSession = false
             activeSession = session
