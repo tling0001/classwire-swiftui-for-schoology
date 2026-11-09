@@ -174,40 +174,7 @@ struct ClassWireAIAssistantView: View {
 
             ScrollViewReader { proxy in
                 ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 16) {
-                        if let conversation = store.activeConversation, conversation.messages.isEmpty {
-                            welcomeContent
-                        } else {
-                            ForEach(store.activeConversation?.messages ?? []) { message in
-                                messageBubble(message)
-                                    .id(message.id)
-                            }
-                        }
-
-                        if let action = store.pendingAction {
-                            actionProposal(action)
-                        }
-
-                        if let error = store.errorMessage {
-                            Label(error, systemImage: "exclamationmark.triangle.fill")
-                                .font(.callout)
-                                .foregroundStyle(.red)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(12)
-                                .background(.red.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
-                        }
-
-                        if !store.status.isEmpty {
-                            Text(store.status)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .accessibilityLiveRegion(.polite)
-                        }
-                    }
-                    .padding(16)
-                    .frame(maxWidth: 900, alignment: .leading)
-                    .frame(maxWidth: .infinity, alignment: .top)
+                    messageTimelineContent
                 }
                 .defaultScrollAnchor(.bottom)
                 .onChange(of: store.activeConversation?.messages.count ?? 0) { _, _ in
@@ -319,6 +286,60 @@ struct ClassWireAIAssistantView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: message.role == "user" ? .trailing : .leading)
+    }
+
+    @ViewBuilder
+    private var conversationMessages: some View {
+        if let conversation = store.activeConversation, conversation.messages.isEmpty {
+            welcomeContent
+        } else {
+            ForEach(store.activeConversation?.messages ?? []) { message in
+                messageBubble(message)
+                    .id(message.id)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var pendingActionContent: some View {
+        if let action = store.pendingAction {
+            actionProposal(action)
+        }
+    }
+
+    @ViewBuilder
+    private var errorContent: some View {
+        if let error = store.errorMessage {
+            Label(error, systemImage: "exclamationmark.triangle.fill")
+                .font(.callout)
+                .foregroundStyle(.red)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(12)
+                .background(.red.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
+        }
+    }
+
+    @ViewBuilder
+    private var statusContent: some View {
+        if !store.status.isEmpty {
+            Text(store.status)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityLiveRegion(.polite)
+        }
+    }
+
+    private var messageTimelineContent: some View {
+        LazyVStack(alignment: .leading, spacing: 16) {
+            conversationMessages
+            pendingActionContent
+            errorContent
+            statusContent
+        }
+        .padding(16)
+        .frame(maxWidth: 900, alignment: .leading)
+        .frame(maxWidth: .infinity, alignment: .top)
     }
 
     private var composer: some View {

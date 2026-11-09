@@ -1,5 +1,18 @@
 # Release notes
 
+## [2026.10.0-port.101]
+
+### iPad course, group, and school profiles
+- Remove the redundant large navigation-bar title for course, group, and school profiles when the iPad has a regular-width layout; keep the full title in the profile infobox.
+- Preserve the existing navigation title on iPhone and macOS, and allow it to return when an iPad window becomes compact.
+
+### ClassWire AI build fixes
+- Break the AI conversation timeline into smaller SwiftUI view expressions so Xcode can type-check the iOS and macOS targets reliably.
+- Apply the iOS keyboard capitalization modifier only on iOS; keep shared AI settings compatible with macOS.
+
+### Build
+- Increment the iOS and macOS bundle build number to 101.
+
 ## [2026.10.0-port.100]
 
 ### ClassWire AI for SwiftUI

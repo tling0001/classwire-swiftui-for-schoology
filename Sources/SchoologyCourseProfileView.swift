@@ -12,6 +12,7 @@ private enum SchoologyCourseTab: String, CaseIterable, Identifiable {
 
 struct SchoologyCourseProfileView: View {
     @Environment(AppSession.self) private var session
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     let course: SchoologyCourse
     @State private var tab: SchoologyCourseTab = .materials
     @State private var materials: [SchoologyProfileItem] = []
@@ -29,6 +30,14 @@ struct SchoologyCourseProfileView: View {
     @State private var showingUpdateComposer = false
     @State private var showingResourceCreator = false
 
+    private var profileNavigationTitle: String {
+        #if os(iOS)
+        horizontalSizeClass == .regular ? "" : course.title
+        #else
+        course.title
+        #endif
+    }
+
     private var resourceCreatorURL: URL? {
         let host = session.canadianServer ? "app.schoologyca.com" : "app.schoology.com"
         return URL(string: "https://\(host)/course/\(course.id)/materials")
@@ -42,7 +51,7 @@ struct SchoologyCourseProfileView: View {
                 compactLayout
             }
         }
-        .navigationTitle(course.title)
+        .navigationTitle(profileNavigationTitle)
         .onAppear { session.setAICourseContext(courseID: course.id, title: course.title) }
         .toolbar {
             if permissions?.canPostUpdates == true || permissions?.canAddResources == true {

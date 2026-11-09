@@ -17,12 +17,16 @@ struct ClassWireAISettingsView: View {
                     }
 
                     TextField("Model", text: $store.model)
+#if os(iOS)
                         .textInputAutocapitalization(.never)
+#endif
                         .autocorrectionDisabled()
 
                     if store.provider.requiresAPIKey {
                         SecureField("API key", text: $keyInput)
+#if os(iOS)
                             .textInputAutocapitalization(.never)
+#endif
                             .autocorrectionDisabled()
                         HStack {
                             Label(
@@ -44,7 +48,9 @@ struct ClassWireAISettingsView: View {
                             .disabled(keyInput.trimmingCharacters(in: .whitespacesAndNewlines).count < 8)
                     } else {
                         TextField("Ollama server URL", text: $store.ollamaEndpoint)
+#if os(iOS)
                             .textInputAutocapitalization(.never)
+#endif
                             .autocorrectionDisabled()
                         Text("On iPhone and iPad, use the Mac or computer's LAN address (for example, http://192.168.1.20:11434). 127.0.0.1 refers to the device itself.")
                             .font(.footnote)

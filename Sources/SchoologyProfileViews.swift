@@ -19,6 +19,7 @@ private enum ProfileTab: String, CaseIterable, Identifiable {
 
 struct GroupProfileView: View {
     @Environment(AppSession.self) private var session
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let group: SchoologyGroup
     @State private var profile: SchoologyGroupProfile?
@@ -38,7 +39,7 @@ struct GroupProfileView: View {
             else if let error { ContentUnavailableView("Unable to load group", systemImage: "exclamationmark.triangle", description: Text(error)) }
             else if let profile { groupLayout(profile) }
         }
-        .navigationTitle(profile?.group.title ?? group.title)
+        .navigationTitle(groupNavigationTitle)
         .toolbar {
             if let permissions = profile?.permissions, hasGroupActions(permissions) {
                 ToolbarItem(placement: .primaryAction) { groupActionsMenu(permissions) }
@@ -67,6 +68,14 @@ struct GroupProfileView: View {
         .sheet(item: $selectedDetail) { item in
             SchoologyProfileItemDetailSheet(item: item)
         }
+    }
+
+    private var groupNavigationTitle: String {
+        #if os(iOS)
+        horizontalSizeClass == .regular ? "" : (profile?.group.title ?? group.title)
+        #else
+        profile?.group.title ?? group.title
+        #endif
     }
 
     private func groupLayout(_ profile: SchoologyGroupProfile) -> some View {
@@ -288,6 +297,7 @@ struct GroupProfileView: View {
 
 struct SchoolProfileView: View {
     @Environment(AppSession.self) private var session
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     let schoolID: String
 
     @State private var profile: SchoologySchoolProfile?
@@ -315,7 +325,7 @@ struct SchoolProfileView: View {
                 schoolLayout(profile)
             }
         }
-        .navigationTitle(profile?.school.title ?? "School")
+        .navigationTitle(schoolNavigationTitle)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button {
@@ -339,6 +349,14 @@ struct SchoolProfileView: View {
         .sheet(item: $selectedDetail) { item in
             SchoologyProfileItemDetailSheet(item: item)
         }
+    }
+
+    private var schoolNavigationTitle: String {
+        #if os(iOS)
+        horizontalSizeClass == .regular ? "" : (profile?.school.title ?? "School")
+        #else
+        profile?.school.title ?? "School"
+        #endif
     }
 
     private func schoolLayout(_ profile: SchoologySchoolProfile) -> some View {
