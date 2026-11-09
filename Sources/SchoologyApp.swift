@@ -63,6 +63,7 @@ enum AppDestination: String, CaseIterable, Identifiable {
     case home = "Home"
     case courses = "Courses"
     case groups = "Groups"
+    case aiAssistant = "ClassWire AI"
     case messages = "Messages"
     case notifications = "Notifications"
     case requests = "Requests"
@@ -80,6 +81,7 @@ enum AppDestination: String, CaseIterable, Identifiable {
         case .home: "house.fill"
         case .courses: "book.closed.fill"
         case .groups: "person.3.fill"
+        case .aiAssistant: "sparkles"
         case .messages: "envelope.fill"
         case .notifications: "bell.fill"
         case .requests: "person.crop.circle.badge.plus"
@@ -187,6 +189,8 @@ struct SchoologyCommands: Commands {
                 .keyboardShortcut("2", modifiers: .command)
             Button("Messages") { session.destination = .messages }
                 .keyboardShortcut("3", modifiers: .command)
+            Button("ClassWire AI") { session.destination = .aiAssistant }
+                .keyboardShortcut("4", modifiers: .command)
             Divider()
             Button("Sign Out") { session.signOut() }
         }

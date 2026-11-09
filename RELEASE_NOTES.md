@@ -1,5 +1,20 @@
 # Release notes
 
+## [2026.10.0-port.100]
+
+### ClassWire AI for SwiftUI
+- Add a native ClassWire AI assistant for iPhone, iPad, and Mac with provider selection for Gemini, OpenAI, Anthropic, and Ollama.
+- Store provider API keys in Apple Keychain and keep conversation history locally on the device.
+- Port tool-assisted Schoology lookups for courses, groups, upcoming events, assignments, grades, materials, updates, messages, and assignment submissions, with contextual navigation.
+- Require explicit in-app confirmation before proposed assignment submissions, messages, course updates, or teacher grade changes are executed.
+- Add adaptive conversation history, a native chat composer, provider settings, and Markdown responses.
+- Preserve platform-native navigation and support Dynamic Type, VoiceOver, dark mode, and Reduce Motion.
+- Native Google Cloud OAuth project/key provisioning is not included in this first SwiftUI port; Gemini API keys can be entered and stored securely in Keychain.
+
+### Build
+- Increment the iOS and macOS bundle build number to 100.
+
+
 ## [2026.10.0-port.99]
 
 ### Demo mode layout

@@ -46,6 +46,7 @@ struct SchoologyAssignmentDetailView: View {
             }
         }
         .navigationTitle(context?.assignment.title ?? title)
+        .onAppear { session.setAIAssignmentContext(sectionID: sectionID, assignmentID: assignmentID, title: title) }
         .toolbar {
             if let context, context.canSubmit, !context.isTeacher, context.ltiURL == nil {
                 ToolbarItem(placement: .primaryAction) {

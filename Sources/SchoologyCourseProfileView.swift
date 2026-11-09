@@ -43,6 +43,7 @@ struct SchoologyCourseProfileView: View {
             }
         }
         .navigationTitle(course.title)
+        .onAppear { session.setAICourseContext(courseID: course.id, title: course.title) }
         .toolbar {
             if permissions?.canPostUpdates == true || permissions?.canAddResources == true {
                 ToolbarItem(placement: .primaryAction) {

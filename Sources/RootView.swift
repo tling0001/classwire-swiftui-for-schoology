@@ -8,6 +8,7 @@ private enum SchoologySidebarSelection: Hashable {
 
 private enum SchoologyNavigationPath: Hashable {
     case person(String)
+    case assignment(sectionID: String, assignmentID: String, title: String)
 }
 
 struct RootView: View {
@@ -97,6 +98,8 @@ struct RootView: View {
                             switch item {
                             case .person(let userID):
                                 SchoologyPersonProfileView(userID: userID)
+                            case .assignment(let sectionID, let assignmentID, let title):
+                                SchoologyAssignmentDetailView(sectionID: sectionID, assignmentID: assignmentID, title: title)
                             }
                         }
                 }
@@ -124,6 +127,30 @@ struct RootView: View {
                 guard let userID else { return }
                 detailPath.append(.person(userID))
                 session.pendingPersonProfileID = nil
+            }
+            .onChange(of: session.pendingAINavigation) { _, request in
+                guard let request else { return }
+                switch request.kind {
+                case "course":
+                    selectedRoute = .course(request.id)
+                    detailPath.removeAll()
+                    preferredCompactColumn = .detail
+                case "group":
+                    selectedRoute = .group(request.id)
+                    detailPath.removeAll()
+                    preferredCompactColumn = .detail
+                case "assignment":
+                    guard let sectionID = request.sectionID else { break }
+                    selectedRoute = .course(sectionID)
+                    detailPath = [.assignment(sectionID: sectionID, assignmentID: request.id, title: request.title)]
+                    preferredCompactColumn = .detail
+                case "messages":
+                    selectedRoute = .destination(.messages)
+                    detailPath.removeAll()
+                    preferredCompactColumn = .detail
+                default: break
+                }
+                session.pendingAINavigation = nil
             }
         } else {
             SignInView()
@@ -233,6 +260,7 @@ private struct SchoologySidebar: View {
         }
 
         Section("Communication") {
+            destinationRow(.aiAssistant)
             ForEach([AppDestination.messages, .notifications, .requests]) { item in
                 destinationRow(item)
             }

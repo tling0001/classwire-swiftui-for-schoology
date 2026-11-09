@@ -10,6 +10,11 @@ final class AppSession {
     var peopleDirectoryEnabled = false
     var destination: AppDestination = .home
     var pendingPersonProfileID: String?
+    var pendingAINavigation: ClassWireAINavigationRequest?
+    var aiCurrentCourseID: String?
+    var aiCurrentCourseTitle: String?
+    var aiCurrentAssignmentID: String?
+    var aiCurrentAssignmentTitle: String?
     var homeSection: HomeSection = .recent
     var isLoading = false
     var isRefreshing = false
@@ -233,6 +238,19 @@ final class AppSession {
             upcomingEvents = SchoologyUpcomingEvent.decodeList(Self.object(upcomingData))
                 .sorted { ($0.date ?? .distantFuture) < ($1.date ?? .distantFuture) }
         }
+    }
+
+    func setAICourseContext(courseID: String, title: String) {
+        aiCurrentCourseID = courseID
+        aiCurrentCourseTitle = title
+        aiCurrentAssignmentID = nil
+        aiCurrentAssignmentTitle = nil
+    }
+
+    func setAIAssignmentContext(sectionID: String, assignmentID: String, title: String) {
+        aiCurrentCourseID = sectionID
+        aiCurrentAssignmentID = assignmentID
+        aiCurrentAssignmentTitle = title
     }
 
     func loadCoursePage(courseID: String, pageID: String) async throws -> SchoologyPage {
