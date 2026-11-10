@@ -12,6 +12,8 @@ final class ClassWirePuterService: NSObject, WKUIDelegate, WKNavigationDelegate 
     static let shared = ClassWirePuterService()
     private(set) var isSignedIn = false
     private(set) var accountLabel = ""
+    private(set) var isSigningIn = false
+    private(set) var signInError: String?
     var isPopupPresented = false
 
     @ObservationIgnored private(set) var webView: WKWebView!
@@ -156,6 +158,18 @@ final class ClassWirePuterService: NSObject, WKUIDelegate, WKNavigationDelegate 
         return ChatResult(text: result["text"] as? String ?? "", toolCalls: calls)
     }
 
+    func signIn() async {
+        isSigningIn = true
+        signInError = nil
+        defer { isSigningIn = false }
+
+        do {
+            _ = try await request("signIn")
+        } catch {
+            signInError = error.localizedDescription
+        }
+    }
+
     func signOut() async {
         do { _ = try await request("signOut") }
         catch { isSignedIn = false; accountLabel = "" }
@@ -217,6 +231,7 @@ final class ClassWirePuterService: NSObject, WKUIDelegate, WKNavigationDelegate 
     window.classWirePuterRequest=async(id,operation,payload)=>{try{await window.classWirePuterReady;
       if(operation==='status'){const signedIn=!!puter.auth.isSignedIn(),user=signedIn?await puter.auth.getUser():null;
         send({type:'auth',signedIn,user:user?userLabel(user):''});send({id,result:{signedIn,user:user?userLabel(user):''}});return;}
+      if(operation==='signIn'){await puter.auth.signIn({request_auth:true});await report();send({id,result:true});return;}
       if(operation==='signOut'){await puter.auth.signOut();await report();send({id,result:true});return;}
       if(!puter.auth.isSignedIn())throw new Error('Connect your Puter account first.');
       let result;
@@ -269,23 +284,38 @@ struct ClassWirePuterWebView: NSViewRepresentable {
 struct ClassWirePuterConnectSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Bindable var service: ClassWirePuterService
+
     var body: some View {
         NavigationStack {
             Group {
                 if service.isPopupPresented, let popup = service.popupWebView {
                     ClassWirePuterWebView(webView: popup)
+                } else if let error = service.signInError {
+                    ContentUnavailableView {
+                        Label("Couldn’t open Puter sign-in", systemImage: "exclamationmark.triangle")
+                    } description: {
+                        Text(error)
+                    } actions: {
+                        Button("Try Again") {
+                            Task { await service.signIn() }
+                        }
+                    }
                 } else {
-                    ClassWirePuterWebView(webView: service.webView)
+                    VStack(spacing: 12) {
+                        ProgressView()
+                        Text("Opening Puter sign-in…")
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .accessibilityElement(children: .combine)
                 }
             }
-            .navigationTitle(service.isPopupPresented ? "Sign in to Puter" : "Puter account")
+            .navigationTitle("Sign in to Puter")
             .toolbar {
-                ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
-                if service.isPopupPresented {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("Close sign-in") {
-                            service.closePopup()
-                        }
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        service.closePopup()
+                        dismiss()
                     }
                 }
             }

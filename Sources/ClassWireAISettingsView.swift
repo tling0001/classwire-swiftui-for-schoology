@@ -83,11 +83,20 @@ struct ClassWireAISettingsView: View {
                     .font(.footnote).foregroundStyle(.secondary)
                 Button("Connect Puter account", systemImage: "person.crop.circle.badge.checkmark") {
                     showingPuterConnect = true
-                }.buttonStyle(.borderedProminent)
+                    Task { await puterService.signIn() }
+                }
+                .buttonStyle(.borderedProminent)
             }
         }
         .sheet(isPresented: $showingPuterConnect) { ClassWirePuterConnectSheet(service: puterService) }
-        .onChange(of: puterService.isSignedIn) { _, _ in Task { await store.refreshKeyStatus() } }
+        .onChange(of: puterService.isSignedIn) { _, isSignedIn in
+            Task {
+                await store.refreshKeyStatus()
+                if isSignedIn {
+                    showingPuterConnect = false
+                }
+            }
+        }
     }
 
     private var modelField: some View {

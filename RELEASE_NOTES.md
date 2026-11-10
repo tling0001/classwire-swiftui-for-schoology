@@ -1,5 +1,15 @@
 # Release notes
 
+## [2026.10.0-port.114]
+
+### Puter sign-in
+- Start Puter authentication directly from the Connect Puter account action in AI Settings; remove the extra in-app Connect with Puter step.
+- Present the actual Puter authentication popup immediately, with a native progress state while it opens and a clear Cancel action.
+- Automatically return to AI Settings after Puter confirms sign-in, while keeping authentication in the existing WebKit website session.
+
+### Build
+- Increment the Apple bundle marketing version to `2026.10.114` and build number to `114`.
+
 ## [2026.10.0-port.113]
 
 ### Fixed
