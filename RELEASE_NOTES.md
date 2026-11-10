@@ -1,5 +1,15 @@
 # Release notes
 
+## [2026.10.0-port.107]
+
+### Fixed
+- Add bounded retry handling when Google IAM has created the ClassWire Gemini service account but the API Keys service has not yet propagated it for service-account binding.
+- Retry only the transient service-account-not-found binding response, with 5-second and 10-second backoffs, while rechecking the service account before retrying.
+
+### Build
+- Increment the iOS and macOS bundle build number to 107.
+
+
 ## [2026.10.0-port.106]
 
 ### Fixed

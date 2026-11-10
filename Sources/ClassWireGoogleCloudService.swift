@@ -200,17 +200,40 @@ final class ClassWireGoogleCloudService: NSObject, ASWebAuthenticationPresentati
         if let name = existingKeyName {
             keyResourceName = name
         } else {
-            let operation = try await googleRequest(
-                URL(string: "https://apikeys.googleapis.com/v2/projects/\(projectID)/locations/global/keys")!,
-                method: "POST",
-                accessToken: accessToken,
-                body: [
-                    "displayName": "ClassWire Gemini authorization key",
-                    "serviceAccountEmail": serviceAccountEmail,
-                    "restrictions": ["apiTargets": [["service": "generativelanguage.googleapis.com"]]]
-                ]
-            )
-            guard let operationName = operation["name"] as? String else {
+            let createURL = URL(string: "https://apikeys.googleapis.com/v2/projects/\(projectID)/locations/global/keys")!
+            var operation: [String: Any]?
+            var lastBindingError: Error?
+
+            // IAM can report the new service account as ready before the API Keys
+            // service has propagated it to its service-account binding backend.
+            // Give that backend a short head start, then retry only this transient error.
+            for attempt in 0..<5 {
+                if attempt > 0 {
+                    try await Task.sleep(for: .seconds(Double(5 * (1 << (attempt - 1)))))
+                    _ = try await googleGET(serviceAccountURL, accessToken: accessToken)
+                }
+                do {
+                    operation = try await googleRequest(
+                        createURL,
+                        method: "POST",
+                        accessToken: accessToken,
+                        body: [
+                            "displayName": "ClassWire Gemini authorization key",
+                            "serviceAccountEmail": serviceAccountEmail,
+                            "restrictions": ["apiTargets": [["service": "generativelanguage.googleapis.com"]]]
+                        ]
+                    )
+                    break
+                } catch ClassWireGoogleCloudError.requestFailed(let status, let detail)
+                    where detail.localizedCaseInsensitiveContains("service account")
+                        && detail.localizedCaseInsensitiveContains("not found") {
+                    lastBindingError = ClassWireGoogleCloudError.requestFailed(status, detail)
+                    if attempt == 2 { throw ClassWireGoogleCloudError.requestFailed(status, detail) }
+                }
+            }
+
+            guard let operation, let operationName = operation["name"] as? String else {
+                if let lastBindingError { throw lastBindingError }
                 throw ClassWireGoogleCloudError.invalidResponse("Google did not return the Gemini key-creation operation.")
             }
             let created = try await waitForOperation(
