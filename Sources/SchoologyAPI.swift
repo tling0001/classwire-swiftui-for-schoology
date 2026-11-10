@@ -38,6 +38,7 @@ actor SchoologyAPI {
     private let mobileCookie = "s_mobile=03447c0175ac0c7299a5508fde9569fc"
     private let userAgent = "okhttp/4.8.0"
     private var timeOffset: Int64 = 0
+    private var lastServerTimeSync: Date?
     private var recentOAuthNonces = Set<String>()
     private var oauthNonceOrder: [String] = []
     private var oauthNonceCounter: UInt64 = 0
@@ -48,7 +49,12 @@ actor SchoologyAPI {
         cache.totalCostLimit = 48 * 1024 * 1024
         return cache
     }()
-    func setCanadianServer(_ enabled: Bool) { useCanadianServer = enabled }
+    func setCanadianServer(_ enabled: Bool) {
+        guard useCanadianServer != enabled else { return }
+        useCanadianServer = enabled
+        // The server-time offset is host-specific; force a fresh sync after switching regions.
+        lastServerTimeSync = nil
+    }
 
     private var apiHost: String { useCanadianServer ? "api.schoologyca.com" : "api.schoology.com" }
     private var webHost: String { useCanadianServer ? "app.schoologyca.com" : "app.schoology.com" }
@@ -189,6 +195,7 @@ actor SchoologyAPI {
     }
 
     func webSessionCookies(auth: SchoologyAuth) async throws -> [SchoologyWebCookie] {
+        await syncServerTime()
         var components = URLComponents(string: "https://\(apiHost)/v1/sessionstart")!
         components.queryItems = [URLQueryItem(name: "for_domain", value: webHost)]
         guard let url = components.url else { throw SchoologyAPIError.invalidResponse }
@@ -411,6 +418,7 @@ actor SchoologyAPI {
         if let cached = imageDataCache.object(forKey: cacheKey) {
             return cached as Data
         }
+        await syncServerTime()
         let session = URLSession(configuration: .ephemeral)
         let redirectDelegate = NoRedirectDelegate()
         defer { session.invalidateAndCancel() }
@@ -470,6 +478,7 @@ actor SchoologyAPI {
 
     func attachmentData(_ url: URL, auth: SchoologyAuth, cookies: [SchoologyWebCookie], allowHTMLAttachment: Bool = false) async throws -> (Data, String) {
         guard url.scheme?.lowercased() == "https", url.host != nil else { throw SchoologyAPIError.invalidResponse }
+        await syncServerTime()
         let session = URLSession(configuration: .ephemeral)
         let redirectDelegate = NoRedirectDelegate()
         defer { session.invalidateAndCancel() }
@@ -599,7 +608,11 @@ actor SchoologyAPI {
         return SchoologyAuth(token: token, secret: secret, userID: "")
     }
 
-    private func syncServerTime() async {
+    private func syncServerTime(force: Bool = false) async {
+        if !force, let lastServerTimeSync,
+           Date.now.timeIntervalSince(lastServerTimeSync) < 30 {
+            return
+        }
         guard let url = URL(string: "https://\(webHost)/oauth/timestamp") else { return }
         var request = URLRequest(url: url)
         request.cachePolicy = .reloadIgnoringLocalCacheData
@@ -609,16 +622,24 @@ actor SchoologyAPI {
            (response as? HTTPURLResponse).map({ (200..<300).contains($0.statusCode) }) == true,
            let server = Int64(String(decoding: data, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)) {
             timeOffset = server - Int64(Date.now.timeIntervalSince1970)
+            lastServerTimeSync = .now
         }
     }
 
     private func nextOAuthNonce() -> String {
         // Match Tauri's 128-bit random value plus a monotonically increasing
-        // process-local sequence so a repeated random value cannot replay a nonce.
-        oauthNonceCounter &+= 1
-        let randomHigh = UInt64.random(in: UInt64.min...UInt64.max)
-        let randomLow = UInt64.random(in: UInt64.min...UInt64.max)
-        let nonce = String(format: "%016llx%016llx%016llx", randomHigh, randomLow, oauthNonceCounter)
+        // sequence. Explicitly reject recent collisions before returning a nonce.
+        var nonce = ""
+        repeat {
+            oauthNonceCounter &+= 1
+            let randomHigh = UInt64.random(in: UInt64.min...UInt64.max)
+            let randomLow = UInt64.random(in: UInt64.min...UInt64.max)
+            nonce = String(format: "%016llx%016llx%016llx",
+                           CUnsignedLongLong(randomHigh),
+                           CUnsignedLongLong(randomLow),
+                           CUnsignedLongLong(oauthNonceCounter))
+        } while recentOAuthNonces.contains(nonce)
+
         recentOAuthNonces.insert(nonce)
         oauthNonceOrder.append(nonce)
         if oauthNonceOrder.count > 4096 {
@@ -739,6 +760,12 @@ actor SchoologyAPI {
         contentType: String = "application/x-www-form-urlencoded",
         cookieHeader: String? = nil
     ) async throws -> Data {
+        if signed {
+            // Keep OAuth timestamps aligned for all signed requests, including GETs.
+            // Cache successful server-time syncs briefly to avoid extra round trips.
+            await syncServerTime()
+        }
+
         // Schoology can redirect API requests. Match the Tauri host's behavior:
         // disable automatic redirect replay and create a fresh OAuth signature for
         // every same-host HTTPS redirect.
@@ -752,9 +779,9 @@ actor SchoologyAPI {
         var redirectCount = 0
         var replayRetryCount = 0
 
-        // Allow up to five same-host redirects plus one fresh-signature retry
+        // Allow up to five same-host redirects plus three fresh-signature retries
         // when Schoology explicitly rejects a timestamp/nonce pair as a replay.
-        for _ in 0...6 {
+        for _ in 0...8 {
             var request = URLRequest(url: currentURL)
             request.httpMethod = currentMethod
             request.timeoutInterval = 45
@@ -767,9 +794,12 @@ actor SchoologyAPI {
                 request.setValue("2026.10.0", forHTTPHeaderField: "X-Schoology-App-Version")
             }
             if auth != nil && isAPIHost {
-                request.setValue(mobileCookie, forHTTPHeaderField: "Cookie")
-            }
-            if let cookieHeader, !cookieHeader.isEmpty {
+                var cookieParts = [mobileCookie]
+                if let cookieHeader, !cookieHeader.isEmpty {
+                    cookieParts.append(cookieHeader)
+                }
+                request.setValue(cookieParts.joined(separator: "; "), forHTTPHeaderField: "Cookie")
+            } else if let cookieHeader, !cookieHeader.isEmpty {
                 request.setValue(cookieHeader, forHTTPHeaderField: "Cookie")
             }
             if let currentBody {
@@ -806,7 +836,7 @@ actor SchoologyAPI {
                 continue
             }
 
-            if signed, replayRetryCount == 0, http.statusCode == 401 {
+            if signed, replayRetryCount < 3, http.statusCode == 401 {
                 let responseText = String(decoding: data.prefix(1_200), as: UTF8.self)
                     .lowercased()
                 let isReplayRejection =
@@ -817,7 +847,7 @@ actor SchoologyAPI {
                     // Rebuild the Authorization header on the next pass so both
                     // oauth_nonce and oauth_signature are fresh.
                     replayRetryCount += 1
-                    await syncServerTime()
+                    await syncServerTime(force: true)
                     continue
                 }
             }

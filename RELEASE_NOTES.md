@@ -1,5 +1,23 @@
 # Release notes
 
+## [2026.10.0-port.127]
+
+### ClassWire AI request reliability
+- Refresh Schoology server time before all signed API requests, including direct session, image, and attachment requests, with a short cache that is invalidated when switching between Schoology regions.
+- Collision-check OAuth nonces using the Tauri-compatible random-plus-sequence scheme.
+- Retry explicit duplicate timestamp/nonce replay rejections up to three times, refreshing server time and rebuilding the Authorization signature for each retry.
+- Preserve Schoology client identity, user agent, cookies, JSON content type, and OAuth authorization headers across signed API requests.
+
+### AI presentation and onboarding
+- Restore the corner AI button on macOS and iPad, with a native button-anchored popover in regular-width layouts and a system sheet in compact layouts.
+- Keep assistant settings and conversation history in the same navigation flow instead of layering modal sheets over the popover.
+- Add a first-use welcome guide for provider setup, data sharing with the selected AI provider, local conversation history, Keychain credential storage, and explicit confirmation of Schoology changes.
+- Retain the existing floating assistant button and compact sheet behavior on iPhone.
+
+### Build
+- Increment the iOS and macOS bundle marketing version to `2026.10.127` and build number to `127`.
+
+
 ## [2026.10.0-port.126]
 
 ### macOS AI access

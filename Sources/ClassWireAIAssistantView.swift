@@ -8,6 +8,7 @@ struct ClassWireAIAssistantView: View {
     @State private var historySearch = ""
     @State private var showingSettings = false
     @State private var showingHistory = false
+    @AppStorage("classwire.ai.onboarding.completed") private var hasCompletedFirstRun = false
     @FocusState private var composerFocused: Bool
     @State private var availableModels: [String] = []
     @State private var isRefreshingModels = false
@@ -24,14 +25,25 @@ struct ClassWireAIAssistantView: View {
 
     var body: some View {
         GeometryReader { geometry in
-            HStack(spacing: 0) {
-                if geometry.size.width >= 760 {
-                    conversationSidebar
-                        .frame(width: min(max(geometry.size.width * 0.25, 220), 300))
-                    Divider()
+            Group {
+                if hasCompletedFirstRun {
+                    HStack(spacing: 0) {
+                        if geometry.size.width >= 760 {
+                            conversationSidebar
+                                .frame(width: min(max(geometry.size.width * 0.25, 220), 300))
+                            Divider()
+                        }
+                        chatColumn
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }
+                } else {
+                    ClassWireAIWelcomeView(
+                        provider: store.provider,
+                        isProviderConfigured: store.hasSavedProviderKey,
+                        onConfigureProvider: { showingSettings = true },
+                        onContinue: { hasCompletedFirstRun = true }
+                    )
                 }
-                chatColumn
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
@@ -48,29 +60,31 @@ struct ClassWireAIAssistantView: View {
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
                 Button("New conversation", systemImage: "square.and.pencil", action: store.createConversation)
-                #if os(iOS)
                 Button("Conversation history", systemImage: "clock") { showingHistory = true }
-                #endif
                 Button("AI settings", systemImage: "gearshape") { showingSettings = true }
             }
         }
-        .sheet(isPresented: $showingSettings, onDismiss: {
-            Task { await refreshAvailableModels() }
-        }) {
+        .navigationDestination(isPresented: $showingSettings) {
             ClassWireAISettingsView(store: store)
         }
-        .sheet(isPresented: $showingHistory) {
-            NavigationStack {
-                historyList
-                    .navigationTitle("Conversations")
-                    .toolbar {
-                        ToolbarItem(placement: .confirmationAction) {
-                            Button("Done") { showingHistory = false }
-                        }
+        .navigationDestination(isPresented: $showingHistory) {
+            historyList
+                .navigationTitle("Conversations")
+                .toolbar {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Done") { showingHistory = false }
                     }
-            }
-            .presentationDetents([.medium, .large])
+                }
         }
+        .onChange(of: showingSettings) { _, isShowing in
+            if !isShowing {
+                Task {
+                    await store.refreshKeyStatus()
+                    await refreshAvailableModels()
+                }
+            }
+        }
+        .task { await store.refreshKeyStatus() }
         .environment(\.openURL, OpenURLAction { url in
             handleCitation(url)
         })

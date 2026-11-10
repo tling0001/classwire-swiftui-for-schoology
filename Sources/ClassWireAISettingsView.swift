@@ -9,8 +9,7 @@ struct ClassWireAISettingsView: View {
     @State private var puterService = ClassWirePuterService.shared
 
     var body: some View {
-        NavigationStack {
-            Form {
+        Form {
                 providerSection
                 if store.provider == .gemini {
                     googleCloudSection
@@ -18,6 +17,9 @@ struct ClassWireAISettingsView: View {
                 privacySection
             }
             .navigationTitle("AI Settings")
+            .navigationDestination(isPresented: $showingPuterConnect) {
+                ClassWirePuterConnectSheet(service: puterService)
+            }
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") {
@@ -41,7 +43,6 @@ struct ClassWireAISettingsView: View {
                     await store.refreshGoogleProjects()
                 }
             }
-        }
     }
 
     private var providerSection: some View {
@@ -88,7 +89,6 @@ struct ClassWireAISettingsView: View {
                 .buttonStyle(.borderedProminent)
             }
         }
-        .sheet(isPresented: $showingPuterConnect) { ClassWirePuterConnectSheet(service: puterService) }
         .onChange(of: puterService.isSignedIn) { _, isSignedIn in
             Task {
                 await store.refreshKeyStatus()

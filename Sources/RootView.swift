@@ -49,33 +49,13 @@ struct RootView: View {
             rootNavigationContent
             #endif
         }
-        #if os(iOS)
         .overlay {
             if session.isSignedIn {
                 ClassWireAIFloatingAssistantOverlay()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
-        #endif
         .onOpenURL(perform: handleIncomingURL)
-        #if os(macOS)
-        .sheet(isPresented: Binding(
-            get: { session.isAIAssistantPresented },
-            set: { session.isAIAssistantPresented = $0 }
-        )) {
-            NavigationStack {
-                ClassWireAIAssistantView()
-                    .toolbar {
-                        ToolbarItem(placement: .cancellationAction) {
-                            Button("Close", systemImage: "xmark") {
-                                session.isAIAssistantPresented = false
-                            }
-                        }
-                    }
-            }
-            .frame(minWidth: 620, idealWidth: 760, minHeight: 560, idealHeight: 720)
-        }
-        #endif
         .animation(reduceMotion ? nil : .snappy(duration: 0.24), value: session.isSignedIn)
         #if os(macOS)
         .safeAreaInset(edge: .top, spacing: 0) {
@@ -93,14 +73,6 @@ struct RootView: View {
         #endif
         .toolbar {
             #if os(macOS)
-            if session.isSignedIn {
-                ToolbarItem(placement: .primaryAction) {
-                    Button("ClassWire AI", systemImage: "sparkles") {
-                        session.isAIAssistantPresented = true
-                    }
-                    .help("Open ClassWire AI")
-                }
-            }
             if session.isDemoMode {
                 ToolbarItem(placement: .status) { Label("Demo data", systemImage: "checkmark.seal.fill").foregroundStyle(.secondary) }
                 ToolbarItem(placement: .automatic) { Button("Exit Demo", systemImage: "rectangle.portrait.and.arrow.right", action: session.exitDemoMode) }

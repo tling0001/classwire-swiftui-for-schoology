@@ -1,59 +1,42 @@
 import SwiftUI
 
-/// Presents the existing, fully functional ClassWire AI experience without
-/// consuming a permanent row in the Schoology navigation sidebar.
+/// A compact, button-anchored assistant for macOS and wide iPad layouts.
+/// Compact iPhone/iPad layouts use the system sheet presentation.
 struct ClassWireAIFloatingAssistantOverlay: View {
+    @Environment(AppSession.self) private var session
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage("classwire.ai.floatingButtonVisible") private var buttonVisible = true
     @State private var isPresented = false
 
     #if os(iOS)
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
     #endif
 
     var body: some View {
         GeometryReader { geometry in
             ZStack(alignment: controlAlignment) {
-                if isPresented && !usesCompactSheet {
-                    assistantPanel(in: geometry.size)
-                        .padding(panelEdgePadding)
-                        .transition(reduceMotion ? .identity : .move(edge: panelTransitionEdge).combined(with: .opacity))
-                        .zIndex(1)
-                }
-
                 if buttonVisible {
                     assistantButton
                         .padding(buttonEdgePadding)
-                        .zIndex(2)
+                        .zIndex(1)
                 }
             }
-            // Keep the assistant layer equal to the complete bounds proposed by its host overlay.
-            // This makes the bottom-trailing alignment independent of the GeometryReader's ideal size.
             .frame(width: geometry.size.width, height: geometry.size.height, alignment: controlAlignment)
-            .animation(reduceMotion ? nil : .snappy(duration: 0.24), value: isPresented)
         }
-        .allowsHitTesting(buttonVisible || isPresented)
-        #if os(iOS)
-        .sheet(isPresented: compactSheetBinding) {
-            NavigationStack {
-                ClassWireAIAssistantView()
-                    .toolbar {
-                        ToolbarItem(placement: .cancellationAction) {
-                            Button("Done", systemImage: "checkmark") {
-                                isPresented = false
-                            }
-                        }
-                    }
+        .allowsHitTesting(buttonVisible)
+        .onChange(of: session.isAIAssistantPresented) { _, shouldPresent in
+            if isPresented != shouldPresent {
+                isPresented = shouldPresent
+                if shouldPresent { buttonVisible = true }
             }
-            .presentationDetents([.large])
-            .presentationDragIndicator(.visible)
         }
-        #endif
+        .animation(reduceMotion ? nil : .snappy(duration: 0.22), value: isPresented)
     }
 
     private var assistantButton: some View {
         Button {
-            isPresented.toggle()
+            setPresented(!isPresented)
         } label: {
             Image(systemName: isPresented ? "sparkles.rectangle.stack.fill" : "sparkles")
                 .font(.system(size: 23, weight: .semibold))
@@ -66,36 +49,53 @@ struct ClassWireAIFloatingAssistantOverlay: View {
         .contextMenu {
             Button("Hide ClassWire AI button", systemImage: "eye.slash", role: .destructive) {
                 buttonVisible = false
-                isPresented = false
+                setPresented(false)
             }
         }
         .accessibilityLabel(isPresented ? "Close ClassWire AI" : "Open ClassWire AI")
         .accessibilityHint("Press and hold, or secondary-click, for assistant button options.")
         .accessibilityAddTraits(isPresented ? .isSelected : [])
-    }
-
-    private func assistantPanel(in size: CGSize) -> some View {
-        let width = min(560, max(280, size.width - 36))
-        let height = min(760, max(360, size.height - 104))
-
-        return NavigationStack {
-            ClassWireAIAssistantView()
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("Close", systemImage: "xmark") {
-                            isPresented = false
+        .popover(isPresented: popoverBinding, arrowEdge: .trailing) {
+            NavigationStack {
+                ClassWireAIAssistantView()
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("Close", systemImage: "xmark") {
+                                setPresented(false)
+                            }
                         }
                     }
-                }
+            }
+            .frame(width: 520, height: 680)
         }
-        .frame(width: width, height: height)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24))
-        .clipShape(RoundedRectangle(cornerRadius: 24))
-        .overlay {
-            RoundedRectangle(cornerRadius: 24)
-                .strokeBorder(.quaternary, lineWidth: 1)
+        #if os(iOS)
+        .sheet(isPresented: compactSheetBinding) {
+            NavigationStack {
+                ClassWireAIAssistantView()
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("Done", systemImage: "checkmark") {
+                                setPresented(false)
+                            }
+                        }
+                    }
+            }
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
         }
-        .shadow(color: .black.opacity(0.16), radius: 24, x: 0, y: 12)
+        #endif
+    }
+
+    private func setPresented(_ value: Bool) {
+        isPresented = value
+        session.isAIAssistantPresented = value
+    }
+
+    private var popoverBinding: Binding<Bool> {
+        Binding(
+            get: { isPresented && !usesCompactSheet },
+            set: { setPresented($0) }
+        )
     }
 
     private var controlAlignment: Alignment {
@@ -114,25 +114,9 @@ struct ClassWireAIFloatingAssistantOverlay: View {
         #endif
     }
 
-    private var panelEdgePadding: EdgeInsets {
-        #if os(macOS)
-        EdgeInsets(top: 86, leading: 0, bottom: 0, trailing: 18)
-        #else
-        EdgeInsets(top: 0, leading: 0, bottom: 88, trailing: 18)
-        #endif
-    }
-
-    private var panelTransitionEdge: Edge {
-        #if os(macOS)
-        .top
-        #else
-        .bottom
-        #endif
-    }
-
     private var usesCompactSheet: Bool {
         #if os(iOS)
-        horizontalSizeClass == .compact
+        horizontalSizeClass == .compact || verticalSizeClass == .compact
         #else
         false
         #endif
@@ -142,7 +126,7 @@ struct ClassWireAIFloatingAssistantOverlay: View {
     private var compactSheetBinding: Binding<Bool> {
         Binding(
             get: { isPresented && usesCompactSheet },
-            set: { if !$0 { isPresented = false } }
+            set: { setPresented($0) }
         )
     }
     #endif
@@ -152,7 +136,6 @@ private struct ClassWireAIGlassButtonModifier: ViewModifier {
     @ViewBuilder
     func body(content: Content) -> some View {
         if #available(iOS 26.0, macOS 26.0, *) {
-            // Keep this utility control neutral; color is reserved for actions with semantic meaning.
             content.glassEffect(.regular.interactive(), in: .circle)
         } else {
             content

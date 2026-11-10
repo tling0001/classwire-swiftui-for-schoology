@@ -409,22 +409,20 @@ struct ClassWirePuterConnectSheet: View {
     @Bindable var service: ClassWirePuterService
 
     var body: some View {
-        NavigationStack {
-            Group {
-                if service.isPopupPresented, let popup = service.popupWebView {
-                    ClassWirePuterWebView(webView: popup)
-                } else {
-                    ClassWirePuterWebView(webView: service.webView)
-                }
+        Group {
+            if service.isPopupPresented, let popup = service.popupWebView {
+                ClassWirePuterWebView(webView: popup)
+            } else {
+                ClassWirePuterWebView(webView: service.webView)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .navigationTitle("Sign in to Puter")
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        service.closePopup()
-                        dismiss()
-                    }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .navigationTitle("Sign in to Puter")
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("Cancel") {
+                    service.closePopup()
+                    dismiss()
                 }
             }
         }
