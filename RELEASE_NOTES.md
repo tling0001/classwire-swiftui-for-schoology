@@ -1,5 +1,22 @@
 # Release notes
 
+## [2026.10.0-port.121]
+
+### Sign-in
+- Use the same native SwiftUI Form and section-based text-entry presentation as the app's composers for school search, username, and password.
+- Keep field labels and hints explicit, preserve secure password entry, and retain platform keyboard/focus behavior.
+
+### Puter AI
+- Keep the Puter WebKit bridge attached to the SwiftUI AI screen so its JavaScript session remains active on iPhone while model discovery is used.
+- Present the primary Puter WebView in the connect sheet and let the user tap its own sign-in control, preserving Puter's required user-initiated popup flow.
+- Refresh Puter authentication state through the embedded WebKit bridge before checking access to the model catalogue.
+- Accept both Puter model IDs and model objects from the model catalogue response.
+- Add a bounded WebKit-ready timeout, clearer authentication/model errors, and refresh model discovery after AI settings close.
+
+### Build
+- Increment the Apple bundle marketing version to `2026.10.121` and build number to `121`.
+
+
 ## [2026.10.0-port.120]
 
 ### Fixed

@@ -84,7 +84,6 @@ struct ClassWireAISettingsView: View {
                     .font(.footnote).foregroundStyle(.secondary)
                 Button("Connect Puter account", systemImage: "person.crop.circle.badge.checkmark") {
                     showingPuterConnect = true
-                    Task { await puterService.signIn() }
                 }
                 .buttonStyle(.borderedProminent)
             }

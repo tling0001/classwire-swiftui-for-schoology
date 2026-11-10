@@ -35,6 +35,15 @@ struct ClassWireAIAssistantView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+        .background {
+            if !showingSettings {
+                ClassWirePuterWebView(webView: ClassWirePuterService.shared.webView)
+                    .frame(width: 1, height: 1)
+                    .opacity(0)
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+            }
+        }
         .navigationTitle("ClassWire AI")
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
@@ -45,7 +54,9 @@ struct ClassWireAIAssistantView: View {
                 Button("AI settings", systemImage: "gearshape") { showingSettings = true }
             }
         }
-        .sheet(isPresented: $showingSettings) {
+        .sheet(isPresented: $showingSettings, onDismiss: {
+            Task { await refreshAvailableModels() }
+        }) {
             ClassWireAISettingsView(store: store)
         }
         .sheet(isPresented: $showingHistory) {
@@ -447,9 +458,15 @@ struct ClassWireAIAssistantView: View {
                         .accessibilityLabel("Refreshing available models")
                 } else if !modelDiscoveryStatus.isEmpty {
                     Text(modelDiscoveryStatus)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
+                        .font(.caption)
+                        .foregroundStyle(
+                            modelDiscoveryStatus.localizedCaseInsensitiveContains("failed") ||
+                            modelDiscoveryStatus.localizedCaseInsensitiveContains("could not") ||
+                            modelDiscoveryStatus.localizedCaseInsensitiveContains("timed out")
+                            ? .red : .secondary
+                        )
+                        .lineLimit(2)
+                        .textSelection(.enabled)
                 }
                 Spacer(minLength: 0)
             }
@@ -465,16 +482,19 @@ struct ClassWireAIAssistantView: View {
         let selectedEndpoint = store.ollamaEndpoint
         let selectedKey = ClassWireAIKeychainStore.load(provider: selectedProvider) ?? ""
         if selectedProvider == .puter {
-            guard ClassWirePuterService.shared.isSignedIn else {
-                availableModels = [store.model]
-                modelDiscoveryStatus = "Connect your Puter account in AI settings"
-                return
-            }
+            let puterService = ClassWirePuterService.shared
             isRefreshingModels = true
-            modelDiscoveryStatus = "Loading Puter models…"
+            modelDiscoveryStatus = "Checking Puter connection…"
             defer { isRefreshingModels = false }
             do {
-                let models = try await ClassWirePuterService.shared.listModels()
+                await puterService.refreshAuthStatus()
+                guard puterService.isSignedIn else {
+                    availableModels = [store.model]
+                    modelDiscoveryStatus = "Connect your Puter account in AI settings"
+                    return
+                }
+                modelDiscoveryStatus = "Loading Puter models…"
+                let models = try await puterService.listModels()
                 guard store.provider == selectedProvider else { return }
                 let discovered = Array(Set(models)).sorted()
                 availableModels = discovered.isEmpty ? [store.model] : discovered

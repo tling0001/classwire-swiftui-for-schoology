@@ -26,28 +26,29 @@ struct SignInView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(spacing: 22) {
-                    switch mode {
-                    case .welcome:
-                        welcome
-                    case .school:
-                        schoolPicker
-                    case .credentials:
-                        credentials
-                    case .schoolBrowser:
-                        schoolBrowserProgress
-                    case .qr:
-                        qrLogin
+            Group {
+                switch mode {
+                case .school: schoolPicker
+                case .credentials: credentials
+                case .welcome, .schoolBrowser, .qr:
+                    ScrollView {
+                        VStack(spacing: 22) {
+                            switch mode {
+                            case .welcome: welcome
+                            case .schoolBrowser: schoolBrowserProgress
+                            case .qr: qrLogin
+                            case .school, .credentials: EmptyView()
+                            }
+                        }
+                        .padding(.horizontal, 22)
+                        .padding(.vertical, 28)
+                        .frame(maxWidth: 520)
+                        .frame(maxWidth: .infinity)
+                        .frame(minHeight: 560)
                     }
+                    .scrollIndicators(.hidden)
                 }
-                .padding(.horizontal, 22)
-                .padding(.vertical, 28)
-                .frame(maxWidth: 520)
-                .frame(maxWidth: .infinity)
-                .frame(minHeight: 560)
             }
-            .scrollIndicators(.hidden)
             .background(.background)
             #if os(iOS)
             .toolbar(.hidden, for: .navigationBar)
@@ -116,45 +117,40 @@ struct SignInView: View {
     }
 
     private var schoolPicker: some View {
-        VStack(spacing: 18) {
-            subpageHeader
-
-            VStack(alignment: .leading, spacing: 9) {
-                Text("School")
-                    .font(.headline)
-
-                HStack(spacing: 10) {
-                    TextField("Enter your School or domain", text: $searchText)
-                        .textContentType(.organizationName)
-                        #if os(iOS)
-                        .textInputAutocapitalization(.never)
-                        .submitLabel(.search)
-                        #endif
-                        .autocorrectionDisabled()
-                        .onSubmit { Task { await searchSchools(searchText) } }
-                        .onChange(of: searchText) { _, value in
-                            Task { await searchSchools(value) }
-                        }
-
-                    if searching {
+        Form {
+            Section { subpageHeader }
+            Section("School") {
+                TextField("School", text: $searchText, prompt: Text("Enter your school or domain"))
+                    .textContentType(.organizationName)
+                    #if os(iOS)
+                    .textInputAutocapitalization(.never)
+                    .submitLabel(.search)
+                    #endif
+                    .autocorrectionDisabled()
+                    .onSubmit { Task { await searchSchools(searchText) } }
+                    .onChange(of: searchText) { _, value in
+                        Task { await searchSchools(value) }
+                    }
+                if searching {
+                    HStack(spacing: 10) {
                         ProgressView().controlSize(.small)
-                    } else if !searchText.isEmpty {
-                        Button("Clear", systemImage: "xmark.circle.fill") {
-                            searchText = ""
-                            schools = []
-                        }
-                        .labelStyle(.iconOnly)
-                        .buttonStyle(.borderless)
+                        Text("Searching schools…").foregroundStyle(.secondary)
+                    }
+                } else if !searchText.isEmpty {
+                    Button("Clear search", systemImage: "xmark.circle") {
+                        searchText = ""
+                        schools = []
                     }
                 }
             }
-            .frame(maxWidth: 420)
-
-            if schools.isEmpty && !searching {
-                ContentUnavailableView.search(text: searchText)
-                    .frame(maxWidth: .infinity, minHeight: 180)
-            } else {
-                LazyVStack(spacing: 6) {
+            if searchText.trimmingCharacters(in: .whitespacesAndNewlines).count >= 2,
+               schools.isEmpty, !searching {
+                Section {
+                    ContentUnavailableView.search(text: searchText).frame(minHeight: 150)
+                }
+            }
+            if !schools.isEmpty {
+                Section("Results") {
                     ForEach(schools) { school in
                         Button {
                             selectedSchool = school
@@ -168,7 +164,7 @@ struct SignInView: View {
                                     .foregroundStyle(LoginPalette.blue)
                                     .frame(width: 28)
                                 VStack(alignment: .leading, spacing: 3) {
-                                    Text(school.title).font(.body.weight(.medium))
+                                    Text(school.title).font(.body.weight(.medium)).foregroundStyle(.primary)
                                     if !school.domain.isEmpty {
                                         Text(school.domain).font(.caption).foregroundStyle(.secondary)
                                     }
@@ -178,31 +174,31 @@ struct SignInView: View {
                                     .font(.caption.weight(.semibold))
                                     .foregroundStyle(.tertiary)
                             }
-                            .padding(12)
-                            .frame(maxWidth: .infinity, alignment: .leading)
                             .contentShape(Rectangle())
                         }
-                        .buttonStyle(.plain)
-                        .background(.quaternary, in: RoundedRectangle(cornerRadius: 12))
+                        .accessibilityHint("Starts sign-in with this school.")
                     }
                 }
-                .frame(maxWidth: 420)
             }
-
-            instanceSwitch
+            Section { instanceSwitch }
         }
+        .formStyle(.grouped)
+        .scrollContentBackground(.hidden)
+        .background(.background)
+        .frame(maxWidth: 520)
+        .frame(maxWidth: .infinity)
     }
 
     private var credentials: some View {
-        VStack(spacing: 20) {
-            subpageHeader
-
-            Text(selectedSchool?.title ?? "Sign in with my account")
-                .font(.title3.weight(.semibold))
-                .frame(maxWidth: 420, alignment: .leading)
-
-            VStack(alignment: .leading, spacing: 14) {
-                TextField("Username or Email", text: $username)
+        Form {
+            Section {
+                subpageHeader
+                Text(selectedSchool?.title ?? "Sign in with my account")
+                    .font(.title3.weight(.semibold))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            Section("Account") {
+                TextField("Username or Email", text: $username, prompt: Text("Enter your username or email"))
                     .textContentType(.username)
                     #if os(iOS)
                     .textInputAutocapitalization(.never)
@@ -211,8 +207,7 @@ struct SignInView: View {
                     .autocorrectionDisabled()
                     .focused($focusedField, equals: .username)
                     .onSubmit { focusedField = .password }
-
-                SecureField("Password", text: $password)
+                SecureField("Password", text: $password, prompt: Text("Enter your password"))
                     .textContentType(.password)
                     #if os(iOS)
                     .submitLabel(.go)
@@ -220,32 +215,34 @@ struct SignInView: View {
                     .focused($focusedField, equals: .password)
                     .onSubmit { signIn() }
             }
-            .frame(maxWidth: 420)
-
-            Button {
-                signIn()
-            } label: {
-                HStack(spacing: 9) {
-                    if session.isLoading { ProgressView() }
-                    Text(session.isLoading ? "Signing in…" : "Sign in")
+            Section {
+                Button {
+                    signIn()
+                } label: {
+                    HStack(spacing: 9) {
+                        if session.isLoading { ProgressView() }
+                        Text(session.isLoading ? "Signing in…" : "Sign in")
+                            .frame(maxWidth: .infinity)
+                    }
                 }
-                .frame(maxWidth: .infinity)
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+                .disabled(username.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || password.isEmpty || session.isLoading)
             }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
-            .disabled(username.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || password.isEmpty || session.isLoading)
-            .frame(maxWidth: 420)
-
-            instanceSwitch
-
-            Button("I need help signing in") {
-                if let url = URL(string: "https://docs.powerschool.com/SGYH/en/students/schoology-mobile-apps/logging-into-the-schoology-mobile-app-students") {
-                    openURL(url)
+            Section {
+                instanceSwitch
+                Button("I need help signing in") {
+                    if let url = URL(string: "https://docs.powerschool.com/SGYH/en/students/schoology-mobile-apps/logging-into-the-schoology-mobile-app-students") {
+                        openURL(url)
+                    }
                 }
+                .font(.footnote)
             }
-            .font(.footnote)
-            .buttonStyle(.borderless)
         }
+        .formStyle(.grouped)
+        .scrollContentBackground(.hidden)
+        .background(.background)
+        .frame(maxWidth: 520)
         .frame(maxWidth: .infinity)
         .onAppear {
             if selectedSchool == nil { focusedField = .username }

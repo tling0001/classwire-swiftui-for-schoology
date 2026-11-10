@@ -21,6 +21,7 @@ final class ClassWirePuterService: NSObject, WKUIDelegate, WKNavigationDelegate 
     @ObservationIgnored private var scriptHandler: ClassWirePuterScriptHandler!
     @ObservationIgnored private var isReady = false
     @ObservationIgnored private var loadError: String?
+    @ObservationIgnored private var readyTimeoutTask: Task<Void, Never>?
     @ObservationIgnored private var pending: [String: CheckedContinuation<Data, Error>] = [:]
     @ObservationIgnored private var pendingTimeouts: [String: Task<Void, Never>] = [:]
     @ObservationIgnored private var readyWaiters: [CheckedContinuation<Void, Error>] = []
@@ -37,21 +38,39 @@ final class ClassWirePuterService: NSObject, WKUIDelegate, WKNavigationDelegate 
         webView.uiDelegate = self
         webView.navigationDelegate = self
         webView.loadHTMLString(Self.bridgeHTML, baseURL: URL(string: "http://localhost"))
+        readyTimeoutTask = Task { [weak self] in
+            do { try await Task.sleep(for: .seconds(25)) } catch { return }
+            guard let self, !self.isReady else { return }
+            self.failReadyWaiters(ClassWireAIError.invalidResponse(
+                "Puter's embedded browser did not finish loading within 25 seconds."
+            ))
+        }
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         guard webView === self.webView else { return }
         isReady = true
         loadError = nil
+        readyTimeoutTask?.cancel()
+        readyTimeoutTask = nil
         readyWaiters.forEach { $0.resume() }
         readyWaiters.removeAll()
     }
 
-    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) { failReadyWaiters(error) }
-    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) { failReadyWaiters(error) }
+    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+        guard webView === self.webView else { return }
+        failReadyWaiters(error)
+    }
+
+    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        guard webView === self.webView else { return }
+        failReadyWaiters(error)
+    }
 
     private func failReadyWaiters(_ error: Error) {
         loadError = error.localizedDescription
+        readyTimeoutTask?.cancel()
+        readyTimeoutTask = nil
         readyWaiters.forEach { $0.resume(throwing: error) }
         readyWaiters.removeAll()
     }
@@ -114,21 +133,45 @@ final class ClassWirePuterService: NSObject, WKUIDelegate, WKNavigationDelegate 
     }
 
     func refreshAuthStatus() async {
-        guard isReady else { return }
         do {
             let value = try await request("status")
-            guard let status = value as? [String: Any] else { return }
+            guard let status = value as? [String: Any] else {
+                throw ClassWireAIError.invalidResponse("Puter returned an invalid authentication status.")
+            }
             isSignedIn = status["signedIn"] as? Bool ?? false
             accountLabel = status["user"] as? String ?? ""
-        } catch { }
+            signInError = nil
+        } catch {
+            signInError = error.localizedDescription
+        }
     }
 
     func listModels() async throws -> [String] {
-        guard let response = try await request("models") as? [String: Any],
-              let models = response["models"] as? [String] else {
+        try await refreshAuthStatus()
+        guard isSignedIn else {
+            throw ClassWireAIError.invalidResponse(
+                signInError ?? "Connect your Puter account in AI settings before loading models."
+            )
+        }
+
+        let value = try await request("models")
+        let rawModels: [Any]
+        if let response = value as? [String: Any], let models = response["models"] as? [Any] {
+            rawModels = models
+        } else if let models = value as? [Any] {
+            rawModels = models
+        } else {
             throw ClassWireAIError.invalidResponse("Puter returned an invalid model catalogue.")
         }
-        return models
+
+        let models = rawModels.compactMap { item -> String? in
+            if let model = item as? String, !model.isEmpty { return model }
+            if let model = item as? [String: Any], let id = model["id"] as? String, !id.isEmpty {
+                return id
+            }
+            return nil
+        }
+        return Array(Set(models)).sorted()
     }
 
     func chat(model: String, messages: [ClassWireAIMessage], tools: [[String: Any]], systemPrompt: String) async throws -> ChatResult {
@@ -267,6 +310,8 @@ final class ClassWirePuterService: NSObject, WKUIDelegate, WKNavigationDelegate 
         return puterSDKPromise;
       }
       const userLabel = user => user?.username || user?.email || user?.name || 'Puter account';
+      const errorText = error => error?.msg || error?.message || error?.error ||
+        (typeof error === 'string' ? error : (() => { try { return JSON.stringify(error); } catch (_) { return String(error); } })());
       async function authenticate(puter) {
         if (typeof puter.ui?.authenticateWithPuter === 'function') await puter.ui.authenticateWithPuter();
         else await puter.auth.signIn({ request_auth: true });
@@ -280,7 +325,7 @@ final class ClassWirePuterService: NSObject, WKUIDelegate, WKNavigationDelegate 
           button.textContent = signedIn ? 'Connected to Puter' : 'Connect with Puter';
           status.textContent = signedIn ? 'Your Puter account is connected.' : 'Sign in to continue.';
           button.disabled = false;
-        } catch (error) { status.textContent = String(error?.message || error); button.disabled = false; }
+        } catch (error) { status.textContent = errorText(error); button.disabled = false; }
       };
       window.classWirePuterRequest = async (id, operation, payload) => {
         try {
@@ -323,14 +368,14 @@ final class ClassWirePuterService: NSObject, WKUIDelegate, WKNavigationDelegate 
             result = { text: typeof content === 'string' ? content : '', toolCalls };
           } else throw new Error('Unsupported Puter operation.');
           send({ id, result });
-        } catch (error) { send({ id, error: String(error?.message || error) }); }
+        } catch (error) { send({ id, error: errorText(error) }); }
       };
       button.addEventListener('click', async () => {
         button.disabled = true; status.textContent = 'Opening Puter sign-in…';
         try { const puter = await ensurePuterSDK(); await authenticate(puter); await report(); }
-        catch (error) { status.textContent = String(error?.message || error); button.disabled = false; }
+        catch (error) { status.textContent = errorText(error); button.disabled = false; }
       });
-      ensurePuterSDK().then(report).catch(error => { status.textContent = String(error?.message || error); button.disabled = false; });
+      ensurePuterSDK().then(report).catch(error => { status.textContent = errorText(error); button.disabled = false; });
     })();
     </script></body></html>
     """
@@ -368,26 +413,11 @@ struct ClassWirePuterConnectSheet: View {
             Group {
                 if service.isPopupPresented, let popup = service.popupWebView {
                     ClassWirePuterWebView(webView: popup)
-                } else if let error = service.signInError {
-                    ContentUnavailableView {
-                        Label("Couldn’t open Puter sign-in", systemImage: "exclamationmark.triangle")
-                    } description: {
-                        Text(error)
-                    } actions: {
-                        Button("Try Again") {
-                            Task { await service.signIn() }
-                        }
-                    }
                 } else {
-                    VStack(spacing: 12) {
-                        ProgressView()
-                        Text("Opening Puter sign-in…")
-                            .foregroundStyle(.secondary)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .accessibilityElement(children: .combine)
+                    ClassWirePuterWebView(webView: service.webView)
                 }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .navigationTitle("Sign in to Puter")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
