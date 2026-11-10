@@ -58,6 +58,47 @@ struct SchoologyPeopleDirectoryView: View {
         return result
     }
 
+    private var peopleList: some View {
+        List {
+            ForEach(sections) { section in
+                Section(section.title) {
+                    ForEach(section.people) { person in
+                        NavigationLink {
+                            SchoologyPersonProfileView(userID: person.id)
+                        } label: {
+                            HStack(spacing: 12) {
+                                if let pictureURL = person.pictureURL {
+                                    AuthenticatedSchoologyImage(url: pictureURL)
+                                        .frame(width: 38, height: 38).clipShape(RoundedRectangle(cornerRadius: 9))
+                                } else {
+                                    SchoologyAvatarPlaceholder(size: 38)
+                                }
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(directoryName(person)).font(.body.weight(.medium))
+                                    if !person.preferredName.isEmpty {
+                                        Text(person.preferredName).font(.caption).foregroundStyle(.secondary)
+                                    } else if !person.role.isEmpty {
+                                        Text(person.role).font(.caption).foregroundStyle(.secondary)
+                                    }
+                                }
+                                Spacer()
+                                if membersMode && person.isAdmin {
+                                    Label("Admin", systemImage: "star.circle.fill")
+                                        .font(.caption.weight(.semibold)).foregroundStyle(.yellow)
+                                }
+                            }
+                            .padding(.vertical, 4).contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+        }
+        .scrollContentBackground(.hidden)
+        .contentMargins(.horizontal, 0, for: .scrollContent)
+        .contentMargins(.bottom, 0, for: .scrollContent)
+    }
+
     var body: some View {
         VStack(spacing: membersMode ? 8 : 10) {
             HStack(spacing: 10) {
@@ -105,45 +146,13 @@ struct SchoologyPeopleDirectoryView: View {
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                List {
-                    ForEach(sections) { section in
-                        Section(section.title) {
-                            ForEach(section.people) { person in
-                                NavigationLink {
-                                    SchoologyPersonProfileView(userID: person.id)
-                                } label: {
-                                    HStack(spacing: 12) {
-                                        if let pictureURL = person.pictureURL {
-                                            AuthenticatedSchoologyImage(url: pictureURL)
-                                                .frame(width: 38, height: 38).clipShape(RoundedRectangle(cornerRadius: 9))
-                                        } else {
-                                            SchoologyAvatarPlaceholder(size: 38)
-                                        }
-                                        VStack(alignment: .leading, spacing: 3) {
-                                            Text(directoryName(person)).font(.body.weight(.medium))
-                                            if !person.preferredName.isEmpty {
-                                                Text(person.preferredName).font(.caption).foregroundStyle(.secondary)
-                                            } else if !person.role.isEmpty {
-                                                Text(person.role).font(.caption).foregroundStyle(.secondary)
-                                            }
-                                        }
-                                        Spacer()
-                                        if membersMode && person.isAdmin {
-                                            Label("Admin", systemImage: "star.circle.fill")
-                                                .font(.caption.weight(.semibold)).foregroundStyle(.yellow)
-                                        }
-                                    }
-                                    .padding(.vertical, 4).contentShape(Rectangle())
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        }
+                Group {
+                    if membersMode {
+                        peopleList.listStyle(.plain)
+                    } else {
+                        peopleList.listStyle(.automatic)
                     }
                 }
-                .listStyle(membersMode ? .plain : .automatic)
-                .scrollContentBackground(.hidden)
-                .contentMargins(.horizontal, 0, for: .scrollContent)
-                .contentMargins(.bottom, 0, for: .scrollContent)
             }
         }
         .padding(membersMode ? 0 : 16)

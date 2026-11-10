@@ -1,5 +1,15 @@
 # Release notes
 
+## [2026.10.0-port.111]
+
+### Fixed
+- Resolve Swift compiler errors in the Puter WebKit bridge by safely encoding JavaScript string arguments and keeping popup WebView teardown inside its owning service.
+- Apply plain and automatic people-directory list styles in separate SwiftUI branches so each branch uses the matching concrete `ListStyle` type.
+- Preserve the Puter sign-in popup lifecycle and existing directory layout while fixing iOS and macOS archive compilation.
+
+### Build
+- Increment the Apple bundle marketing version to `2026.10.111` and build number to `111`.
+
 ## [2026.10.0-port.110]
 
 ### Fixed

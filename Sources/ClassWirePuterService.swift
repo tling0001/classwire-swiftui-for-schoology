@@ -150,6 +150,14 @@ final class ClassWirePuterService: NSObject, WKUIDelegate, WKNavigationDelegate 
         catch { isSignedIn = false; accountLabel = "" }
     }
 
+    func closePopup() {
+        popupWebView?.stopLoading()
+        popupWebView?.uiDelegate = nil
+        popupWebView?.navigationDelegate = nil
+        popupWebView = nil
+        isPopupPresented = false
+    }
+
     private func request(_ operation: String, payload: String? = nil) async throws -> Any {
         try await waitUntilReady()
         return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Any, Error>) in
@@ -170,9 +178,11 @@ final class ClassWirePuterService: NSObject, WKUIDelegate, WKNavigationDelegate 
     }
 
     private static func jsString(_ value: String) -> String {
-        let data = try JSONSerialization.data(withJSONObject: [value], options: [.fragmentsAllowed])
-        let encoded = String(decoding: data, as: UTF8.self)
-        return String(encoded.dropFirst().dropLast())
+        guard let data = try? JSONEncoder().encode(value),
+              let encoded = String(data: data, encoding: .utf8) else {
+            return "\"\""
+        }
+        return encoded
     }
 
     private static let bridgeHTML = """
@@ -262,9 +272,7 @@ struct ClassWirePuterConnectSheet: View {
                 if service.isPopupPresented {
                     ToolbarItem(placement: .cancellationAction) {
                         Button("Close sign-in") {
-                            service.popupWebView?.stopLoading()
-                            service.popupWebView = nil
-                            service.isPopupPresented = false
+                            service.closePopup()
                         }
                     }
                 }
