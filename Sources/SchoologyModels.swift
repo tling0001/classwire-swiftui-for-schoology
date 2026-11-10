@@ -239,15 +239,19 @@ struct SchoologyActivity: Identifiable, Sendable {
             keys: ["files", "file", "links", "link", "attachment", "attachments", "items", "data"]
         )
         for item in items {
-            let mime = SchoologyValue.string(item["filemime"] ?? item["fileMIME"] ?? item["mime"] ?? item["type"]).lowercased()
-            let thumbnail = item["thumbnail"] ?? item["fileThumbnailURL"] ?? item["file_thumbnail_url"] ??
-                item["image_url"] ?? item["imageUrl"]
+            let mime = SchoologyValue.string(item["filemime"] ?? item["fileMIME"] ?? item["mime"] ?? item["type"] ?? item["file_type"] ?? item["fileType"]).lowercased()
+            let thumbnail = item["thumbnail"] ?? item["thumbnail_url"] ?? item["thumbnailURL"] ??
+                item["fileThumbnailURL"] ?? item["file_thumbnail_url"] ?? item["image_url"] ?? item["imageUrl"]
+            let rawURL = item["file_download_url"] ?? item["fileDownloadURL"] ??
+                item["download_path"] ?? item["downloadPath"] ?? item["download_url"] ?? item["downloadUrl"] ??
+                item["file_view_url"] ?? item["fileViewURL"] ?? item["file_url"] ?? item["fileURL"] ?? item["url"]
             if let url = SchoologyValue.url(thumbnail) {
                 urls.append(url)
-            } else if mime.hasPrefix("image/") {
-                let rawURL = item["file_download_url"] ?? item["fileDownloadURL"] ??
-                    item["download_path"] ?? item["downloadPath"] ?? item["url"]
-                if let url = SchoologyValue.url(rawURL) { urls.append(url) }
+            } else if let url = SchoologyValue.url(rawURL) {
+                let imageExtensions = ["jpg", "jpeg", "png", "gif", "webp", "heic", "heif", "avif", "tif", "tiff", "bmp"]
+                if mime.hasPrefix("image/") || mime == "image" || mime.contains("image") || imageExtensions.contains(url.pathExtension.lowercased()) {
+                    urls.append(url)
+                }
             }
         }
 

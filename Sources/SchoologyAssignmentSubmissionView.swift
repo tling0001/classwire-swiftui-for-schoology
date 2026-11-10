@@ -92,7 +92,8 @@ struct SchoologyAssignmentSubmissionView: View {
                 sectionID: sectionID,
                 gradeItemID: context.gradeItemID,
                 student: student,
-                maxPoints: context.maxPoints
+                maxPoints: context.maxPoints,
+                gradingScaleType: context.gradingScaleType
             ) {
                 refreshID = UUID()
             }

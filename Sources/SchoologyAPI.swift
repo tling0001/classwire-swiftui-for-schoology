@@ -423,14 +423,15 @@ actor SchoologyAPI {
             request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
             request.setValue("image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8", forHTTPHeaderField: "Accept")
             request.setValue("https://\(webHost)/", forHTTPHeaderField: "Referer")
-            if currentURL.host?.caseInsensitiveCompare(apiHost) == .orderedSame {
+            let requestHost = currentURL.host?.lowercased() ?? ""
+            let schoologyDomain = useCanadianServer ? "schoologyca.com" : "schoology.com"
+            if requestHost == schoologyDomain || requestHost.hasSuffix("." + schoologyDomain) {
+                request.setValue(mobileCookie, forHTTPHeaderField: "Cookie")
+            }
+            if requestHost == apiHost.lowercased() {
                 request.setValue("Android", forHTTPHeaderField: "X-Schoology-Client")
                 request.setValue("2026.10.0", forHTTPHeaderField: "X-Schoology-App-Version")
-                request.setValue(mobileCookie, forHTTPHeaderField: "Cookie")
-                request.setValue(
-                    try authorization(method: "GET", url: currentURL, auth: auth, extra: []),
-                    forHTTPHeaderField: "Authorization"
-                )
+                request.setValue(try authorization(method: "GET", url: currentURL, auth: auth, extra: []), forHTTPHeaderField: "Authorization")
             }
 
             let (data, response) = try await session.data(for: request, delegate: redirectDelegate)
@@ -443,15 +444,29 @@ actor SchoologyAPI {
                 currentURL = nextURL
                 continue
             }
-            guard (200..<300).contains(http.statusCode), data.count <= 12 * 1024 * 1024 else { return nil }
+            guard (200..<300).contains(http.statusCode), !data.isEmpty, data.count <= 12 * 1024 * 1024 else { return nil }
             let mime = http.value(forHTTPHeaderField: "Content-Type")?.lowercased() ?? ""
-            guard mime.hasPrefix("image/") else { return nil }
+            guard mime.hasPrefix("image/") || Self.hasRecognizedImageSignature(data) else { return nil }
             imageDataCache.setObject(data as NSData, forKey: cacheKey, cost: data.count)
             return data
         }
         return nil
     }
 
+
+    private static func hasRecognizedImageSignature(_ data: Data) -> Bool {
+        let bytes = [UInt8](data.prefix(16))
+        if bytes.count >= 8, Array(bytes[0..<8]) == [137, 80, 78, 71, 13, 10, 26, 10] { return true }
+        if bytes.count >= 3, bytes[0] == 0xFF, bytes[1] == 0xD8, bytes[2] == 0xFF { return true }
+        if bytes.count >= 6, String(bytes: bytes[0..<6], encoding: .ascii)?.hasPrefix("GIF8") == true { return true }
+        if bytes.count >= 12, String(bytes: bytes[0..<4], encoding: .ascii) == "RIFF",
+           String(bytes: bytes[8..<12], encoding: .ascii) == "WEBP" { return true }
+        if bytes.count >= 12, String(bytes: bytes[4..<8], encoding: .ascii) == "ftyp" {
+            let brand = String(bytes: bytes[8..<12], encoding: .ascii) ?? ""
+            if ["avif", "avis", "heic", "heix", "hevc", "hevx", "mif1", "msf1"].contains(brand) { return true }
+        }
+        return false
+    }
 
     func attachmentData(_ url: URL, auth: SchoologyAuth, cookies: [SchoologyWebCookie], allowHTMLAttachment: Bool = false) async throws -> (Data, String) {
         guard url.scheme?.lowercased() == "https", url.host != nil else { throw SchoologyAPIError.invalidResponse }

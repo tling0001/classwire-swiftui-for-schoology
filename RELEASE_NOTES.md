@@ -1,5 +1,21 @@
 # Release notes
 
+## [2026.10.0-port.125]
+
+### Teacher grading
+- Follow Android's teacher workflow by paginating active enrollments, assignment grade rows, and submission revisions instead of stopping at the first 200 records.
+- Add native rubric grading with criterion scores, preset rating choices, criterion comments, overall comments, student comment visibility, and optional total-grade overrides.
+- Save rubric criteria and override state through Schoology's rubric-grade endpoint while retaining numeric grading for non-rubric assignments.
+
+### Post images
+- Accept valid image bytes when Schoology labels the response as generic binary data, validating common raster image signatures instead of relying only on MIME headers.
+- Forward the mobile session cookie to Schoology-owned image hosts and recognize additional image attachment URL, MIME, and filename-extension variants.
+
+### Build
+- Increment the Apple bundle marketing version to `2026.10.125` and build number to `125`.
+
+
+
 ## [2026.10.0-port.124]
 
 ### Post images

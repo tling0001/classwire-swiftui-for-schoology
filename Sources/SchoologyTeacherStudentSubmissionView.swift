@@ -8,6 +8,7 @@ struct SchoologyTeacherStudentSubmissionView: View {
     let gradeItemID: String
     let student: SchoologyAssignmentStudent
     let maxPoints: String
+    let gradingScaleType: String?
     let onSaved: () -> Void
 
     @State private var profile: SchoologyProfileItem?
@@ -15,6 +16,10 @@ struct SchoologyTeacherStudentSubmissionView: View {
     @State private var grade = ""
     @State private var comment = ""
     @State private var commentVisible = false
+    @State private var rubric: SchoologyTeacherRubric?
+    @State private var rubricGrades: [String: SchoologyRubricCriterionGrade] = [:]
+    @State private var rubricOverride = ""
+    @State private var rubricLoadFailed = false
     @State private var isLoading = true
     @State private var isSaving = false
     @State private var error: String?
@@ -45,19 +50,23 @@ struct SchoologyTeacherStudentSubmissionView: View {
                             }
 
                             VStack(alignment: .leading, spacing: 12) {
-                                Text("Grade").font(.headline)
-                                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                                    TextField("Grade", text: $grade)
-                                        #if os(iOS)
-                                        .keyboardType(.decimalPad)
-                                        #endif
-                                    if !maxPoints.isEmpty {
-                                        Text("/ " + SchoologyGradeValueFormatter.display(maxPoints))
-                                            .foregroundStyle(.secondary)
+                                if let rubric {
+                                    rubricEditor(rubric)
+                                } else {
+                                    Text("Grade").font(.headline)
+                                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                                        TextField("Grade", text: $grade)
+                                            #if os(iOS)
+                                            .keyboardType(.decimalPad)
+                                            #endif
+                                        if !maxPoints.isEmpty {
+                                            Text("/ " + SchoologyGradeValueFormatter.display(maxPoints))
+                                                .foregroundStyle(.secondary)
+                                        }
                                     }
+                                    .padding(12)
+                                    .background(.background, in: RoundedRectangle(cornerRadius: 10))
                                 }
-                                .padding(12)
-                                .background(.background, in: RoundedRectangle(cornerRadius: 10))
                                 Text("Overall Comment").font(.headline)
                                 TextField("Write an overall comment…", text: $comment, axis: .vertical)
                                     .lineLimit(4...10)
@@ -95,7 +104,7 @@ struct SchoologyTeacherStudentSubmissionView: View {
                     Button("Save Grade", systemImage: "checkmark") {
                         Task { await saveGrade() }
                     }
-                    .disabled(isLoading || isSaving || (!grade.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && Double(grade) == nil))
+                    .disabled(isLoading || isSaving || rubricLoadFailed || (rubric == nil && !grade.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && Double(grade) == nil))
                 }
             }
             .task(id: student.id) { await load() }
@@ -163,6 +172,68 @@ struct SchoologyTeacherStudentSubmissionView: View {
         .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(.quaternary))
     }
 
+    @ViewBuilder
+    private func rubricEditor(_ rubric: SchoologyTeacherRubric) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Text(rubric.title).font(.headline)
+                Spacer()
+                Text("\(SchoologyGradeValueFormatter.display(rubric.totalPoints.formatted())) pts").font(.caption).foregroundStyle(.secondary)
+            }
+            ForEach(rubric.criteria) { criterion in
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(criterion.title).font(.subheadline.weight(.semibold))
+                    if !criterion.description.isEmpty { Text(criterion.description).font(.caption).foregroundStyle(.secondary) }
+                    HStack {
+                        TextField("Points", text: criterionGradeBinding(criterion.id))
+                            #if os(iOS)
+                            .keyboardType(.decimalPad)
+                            #endif
+                            .frame(maxWidth: 110)
+                        Text("/ \(SchoologyGradeValueFormatter.display(criterion.maxPoints.formatted()))").font(.caption).foregroundStyle(.secondary)
+                        Spacer()
+                        if !criterion.ratings.isEmpty {
+                            Menu("Rating") {
+                                ForEach(criterion.ratings) { rating in
+                                    Button("\(SchoologyGradeValueFormatter.display(rating.points.formatted())) · \(rating.description)") {
+                                        let old = rubricGrades[criterion.id] ?? SchoologyRubricCriterionGrade(grade: "", comment: "")
+                                        rubricGrades[criterion.id] = SchoologyRubricCriterionGrade(grade: rating.points.formatted(), comment: old.comment)
+                                    }
+                                }
+                            }
+                            .font(.caption)
+                        }
+                    }
+                    TextField("Criterion comment", text: criterionCommentBinding(criterion.id), axis: .vertical).lineLimit(2...4)
+                }
+                .padding(12)
+                .background(.background, in: RoundedRectangle(cornerRadius: 10))
+            }
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Override total (optional)").font(.subheadline.weight(.semibold))
+                TextField("Calculated from rubric", text: $rubricOverride)
+                    #if os(iOS)
+                    .keyboardType(.decimalPad)
+                    #endif
+            }
+        }
+        .accessibilityElement(children: .contain)
+    }
+
+    private func criterionGradeBinding(_ id: String) -> Binding<String> {
+        Binding(get: { rubricGrades[id]?.grade ?? "" }, set: { value in
+            let old = rubricGrades[id] ?? SchoologyRubricCriterionGrade(grade: "", comment: "")
+            rubricGrades[id] = SchoologyRubricCriterionGrade(grade: value, comment: old.comment)
+        })
+    }
+
+    private func criterionCommentBinding(_ id: String) -> Binding<String> {
+        Binding(get: { rubricGrades[id]?.comment ?? "" }, set: { value in
+            let old = rubricGrades[id] ?? SchoologyRubricCriterionGrade(grade: "", comment: "")
+            rubricGrades[id] = SchoologyRubricCriterionGrade(grade: old.grade, comment: value)
+        })
+    }
+
     private func load() async {
         isLoading = true
         error = nil
@@ -183,6 +254,21 @@ struct SchoologyTeacherStudentSubmissionView: View {
             comment = gradeData.comment
             commentVisible = gradeData.commentVisible
         }
+        if !session.isDemoMode, gradingScaleType == "2" || gradingScaleType?.lowercased().contains("rubric") == true {
+            do {
+                if let loaded = try await session.loadTeacherRubric(sectionID: sectionID, gradeItemID: gradeItemID, enrollmentID: student.enrollmentID) {
+                    rubric = loaded.0
+                    rubricGrades = loaded.1.criteria
+                    rubricOverride = loaded.1.overrideGrade
+                    if !loaded.1.totalGrade.isEmpty { grade = loaded.1.totalGrade }
+                    if !loaded.1.comment.isEmpty { comment = loaded.1.comment }
+                    commentVisible = loaded.1.commentVisible
+                }
+            } catch {
+                rubricLoadFailed = true
+                self.error = "Unable to load the grading rubric: " + error.localizedDescription
+            }
+        }
         revisions = (await revisionRequest) ?? []
         if profile == nil && revisions.isEmpty {
             error = "ClassWire couldn't load this student's profile or submission details."
@@ -196,14 +282,14 @@ struct SchoologyTeacherStudentSubmissionView: View {
         error = nil
         saveConfirmation = nil
         do {
-            try await session.updateTeacherAssignmentGrade(
-                sectionID: sectionID,
-                assignmentID: gradeItemID,
-                enrollmentID: student.enrollmentID,
-                grade: grade,
-                comment: comment,
-                commentVisible: commentVisible
-            )
+            if let rubric {
+                try await session.updateTeacherRubricGrade(sectionID: sectionID, gradeItemID: gradeItemID,
+                    enrollmentID: student.enrollmentID, rubric: rubric, criteriaGrades: rubricGrades,
+                    overrideGrade: rubricOverride, comment: comment, commentVisible: commentVisible)
+            } else {
+                try await session.updateTeacherAssignmentGrade(sectionID: sectionID, assignmentID: gradeItemID,
+                    enrollmentID: student.enrollmentID, grade: grade, comment: comment, commentVisible: commentVisible)
+            }
             saveConfirmation = "Grade saved"
             onSaved()
         } catch {

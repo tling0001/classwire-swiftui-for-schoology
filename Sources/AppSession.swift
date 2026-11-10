@@ -1530,7 +1530,7 @@ final class AppSession {
                 ?? demoAssignments(for: sectionID).first
                 ?? SchoologyProfileItem(id: assignmentID, title: "Assignment", body: "Fictional assignment details.", subtitle: "", url: nil, isAdmin: false, kind: "assignment", collectionID: nil)
             return SchoologyAssignmentContext(assignment: assignment, canSubmit: !demoIsTeacher, allowComments: true, isTeacher: demoIsTeacher,
-                gradeItemID: assignmentID, enrollmentID: demoIsTeacher ? "demo-student" : nil, ltiURL: nil, currentGrade: "18", maxPoints: "20",
+                gradeItemID: assignmentID, enrollmentID: demoIsTeacher ? "demo-student" : nil, ltiURL: nil, gradingScaleID: nil, gradingScaleType: nil, currentGrade: "18", maxPoints: "20",
                 richDescription: assignment.body, teacherComment: "Nice work — keep it up!", attachments: [])
         }
         guard let auth else { throw SchoologyAPIError.notSignedIn }
@@ -1610,6 +1610,8 @@ final class AppSession {
             SchoologyProfileItem(id: assignmentID, title: "Assignment", body: "", subtitle: "", url: nil, isAdmin: false, kind: "assignment", collectionID: nil)
         return SchoologyAssignmentContext(assignment: profile, canSubmit: canSubmit, allowComments: allowComments, isTeacher: isTeacher,
             gradeItemID: gradeItemID, enrollmentID: enrollmentID, ltiURL: ltiURL,
+            gradingScaleID: SchoologyValue.optionalString(gradeItem["grading_scale"] ?? gradeItem["gradingScale"] ?? gradeItem["grading_scale_id"] ?? gradeItem["gradingScaleId"]),
+            gradingScaleType: SchoologyValue.optionalString(gradeItem["grading_scale_type"] ?? gradeItem["gradingScaleType"]),
             currentGrade: SchoologyValue.string(grade["grade"] ?? grade["calculated_grade"], fallback: "—"),
             maxPoints: SchoologyValue.string(rawAssignment["max_points"] ?? rawAssignment["maxPoints"] ?? gradeItem["max_points"] ?? gradeItem["maxPoints"]),
             richDescription: richDescription, teacherComment: teacherComment, attachments: attachments)
@@ -1626,19 +1628,30 @@ final class AppSession {
             return SchoologyValue.plainText(SchoologyValue.string((value as? [String: Any])?["comment"] ?? (value as? [String: Any])?["body"] ?? value))
         }
         if context.isTeacher {
-            async let enrollmentsRequest = api.get("sections/\(sectionID)/enrollments", auth: auth, params: ["enrollment_status": "1", "limit": "200"])
-            async let gradesRequest = api.get("sections/\(sectionID)/grades", auth: auth, params: ["assignment_id": context.gradeItemID, "limit": "200"])
-            async let submissionsRequest = try? await api.get("sections/\(sectionID)/submissions/\(context.gradeItemID)", auth: auth, params: ["with_attachments": "TRUE", "all_revisions": "TRUE", "limit": "200"])
-            let (enrollmentData, gradeData, submissionData) = try await (enrollmentsRequest, gradesRequest, submissionsRequest)
-            let enrollments = SchoologyValue.list(Self.object(enrollmentData), keys: ["enrollment", "enrollments", "items"]).filter { !SchoologyValue.bool($0["admin"]) && SchoologyValue.string($0["status"], fallback: "1") == "1" }
-            let grades = SchoologyValue.list(Self.object(gradeData), keys: ["grade", "grades", "items"])
+            func loadAllPages(path: String, base: [String: String], keys: [String]) async throws -> [[String: Any]] {
+                var rows: [[String: Any]] = []
+                var offset = 0
+                for _ in 0..<100 {
+                    var params = base
+                    params["start"] = String(offset)
+                    params["limit"] = "200"
+                    let data = try await api.get(path, auth: auth, params: params)
+                    let page = SchoologyValue.list(Self.object(data), keys: keys)
+                    rows.append(contentsOf: page)
+                    if page.count < 200 { break }
+                    offset += page.count
+                }
+                return rows
+            }
+            async let enrollmentsRequest = loadAllPages(path: "sections/\(sectionID)/enrollments", base: ["enrollment_status": "1"], keys: ["enrollment", "enrollments", "items"])
+            async let gradesRequest = loadAllPages(path: "sections/\(sectionID)/grades", base: ["assignment_id": context.gradeItemID], keys: ["grade", "grades", "items"])
+            async let revisionsRequest = loadAllPages(path: "sections/\(sectionID)/submissions/\(context.gradeItemID)", base: ["with_attachments": "TRUE", "all_revisions": "TRUE"], keys: ["revision", "revisions", "items"])
+            let (allEnrollments, grades, revisions) = try await (enrollmentsRequest, gradesRequest, revisionsRequest)
+            let enrollments = allEnrollments.filter { !SchoologyValue.bool($0["admin"]) && SchoologyValue.string($0["status"], fallback: "1") == "1" }
             let gradeByEnrollment = Dictionary(grades.compactMap { row -> (String, [String: Any])? in
                 let id = SchoologyValue.string(row["enrollment_id"] ?? row["enrollmentId"])
                 return id.isEmpty ? nil : (id, row)
             }, uniquingKeysWith: { first, _ in first })
-            let root = submissionData.map(Self.object) ?? [:]
-            let nested = root["data"] as? [String: Any]
-            let revisions = SchoologyValue.list(root["revision"] ?? root["revisions"] ?? nested?["revision"] ?? nested?["revisions"], keys: ["revision", "revisions", "items"])
             let students = enrollments.map { row -> SchoologyAssignmentStudent in
                 let uid = SchoologyValue.string(row["uid"] ?? row["user_id"] ?? row["userId"])
                 let eid = SchoologyValue.string(row["id"] ?? row["enrollment_id"])
@@ -1778,6 +1791,67 @@ final class AppSession {
             params: ["with_attachments": "TRUE", "all_revisions": "TRUE", "start": "0", "limit": "200"]
         )
         return decodeAssignmentRevisions(from: Self.object(data))
+    }
+
+    func loadTeacherRubric(sectionID: String, gradeItemID: String, enrollmentID: String) async throws -> (SchoologyTeacherRubric, SchoologyTeacherRubricGrade)? {
+        guard let auth else { throw SchoologyAPIError.notSignedIn }
+        let itemData = try await api.get("sections/\(sectionID)/grade_items/\(gradeItemID)", auth: auth)
+        let itemRoot = Self.object(itemData)
+        let item = (itemRoot["assignment"] as? [String: Any]) ?? (itemRoot["grade_item"] as? [String: Any]) ?? (itemRoot["gradeItem"] as? [String: Any]) ?? itemRoot
+        let scaleType = SchoologyValue.string(item["grading_scale_type"] ?? item["gradingScaleType"])
+        let rubricID = SchoologyValue.string(item["grading_scale"] ?? item["gradingScale"] ?? item["grading_scale_id"] ?? item["gradingScaleId"] ?? item["rubric_id"] ?? item["rubricId"])
+        guard !rubricID.isEmpty, scaleType == "2" || scaleType.lowercased().contains("rubric") else { return nil }
+        async let rubricRequest = api.get("sections/\(sectionID)/grading_rubrics/\(rubricID)", auth: auth)
+        async let gradeRequest = api.get("rubric_grade/\(rubricID)/grade_item/\(gradeItemID)/enrollment/\(enrollmentID)", auth: auth)
+        let (rubricData, gradeData) = try await (rubricRequest, gradeRequest)
+        let rubricRoot = Self.object(rubricData)
+        let rubric = (rubricRoot["grading_rubric"] as? [String: Any]) ?? (rubricRoot["rubric"] as? [String: Any]) ?? rubricRoot
+        let criteria = SchoologyValue.list(rubric["criteria"] ?? rubric["criterion"], keys: ["criteria", "criterion", "items"]).compactMap { row -> SchoologyRubricCriterion? in
+            let id = SchoologyValue.string(row["id"] ?? row["criteria_id"] ?? row["criteriaId"])
+            guard !id.isEmpty else { return nil }
+            let ratings = SchoologyValue.list(row["ratings"] ?? row["rating"], keys: ["ratings", "rating", "items"]).compactMap { rating -> SchoologyRubricRating? in
+                guard let points = Double(SchoologyValue.string(rating["points"])) else { return nil }
+                return SchoologyRubricRating(points: points, description: SchoologyValue.string(rating["description"]))
+            }
+            return SchoologyRubricCriterion(id: id, title: SchoologyValue.string(row["title"], fallback: "Criterion"),
+                description: SchoologyValue.string(row["description"]),
+                maxPoints: Double(SchoologyValue.string(row["max_points"] ?? row["maxPoints"])) ?? 0,
+                weight: Double(SchoologyValue.string(row["weight"])) ?? 0, ratings: ratings)
+        }
+        let gradeRoot = Self.object(gradeData)
+        let grade = (gradeRoot["rubric_grade"] as? [String: Any]) ?? (gradeRoot["grade"] as? [String: Any]) ?? gradeRoot
+        let rows = SchoologyValue.list(grade["criteria_grades"] ?? grade["criteriaGrades"], keys: ["criteria_grades", "criteriaGrades", "items"])
+        var criterionGrades: [String: SchoologyRubricCriterionGrade] = [:]
+        for row in rows {
+            let id = SchoologyValue.string(row["criteria_id"] ?? row["criteriaId"])
+            if !id.isEmpty { criterionGrades[id] = SchoologyRubricCriterionGrade(grade: SchoologyValue.string(row["grade"]), comment: SchoologyValue.string(row["comment"])) }
+        }
+        return (
+            SchoologyTeacherRubric(id: SchoologyValue.string(rubric["id"], fallback: rubricID),
+                title: SchoologyValue.string(rubric["title"], fallback: "Rubric"),
+                totalPoints: Double(SchoologyValue.string(rubric["total_points"] ?? rubric["totalPoints"])) ?? 0,
+                criteria: criteria),
+            SchoologyTeacherRubricGrade(totalGrade: SchoologyValue.string(grade["total_grade"]),
+                overrideGrade: SchoologyValue.string(grade["total_grade_override"] ?? grade["totalGradeOverride"]),
+                comment: SchoologyValue.plainText(SchoologyValue.string(grade["comment"])),
+                commentVisible: SchoologyValue.bool(grade["comment_status"] ?? grade["commentStatus"]),
+                criteria: criterionGrades)
+        )
+    }
+
+    func updateTeacherRubricGrade(sectionID: String, gradeItemID: String, enrollmentID: String, rubric: SchoologyTeacherRubric,
+        criteriaGrades: [String: SchoologyRubricCriterionGrade], overrideGrade: String, comment: String, commentVisible: Bool) async throws {
+        guard let auth, let enrollment = Int(enrollmentID), enrollment > 0, let rubricID = Int(rubric.id) else { throw SchoologyAPIError.invalidResponse }
+        let rows: [[String: Any]] = rubric.criteria.map { criterion in
+            let value = criteriaGrades[criterion.id] ?? SchoologyRubricCriterionGrade(grade: "", comment: "")
+            return ["criteria_id": Int(criterion.id) ?? 0, "grade": value.grade.isEmpty ? (NSNull() as Any) : (Double(value.grade) ?? 0), "comment": value.comment]
+        }
+        var payload: [String: Any] = ["criteria_grades": rows, "comment": comment, "comment_status": commentVisible ? 1 : 0]
+        let override = overrideGrade.trimmingCharacters(in: .whitespacesAndNewlines)
+        if override.isEmpty { payload["clear_total_grade_override"] = 1 }
+        else if let value = Double(override) { payload["total_grade_override"] = value }
+        else { throw SchoologyAPIError.invalidResponse }
+        _ = try await api.putJSON("rubric_grade/\(rubricID)/grade_item/\(gradeItemID)/enrollment/\(enrollment)", auth: auth, body: payload)
     }
 
     func updateTeacherAssignmentGrade(sectionID: String, assignmentID: String, enrollmentID: String, grade: String, comment: String, commentVisible: Bool) async throws {

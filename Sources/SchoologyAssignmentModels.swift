@@ -13,6 +13,8 @@ struct SchoologyAssignmentContext: Sendable {
     let gradeItemID: String
     let enrollmentID: String?
     let ltiURL: URL?
+    let gradingScaleID: String?
+    let gradingScaleType: String?
     let currentGrade: String
     let maxPoints: String
     let richDescription: String
@@ -44,4 +46,36 @@ struct SchoologyTeacherGrade: Sendable {
     let grade: String
     let comment: String
     let commentVisible: Bool
+}
+
+
+struct SchoologyRubricRating: Identifiable, Sendable {
+    let points: Double
+    let description: String
+    var id: String { "\(points)-\(description)" }
+}
+struct SchoologyRubricCriterion: Identifiable, Sendable {
+    let id: String
+    let title: String
+    let description: String
+    let maxPoints: Double
+    let weight: Double
+    let ratings: [SchoologyRubricRating]
+}
+struct SchoologyRubricCriterionGrade: Sendable {
+    let grade: String
+    let comment: String
+}
+struct SchoologyTeacherRubric: Sendable {
+    let id: String
+    let title: String
+    let totalPoints: Double
+    let criteria: [SchoologyRubricCriterion]
+}
+struct SchoologyTeacherRubricGrade: Sendable {
+    let totalGrade: String
+    let overrideGrade: String
+    let comment: String
+    let commentVisible: Bool
+    let criteria: [String: SchoologyRubricCriterionGrade]
 }
