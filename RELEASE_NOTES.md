@@ -1,5 +1,15 @@
 # Release notes
 
+## [2026.10.0-port.120]
+
+### Fixed
+- Remove the iOS 27/macOS 27-only bordered text-field style that prevented the iOS 18 and macOS 14 targets from archiving.
+- Let SwiftUI choose its native default text-field appearance for school search, username, and password controls, preserving native platform behavior without raising deployment targets.
+
+### Build
+- Increment the Apple bundle marketing version to `2026.10.120` and build number to `120`.
+
+
 ## [2026.10.0-port.119]
 
 ### Fixed
