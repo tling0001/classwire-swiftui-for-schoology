@@ -59,7 +59,7 @@ struct SchoologyPeopleDirectoryView: View {
     }
 
     var body: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: membersMode ? 8 : 10) {
             HStack(spacing: 10) {
                 Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
                 TextField(placeholder, text: $searchText)
@@ -85,12 +85,15 @@ struct SchoologyPeopleDirectoryView: View {
             }
             .padding(10)
             .background(.quaternary.opacity(0.55), in: RoundedRectangle(cornerRadius: 10))
+            .padding(.horizontal, membersMode ? 16 : 0)
 
             if membersMode {
                 Picker("Filter members", selection: $filter) {
                     ForEach(SchoologyPeopleFilter.allCases) { Text($0.rawValue).tag($0) }
                 }
-                .pickerStyle(.segmented).accessibilityLabel("Filter members")
+                .pickerStyle(.segmented)
+                .accessibilityLabel("Filter members")
+                .padding(.horizontal, 16)
             }
 
             if visibleItems.isEmpty {
@@ -137,10 +140,13 @@ struct SchoologyPeopleDirectoryView: View {
                         }
                     }
                 }
-                .listStyle(.automatic)
+                .listStyle(membersMode ? .plain : .automatic)
+                .scrollContentBackground(.hidden)
+                .contentMargins(.horizontal, 0, for: .scrollContent)
+                .contentMargins(.bottom, 0, for: .scrollContent)
             }
         }
-        .padding()
+        .padding(membersMode ? 0 : 16)
     }
 
     private func directoryName(_ person: SchoologyProfileItem) -> String {

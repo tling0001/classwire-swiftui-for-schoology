@@ -72,10 +72,10 @@ jobs:
         shell: bash
         run: |
           VERSION="$(tr -d '[:space:]' < VERSION)"
-          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+-port\.[0-9]+$ ]] || { echo "Invalid VERSION: $VERSION" >&2; exit 1; }
+          [[ "$VERSION" =~ ^([0-9]+\.[0-9]+\.[0-9]+)\.([0-9]+)$ ]] || { echo "Invalid VERSION: $VERSION (expected MAJOR.MINOR.PATCH.ITERATION)" >&2; exit 1; }
           echo "value=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "marketing=${VERSION%-port.*}" >> "$GITHUB_OUTPUT"
-          echo "build=${VERSION##*-port.}" >> "$GITHUB_OUTPUT"
+          echo "marketing=${BASH_REMATCH[1]}" >> "$GITHUB_OUTPUT"
+          echo "build=${BASH_REMATCH[2]}" >> "$GITHUB_OUTPUT"
       - name: Verify Developer ID signing configuration
         shell: bash
         env:
@@ -223,10 +223,10 @@ jobs:
         shell: bash
         run: |
           VERSION="$(tr -d '[:space:]' < VERSION)"
-          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+-port\.[0-9]+$ ]] || { echo "Invalid VERSION: $VERSION" >&2; exit 1; }
+          [[ "$VERSION" =~ ^([0-9]+\.[0-9]+\.[0-9]+)\.([0-9]+)$ ]] || { echo "Invalid VERSION: $VERSION (expected MAJOR.MINOR.PATCH.ITERATION)" >&2; exit 1; }
           echo "value=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "marketing=${VERSION%-port.*}" >> "$GITHUB_OUTPUT"
-          echo "build=${VERSION##*-port.}" >> "$GITHUB_OUTPUT"
+          echo "marketing=${BASH_REMATCH[1]}" >> "$GITHUB_OUTPUT"
+          echo "build=${BASH_REMATCH[2]}" >> "$GITHUB_OUTPUT"
       - name: Verify iOS Ad Hoc signing configuration
         shell: bash
         env:
@@ -409,10 +409,10 @@ jobs:
         shell: bash
         run: |
           VERSION="$(tr -d '[:space:]' < VERSION)"
-          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+-port\.[0-9]+$ ]] || { echo "Invalid VERSION: $VERSION" >&2; exit 1; }
+          [[ "$VERSION" =~ ^([0-9]+\.[0-9]+\.[0-9]+)\.([0-9]+)$ ]] || { echo "Invalid VERSION: $VERSION (expected MAJOR.MINOR.PATCH.ITERATION)" >&2; exit 1; }
           echo "value=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "marketing=${VERSION%-port.*}" >> "$GITHUB_OUTPUT"
-          echo "build=${VERSION##*-port.}" >> "$GITHUB_OUTPUT"
+          echo "marketing=${BASH_REMATCH[1]}" >> "$GITHUB_OUTPUT"
+          echo "build=${BASH_REMATCH[2]}" >> "$GITHUB_OUTPUT"
       - name: Verify iOS Ad Hoc signing configuration
         shell: bash
         env:
@@ -564,10 +564,10 @@ jobs:
         shell: bash
         run: |
           VERSION="$(tr -d '[:space:]' < VERSION)"
-          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+-port\.[0-9]+$ ]] || { echo "Invalid VERSION: $VERSION" >&2; exit 1; }
+          [[ "$VERSION" =~ ^([0-9]+\.[0-9]+\.[0-9]+)\.([0-9]+)$ ]] || { echo "Invalid VERSION: $VERSION (expected MAJOR.MINOR.PATCH.ITERATION)" >&2; exit 1; }
           echo "value=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "marketing=${VERSION%-port.*}" >> "$GITHUB_OUTPUT"
-          echo "build=${VERSION##*-port.}" >> "$GITHUB_OUTPUT"
+          echo "marketing=${BASH_REMATCH[1]}" >> "$GITHUB_OUTPUT"
+          echo "build=${BASH_REMATCH[2]}" >> "$GITHUB_OUTPUT"
       - name: Verify App Store Connect signing configuration
         shell: bash
         env:
@@ -745,10 +745,10 @@ jobs:
         shell: bash
         run: |
           VERSION="$(tr -d '[:space:]' < VERSION)"
-          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+-port\.[0-9]+$ ]] || { echo "Invalid VERSION: $VERSION" >&2; exit 1; }
+          [[ "$VERSION" =~ ^([0-9]+\.[0-9]+\.[0-9]+)\.([0-9]+)$ ]] || { echo "Invalid VERSION: $VERSION (expected MAJOR.MINOR.PATCH.ITERATION)" >&2; exit 1; }
           echo "value=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "marketing=${VERSION%-port.*}" >> "$GITHUB_OUTPUT"
-          echo "build=${VERSION##*-port.}" >> "$GITHUB_OUTPUT"
+          echo "marketing=${BASH_REMATCH[1]}" >> "$GITHUB_OUTPUT"
+          echo "build=${BASH_REMATCH[2]}" >> "$GITHUB_OUTPUT"
       - name: Verify Mac App Store signing configuration
         shell: bash
         env:

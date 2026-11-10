@@ -1,5 +1,15 @@
 # Release notes
 
+## [2026.10.0.110]
+
+### Fixed
+- Remove the extra outer margins around course and group member lists. Keep search and filter controls comfortably inset while allowing the list to fill its available area with a seamless system background in light and dark appearances.
+
+### Versioning
+- Change release identifiers to `MAJOR.MINOR.PATCH.ITERATION` (for example, `2026.10.0.110`) instead of the `-port.N` suffix.
+- Keep Apple's required three-component marketing version (`2026.10.0`) and increment the independent bundle build number to 110.
+
+
 ## [2026.10.0-port.109]
 
 ### AI model selection
