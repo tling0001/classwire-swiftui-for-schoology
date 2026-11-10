@@ -1,5 +1,16 @@
 # Release notes
 
+## [2026.10.0-port.105]
+
+### ClassWire AI layout
+- Correct the floating assistant overlay's layout bounds so its button stays anchored to the bottom-right safe-area corner on iPhone instead of appearing in the middle of the screen.
+- Replace the full-width AI message composer bar with a compact, rounded floating Liquid Glass composer on iOS 26 and macOS 26, with a regular-material fallback on earlier supported OS versions.
+- Preserve the multiline message field, 44-point send target, keyboard submission, and adaptive layout.
+
+### Build
+- Increment the iOS and macOS bundle build number to 105.
+
+
 ## [2026.10.0-port.104]
 
 ### ClassWire AI floating assistant

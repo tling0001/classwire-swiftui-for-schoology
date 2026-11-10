@@ -342,15 +342,33 @@ struct ClassWireAIAssistantView: View {
         .frame(maxWidth: .infinity, alignment: .top)
     }
 
+    @ViewBuilder
     private var composer: some View {
+        if #available(iOS 26.0, macOS 26.0, *) {
+            composerContent
+                .glassEffect(.regular, in: .rect(cornerRadius: 28))
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+        } else {
+            composerContent
+                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 28))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 28)
+                        .strokeBorder(.quaternary, lineWidth: 1)
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+        }
+    }
+
+    private var composerContent: some View {
         HStack(alignment: .bottom, spacing: 10) {
             TextField("Ask about your Schoology work…", text: $draft, axis: .vertical)
                 .lineLimit(1...5)
                 .textFieldStyle(.plain)
-                .padding(.horizontal, 13)
-                .padding(.vertical, 11)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 10)
                 .frame(minHeight: 44)
-                .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 18))
                 .focused($composerFocused)
                 .onSubmit(sendDraft)
                 .accessibilityLabel("Message ClassWire AI")
@@ -367,9 +385,8 @@ struct ClassWireAIAssistantView: View {
             .accessibilityLabel("Send message")
             .accessibilityHint("Sends your question to ClassWire AI.")
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .background(.bar)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
     }
 
     private func actionProposal(_ action: ClassWireAIPendingAction) -> some View {

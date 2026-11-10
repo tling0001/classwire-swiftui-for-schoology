@@ -52,6 +52,7 @@ struct RootView: View {
         .overlay {
             if session.isSignedIn {
                 ClassWireAIFloatingAssistantOverlay()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
         .onOpenURL(perform: handleIncomingURL)

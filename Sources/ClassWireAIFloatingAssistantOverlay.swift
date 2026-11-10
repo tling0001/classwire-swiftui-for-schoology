@@ -27,7 +27,9 @@ struct ClassWireAIFloatingAssistantOverlay: View {
                         .zIndex(2)
                 }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            // Keep the assistant layer equal to the complete bounds proposed by its host overlay.
+            // This makes the bottom-trailing alignment independent of the GeometryReader's ideal size.
+            .frame(width: geometry.size.width, height: geometry.size.height, alignment: controlAlignment)
             .animation(reduceMotion ? nil : .snappy(duration: 0.24), value: isPresented)
         }
         .allowsHitTesting(buttonVisible || isPresented)
