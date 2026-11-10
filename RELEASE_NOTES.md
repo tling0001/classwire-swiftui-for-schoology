@@ -1,5 +1,20 @@
 # Release notes
 
+## [2026.10.0-port.126]
+
+### macOS AI access
+- Replace the floating AI overlay on macOS with a standard, labeled toolbar action that opens the existing native assistant in a resizable sheet.
+- Add the matching ClassWire menu-bar command and Option-Command-A shortcut so AI remains discoverable when the toolbar is hidden or customized.
+- Keep the floating assistant control on iPhone and iPad.
+
+### Teacher grading and build
+- Fix the Swift 6.4 region-isolation archive failure by keeping untyped paginated JSON results on the main actor instead of returning them through concurrent task groups.
+- Retain full pagination for active enrollments, grades, and submission revisions.
+
+### Build
+- Increment the Apple bundle marketing version to `2026.10.126` and build number to `126`.
+
+
 ## [2026.10.0-port.125]
 
 ### Teacher grading

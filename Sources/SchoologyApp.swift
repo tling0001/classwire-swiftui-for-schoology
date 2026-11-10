@@ -190,6 +190,12 @@ struct SchoologyCommands: Commands {
             Button("Messages") { session.destination = .messages }
                 .keyboardShortcut("3", modifiers: .command)
             Divider()
+            Button("Open ClassWire AI") {
+                session.isAIAssistantPresented = true
+            }
+            .keyboardShortcut("a", modifiers: [.command, .option])
+            .disabled(!session.isSignedIn)
+            Divider()
             Button("Sign Out") { session.signOut() }
         }
     }

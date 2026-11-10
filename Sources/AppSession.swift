@@ -11,6 +11,7 @@ final class AppSession {
     var destination: AppDestination = .home
     var pendingPersonProfileID: String?
     var pendingAINavigation: ClassWireAINavigationRequest?
+    var isAIAssistantPresented = false
     var aiCurrentCourseID: String?
     var aiCurrentCourseTitle: String?
     var aiCurrentAssignmentID: String?
@@ -1643,10 +1644,24 @@ final class AppSession {
                 }
                 return rows
             }
-            async let enrollmentsRequest = loadAllPages(path: "sections/\(sectionID)/enrollments", base: ["enrollment_status": "1"], keys: ["enrollment", "enrollments", "items"])
-            async let gradesRequest = loadAllPages(path: "sections/\(sectionID)/grades", base: ["assignment_id": context.gradeItemID], keys: ["grade", "grades", "items"])
-            async let revisionsRequest = loadAllPages(path: "sections/\(sectionID)/submissions/\(context.gradeItemID)", base: ["with_attachments": "TRUE", "all_revisions": "TRUE"], keys: ["revision", "revisions", "items"])
-            let (allEnrollments, grades, revisions) = try await (enrollmentsRequest, gradesRequest, revisionsRequest)
+            // Keep untyped JSON page results on the main actor. Swift 6.4
+            // rejects sending [[String: Any]] across async-let isolation.
+            // Requests remain paginated so large classes are not truncated at 200.
+            let allEnrollments = try await loadAllPages(
+                path: "sections/\(sectionID)/enrollments",
+                base: ["enrollment_status": "1"],
+                keys: ["enrollment", "enrollments", "items"]
+            )
+            let grades = try await loadAllPages(
+                path: "sections/\(sectionID)/grades",
+                base: ["assignment_id": context.gradeItemID],
+                keys: ["grade", "grades", "items"]
+            )
+            let revisions = try await loadAllPages(
+                path: "sections/\(sectionID)/submissions/\(context.gradeItemID)",
+                base: ["with_attachments": "TRUE", "all_revisions": "TRUE"],
+                keys: ["revision", "revisions", "items"]
+            )
             let enrollments = allEnrollments.filter { !SchoologyValue.bool($0["admin"]) && SchoologyValue.string($0["status"], fallback: "1") == "1" }
             let gradeByEnrollment = Dictionary(grades.compactMap { row -> (String, [String: Any])? in
                 let id = SchoologyValue.string(row["enrollment_id"] ?? row["enrollmentId"])
