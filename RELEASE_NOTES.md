@@ -1,5 +1,22 @@
 # Release notes
 
+## [2026.10.0-port.124]
+
+### Post images
+- Decode HTML-escaped ampersands in image source URLs so query-string image links remain valid.
+- Give each authenticated image request a terminal failure state, preventing failed or unauthenticated secondary images from displaying a spinner indefinitely.
+- Respect task cancellation when posts or image rows leave the visible hierarchy.
+
+### Shared resources
+- Unify course Materials, group resources, collection browsing, standalone Resources, and the resource picker around one recursive folder/item row.
+- Keep course-specific document resolution and previews while sharing folder expansion, loading/error states, folder colors, and item presentation.
+- Add multi-select checkmarks to the shared resource picker rows and retain selections while navigating folders or importing from resource apps.
+- Increase group resource page size to match collection and school resource browsing.
+
+### Build
+- Increment the Apple bundle marketing version to `2026.10.124` and build number to `124`.
+
+
 ## [2026.10.0-port.123]
 
 ### Sign-in layout

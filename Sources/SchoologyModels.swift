@@ -225,8 +225,11 @@ struct SchoologyActivity: Identifiable, Sendable {
         if let regex = try? NSRegularExpression(pattern: pattern) {
             let range = NSRange(html.startIndex..<html.endIndex, in: html)
             for match in regex.matches(in: html, range: range) {
-                guard let valueRange = Range(match.range(at: 1), in: html),
-                      let url = SchoologyValue.url(String(html[valueRange])) else { continue }
+                guard let valueRange = Range(match.range(at: 1), in: html) else { continue }
+                let rawURL = String(html[valueRange])
+                    .replacingOccurrences(of: "&amp;", with: "&")
+                    .replacingOccurrences(of: "&#38;", with: "&")
+                guard let url = SchoologyValue.url(rawURL) else { continue }
                 urls.append(url)
             }
         }
@@ -371,7 +374,10 @@ enum SchoologyValue {
     }
 
     static func url(_ value: Any?) -> URL? {
-        let raw = string(value).trimmingCharacters(in: .whitespacesAndNewlines)
+        let raw = string(value)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "&amp;", with: "&")
+            .replacingOccurrences(of: "&#38;", with: "&")
         guard !raw.isEmpty else { return nil }
         if raw.hasPrefix("//") { return URL(string: "https:\(raw)") }
         if raw.hasPrefix("/") { return URL(string: "https://app.schoology.com\(raw)") }

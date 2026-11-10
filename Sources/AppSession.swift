@@ -1479,7 +1479,7 @@ final class AppSession {
     func loadGroupResources(groupID: String, folderID: String? = nil, collectionID: String? = nil) async throws -> [SchoologyProfileItem] {
         if isDemoMode { return demoGroupResourceItems[groupID] ?? demoMaterials }
         guard let auth else { throw SchoologyAPIError.notSignedIn }
-        var params = ["limit": "50", "with_attachments": "TRUE"]
+        var params = ["start": "0", "limit": "200", "with_attachments": "TRUE"]
         if let folderID, !folderID.isEmpty { params["f"] = folderID }
         let path: String
         if let collectionID, !collectionID.isEmpty { path = "collections/\(collectionID)/resources" }

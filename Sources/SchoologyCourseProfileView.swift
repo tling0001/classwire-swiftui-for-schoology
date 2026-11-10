@@ -232,7 +232,7 @@ struct SchoologyCourseProfileView: View {
         case .materials:
             List {
                 ForEach(materials) { item in
-                    SchoologyInlineCourseMaterialRow(courseID: course.id, item: item)
+                    SchoologyInlineResourceItemRow(item: item, source: .course(courseID: course.id))
                 }
             }
             .overlay { if materials.isEmpty && loadedTabs.contains(.materials) { ContentUnavailableView("No materials", systemImage: "folder") } }
@@ -317,7 +317,7 @@ struct SchoologyCourseResourceFolderView: View {
         Group {
             if item.isFolder {
                 List(children) { child in
-                    SchoologyInlineCourseMaterialRow(courseID: courseID, item: child)
+                    SchoologyInlineResourceItemRow(item: child, source: .course(courseID: courseID))
                 }
                 .overlay {
                     if loading { ProgressView("Loading materials…") }

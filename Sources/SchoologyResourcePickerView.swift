@@ -7,22 +7,16 @@ struct SchoologyResourcePickerView: View {
 
     @State private var collection: SchoologyResourceCollection?
     @State private var items: [SchoologyProfileItem] = []
-    @State private var folderPath: [SchoologyProfileItem] = []
     @State private var selectedResources: [String: SchoologyPickedResource] = [:]
     @State private var selectedApp: SchoologyResourceCollection?
     @State private var isLoadingItems = false
     @State private var error: String?
 
-    private var currentFolderID: String? { folderPath.last?.id }
-
     var body: some View {
         NavigationStack {
             Group {
-                if let collection {
-                    resourceList(collection)
-                } else {
-                    collectionList
-                }
+                if let collection { resourceList(collection) }
+                else { collectionList }
             }
             .navigationTitle(collection?.title ?? "Choose a Resource")
             #if os(iOS)
@@ -104,100 +98,33 @@ struct SchoologyResourcePickerView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 7))
             } else {
                 Image(systemName: isApp ? "app.fill" : item.typeID == "3" ? "book.closed" : "folder")
-                    .font(.title3)
-                    .foregroundStyle(SchoologyStyle.blue)
-                    .frame(width: 32)
+                    .font(.title3).foregroundStyle(SchoologyStyle.blue).frame(width: 32)
             }
             Text(item.title).foregroundStyle(.primary)
             Spacer()
             Image(systemName: isApp ? "arrow.up.right" : "chevron.right")
                 .font(.caption).foregroundStyle(.tertiary)
         }
+        .frame(minHeight: 44)
         .contentShape(Rectangle())
     }
 
     private func resourceList(_ collection: SchoologyResourceCollection) -> some View {
-        List {
-            if isLoadingItems {
-                ProgressView("Loading resources…")
-            } else if let error {
-                ContentUnavailableView("Unable to Load Resources", systemImage: "exclamationmark.triangle", description: Text(error))
-            } else if items.isEmpty {
-                ContentUnavailableView("No Resources", systemImage: "folder")
-            } else {
-                if !folderPath.isEmpty {
-                    Button {
-                        folderPath.removeLast()
-                        Task { await loadItems(in: collection, folderID: currentFolderID) }
-                    } label: {
-                        Label("Back to " + (folderPath.last?.title ?? collection.title), systemImage: "chevron.left")
-                    }
-                }
-                ForEach(items) { item in
-                    if item.isFolder {
-                        Button {
-                            folderPath.append(item)
-                            Task { await loadItems(in: collection, folderID: item.id) }
-                        } label: {
-                            HStack(spacing: 10) {
-                                Image(systemName: "folder.fill").foregroundStyle(folderTint(item.folderColor))
-                                Text(item.title).foregroundStyle(.primary)
-                                Spacer()
-                                Image(systemName: "chevron.right").font(.caption).foregroundStyle(.tertiary)
-                            }
-                        }
-                        .buttonStyle(.plain)
-                    } else {
-                        Button {
-                            if selectedResources[item.id] == nil {
-                                selectedResources[item.id] = SchoologyPickedResource(id: item.id, title: item.title)
-                            } else {
-                                selectedResources.removeValue(forKey: item.id)
-                            }
-                        } label: {
-                            HStack(spacing: 10) {
-                                Label(item.title, systemImage: resourceSymbol(item))
-                                    .foregroundStyle(.primary)
-                                Spacer()
-                                if selectedResources[item.id] != nil {
-                                    Image(systemName: "checkmark.circle.fill").foregroundStyle(.tint)
-                                }
-                            }
-                            .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-            }
+        SchoologyResourcesContentView(
+            items: items,
+            source: .collection(collectionID: collection.id),
+            isLoading: isLoadingItems,
+            error: error,
+            emptyTitle: "No Resources",
+            emptyDescription: "This collection is empty.",
+            selection: $selectedResources
+        ) {
+            await loadItems(in: collection, folderID: collection.folderID)
         }
-        .schoologyInsetGroupedListStyle()
-    }
-
-    private func folderTint(_ value: String) -> Color {
-        switch value {
-        case "black": .primary
-        case "gray": .gray
-        case "green": .green
-        case "orange": .orange
-        case "pink": .pink
-        case "purple": .purple
-        case "red": .red
-        case "yellow": .yellow
-        default: .blue
-        }
-    }
-
-    private func resourceSymbol(_ item: SchoologyProfileItem) -> String {
-        if item.documentType == "link" || item.kind.lowercased().contains("link") { return "link" }
-        if item.kind.lowercased().contains("page") { return "doc.text" }
-        if item.kind.lowercased().contains("assessment") || item.kind.lowercased().contains("quiz") { return "checklist" }
-        if item.kind.lowercased().contains("discussion") { return "text.bubble" }
-        return "doc"
     }
 
     private func open(_ item: SchoologyResourceCollection) async {
         collection = item
-        folderPath = []
         items = []
         error = nil
         await loadItems(in: item, folderID: item.folderID)
