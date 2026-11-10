@@ -50,11 +50,12 @@ enum ClassWireAIToolService {
             "section_id": ["type": "integer"],
             "title": ["type": "string"]
         ], required: ["kind"]),
-        tool("submit_assignment_text", "PROPOSE a text-only submission for an assignment. The user must review and explicitly confirm before it is submitted.", [
-            "text": ["type": "string"],
+        tool("submit_assignment_text", "PROPOSE a rich-text assignment submission. Write the response in Markdown, including paragraphs, headings, bold, italic, inline code, links, and ordered or unordered lists where useful. The user must review and explicitly confirm before it is submitted.", [
+            "markdown": ["type": "string", "description": "The complete assignment response formatted as Markdown."],
+            "text": ["type": "string", "description": "Plain-text compatibility fallback."],
             "assignment_id": ["type": "integer"],
             "section_id": ["type": "integer"]
-        ], required: ["text"]),
+        ], required: ["markdown"]),
         tool("send_message", "PROPOSE a Schoology message. The user must review and explicitly confirm before it is sent.", [
             "recipient_name": ["type": "string"],
             "subject": ["type": "string"],
@@ -339,15 +340,16 @@ enum ClassWireAIToolService {
             return .data(["navigated": true])
 
         case "submit_assignment_text":
-            let textValue = text(arguments["text"]).trimmingCharacters(in: .whitespacesAndNewlines)
+            let markdown = text(arguments["markdown"], fallback: text(arguments["text"])).trimmingCharacters(in: .whitespacesAndNewlines)
+            let textValue = ClassWireAIMarkdownHTML.encode(markdown)
             let assignmentID = text(arguments["assignment_id"], fallback: session.aiCurrentAssignmentID ?? "")
             let sectionID = text(arguments["section_id"], fallback: session.aiCurrentCourseID ?? "")
-            guard !textValue.isEmpty, !assignmentID.isEmpty, !sectionID.isEmpty else {
+            guard !markdown.isEmpty, !textValue.isEmpty, !assignmentID.isEmpty, !sectionID.isEmpty else {
                 throw ClassWireAIError.action("Open an assignment or include section_id and assignment_id with the proposed text.")
             }
             return .action(ClassWireAIPendingAction(
                 type: name,
-                values: ["text": textValue, "assignment_id": assignmentID, "section_id": sectionID],
+                values: ["text": textValue, "preview_markdown": markdown, "assignment_id": assignmentID, "section_id": sectionID],
                 title: "Submit assignment text",
                 summary: "Submit the proposed text to \(session.aiCurrentAssignmentTitle ?? "the selected assignment") in \(session.aiCurrentCourseTitle ?? "the selected course")."
             ))

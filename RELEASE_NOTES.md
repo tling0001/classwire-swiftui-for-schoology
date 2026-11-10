@@ -1,5 +1,17 @@
 # Release notes
 
+## [2026.10.0-port.108]
+
+### AI assignments
+- Allow ClassWire AI to prepare rich-text assignment submissions from Markdown, converting headings, paragraphs, bold, italic, inline code, links, and ordered or unordered lists into a restricted Schoology HTML subset.
+- Show the formatted proposal for review and retain the explicit confirmation step before submitting.
+
+### AI chat
+- Fix message sizing so user messages occupy the trailing side and AI replies remain on the leading side, with bounded readable bubble widths.
+
+### Build
+- Increment the iOS and macOS bundle build number to 108.
+
 ## [2026.10.0-port.107]
 
 ### Fixed

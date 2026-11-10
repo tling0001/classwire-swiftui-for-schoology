@@ -258,8 +258,9 @@ struct ClassWireAIAssistantView: View {
     }
 
     private func messageBubble(_ message: ClassWireAIMessage) -> some View {
-        HStack(alignment: .top, spacing: 8) {
-            if message.role == "assistant" {
+        let isUser = message.role == "user"
+        return HStack(alignment: .top, spacing: 8) {
+            if !isUser {
                 Image(systemName: "sparkles")
                     .font(.callout.weight(.semibold))
                     .foregroundStyle(SchoologyStyle.blue)
@@ -267,25 +268,25 @@ struct ClassWireAIAssistantView: View {
                     .background(SchoologyStyle.blue.opacity(0.12), in: Circle())
                     .accessibilityHidden(true)
             } else {
-                Spacer(minLength: 28)
+                Spacer(minLength: 36)
             }
 
             Text(attributedMessage(message.content))
                 .textSelection(.enabled)
                 .font(.body)
                 .padding(12)
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(maxWidth: 680, alignment: .leading)
+                .fixedSize(horizontal: false, vertical: true)
                 .background(
-                    message.role == "user" ? SchoologyStyle.blue.opacity(0.12) : Color.secondary.opacity(0.08),
+                    isUser ? SchoologyStyle.blue.opacity(0.12) : Color.secondary.opacity(0.08),
                     in: RoundedRectangle(cornerRadius: 16)
                 )
-                .fixedSize(horizontal: false, vertical: true)
 
-            if message.role == "user" {
-                Spacer(minLength: 28)
+            if !isUser {
+                Spacer(minLength: 36)
             }
         }
-        .frame(maxWidth: .infinity, alignment: message.role == "user" ? .trailing : .leading)
+        .frame(maxWidth: .infinity, alignment: isUser ? .trailing : .leading)
     }
 
     @ViewBuilder
@@ -410,7 +411,7 @@ struct ClassWireAIAssistantView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(.background, in: RoundedRectangle(cornerRadius: 10))
             } else if action.type == "submit_assignment_text" {
-                Text(action.values["text"] ?? "")
+                Text(attributedMessage(action.values["preview_markdown"] ?? action.values["text"] ?? ""))
                     .font(.body)
                     .textSelection(.enabled)
                     .padding(10)
