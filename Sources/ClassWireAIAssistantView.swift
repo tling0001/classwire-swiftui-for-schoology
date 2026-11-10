@@ -9,6 +9,9 @@ struct ClassWireAIAssistantView: View {
     @State private var showingSettings = false
     @State private var showingHistory = false
     @FocusState private var composerFocused: Bool
+    @State private var availableModels: [String] = []
+    @State private var isRefreshingModels = false
+    @State private var modelDiscoveryStatus = ""
 
     private var filteredConversations: [ClassWireAIConversation] {
         let query = historySearch.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -181,12 +184,20 @@ struct ClassWireAIAssistantView: View {
                     guard let last = store.activeConversation?.messages.last else { return }
                     proxy.scrollTo(last.id, anchor: .bottom)
                 }
+                .scrollDismissesKeyboard(.interactively)
+                .simultaneousGesture(TapGesture().onEnded {
+                    if composerFocused { composerFocused = false }
+                })
             }
 
             Divider()
             composer
         }
         .background(.background)
+        .task { await refreshAvailableModels() }
+        .onChange(of: store.provider) { _, _ in Task { await refreshAvailableModels() } }
+        .onChange(of: store.ollamaEndpoint) { _, _ in Task { await refreshAvailableModels() } }
+        .onChange(of: store.hasSavedProviderKey) { _, _ in Task { await refreshAvailableModels() } }
     }
 
     private var welcomeContent: some View {
@@ -363,31 +374,153 @@ struct ClassWireAIAssistantView: View {
     }
 
     private var composerContent: some View {
-        HStack(alignment: .bottom, spacing: 10) {
-            TextField("Ask about your Schoology work…", text: $draft, axis: .vertical)
-                .lineLimit(1...5)
-                .textFieldStyle(.plain)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 10)
-                .frame(minHeight: 44)
-                .focused($composerFocused)
-                .onSubmit(sendDraft)
-                .accessibilityLabel("Message ClassWire AI")
+        VStack(spacing: 4) {
+            HStack(alignment: .bottom, spacing: 10) {
+                TextField("Ask about your Schoology work…", text: $draft, axis: .vertical)
+                    .lineLimit(1...5)
+                    .textFieldStyle(.plain)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 10)
+                    .frame(minHeight: 44)
+                    .focused($composerFocused)
+                    .onSubmit(sendDraft)
+                    .accessibilityLabel("Message ClassWire AI")
 
-            Button(action: sendDraft) {
-                Image(systemName: "arrow.up")
-                    .font(.headline)
-                    .foregroundStyle(.white)
-                    .frame(width: 44, height: 44)
-                    .background(SchoologyStyle.blue, in: Circle())
+                Button(action: sendDraft) {
+                    Image(systemName: "arrow.up")
+                        .font(.headline)
+                        .foregroundStyle(.white)
+                        .frame(width: 44, height: 44)
+                        .background(SchoologyStyle.blue, in: Circle())
+                }
+                .buttonStyle(.plain)
+                .disabled(store.isSending || draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .accessibilityLabel("Send message")
+                .accessibilityHint("Sends your question to ClassWire AI.")
             }
-            .buttonStyle(.plain)
-            .disabled(store.isSending || draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            .accessibilityLabel("Send message")
-            .accessibilityHint("Sends your question to ClassWire AI.")
+
+            HStack(spacing: 8) {
+                Menu {
+                    Button("Refresh models", systemImage: "arrow.clockwise") {
+                        Task { await refreshAvailableModels() }
+                    }
+                    if !availableModels.isEmpty { Divider() }
+                    ForEach(availableModels, id: \.self) { model in
+                        Button {
+                            store.model = model
+                            store.persistSettings()
+                            composerFocused = false
+                        } label: {
+                            if store.model == model {
+                                Label(model, systemImage: "checkmark")
+                            } else {
+                                Text(model)
+                            }
+                        }
+                    }
+                } label: {
+                    Label(store.model, systemImage: "cpu")
+                        .font(.caption)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 8)
+                        .frame(minHeight: 44)
+                        .contentShape(Rectangle())
+                }
+                .accessibilityLabel("Choose AI model")
+                .accessibilityHint("Selects a model available from the current provider.")
+
+                if isRefreshingModels {
+                    ProgressView()
+                        .controlSize(.small)
+                        .accessibilityLabel("Refreshing available models")
+                } else if !modelDiscoveryStatus.isEmpty {
+                    Text(modelDiscoveryStatus)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 8)
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
+    }
+
+    private func refreshAvailableModels() async {
+        guard !isRefreshingModels else { return }
+        let selectedProvider = store.provider
+        let selectedEndpoint = store.ollamaEndpoint
+        let selectedKey = ClassWireAIKeychainStore.load(provider: selectedProvider) ?? ""
+        guard selectedProvider == .ollama || !selectedKey.isEmpty else {
+            availableModels = [store.model]
+            modelDiscoveryStatus = "Add an API key to load models"
+            return
+        }
+
+        isRefreshingModels = true
+        modelDiscoveryStatus = "Loading models…"
+        defer { isRefreshingModels = false }
+
+        do {
+            var request: URLRequest
+            switch selectedProvider {
+            case .gemini:
+                request = URLRequest(url: URL(string: "https://generativelanguage.googleapis.com/v1beta/models")!)
+                request.setValue(selectedKey, forHTTPHeaderField: "x-goog-api-key")
+            case .openai:
+                request = URLRequest(url: URL(string: "https://api.openai.com/v1/models")!)
+                request.setValue("Bearer \(selectedKey)", forHTTPHeaderField: "Authorization")
+            case .anthropic:
+                request = URLRequest(url: URL(string: "https://api.anthropic.com/v1/models?limit=100")!)
+                request.setValue(selectedKey, forHTTPHeaderField: "x-api-key")
+                request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
+            case .ollama:
+                let base = selectedEndpoint.trimmingCharacters(in: .whitespacesAndNewlines).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+                guard let baseURL = URL(string: base), ["http", "https"].contains(baseURL.scheme?.lowercased() ?? ""), baseURL.host != nil else {
+                    throw ClassWireAIError.invalidResponse("Enter a valid Ollama server URL in AI settings.")
+                }
+                request = URLRequest(url: baseURL.appendingPathComponent("api/tags"))
+            }
+
+            request.httpMethod = "GET"
+            request.timeoutInterval = 12
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+                let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+                throw ClassWireAIError.invalidResponse("Model discovery failed (HTTP \(status)).")
+            }
+            let root = try JSONSerialization.jsonObject(with: data) as? [String: Any] ?? [:]
+            let models: [String]
+            switch selectedProvider {
+            case .gemini:
+                models = (root["models"] as? [[String: Any]] ?? []).compactMap { item in
+                    let methods = item["supportedGenerationMethods"] as? [String] ?? []
+                    guard methods.contains("generateContent") else { return nil }
+                    return (item["name"] as? String)?.replacingOccurrences(of: "models/", with: "")
+                }
+            case .openai:
+                models = (root["data"] as? [[String: Any]] ?? []).compactMap { $0["id"] as? String }.filter {
+                    let id = $0.lowercased()
+                    return (id.hasPrefix("gpt-") || id.hasPrefix("o1") || id.hasPrefix("o3") || id.hasPrefix("o4"))
+                        && !["audio", "realtime", "transcribe", "tts", "embedding", "moderation"].contains(where: id.contains)
+                }
+            case .anthropic:
+                models = (root["data"] as? [[String: Any]] ?? []).compactMap { $0["id"] as? String }.filter { $0.hasPrefix("claude-") }
+            case .ollama:
+                models = (root["models"] as? [[String: Any]] ?? []).compactMap { ($0["name"] as? String) ?? ($0["model"] as? String) }
+            }
+            guard store.provider == selectedProvider, store.ollamaEndpoint == selectedEndpoint else { return }
+            availableModels = Array(Set(models)).sorted()
+            if !availableModels.contains(store.model) { availableModels.insert(store.model, at: 0) }
+            modelDiscoveryStatus = models.isEmpty ? "No models returned; current model retained" : "\(models.count) available"
+        } catch {
+            guard store.provider == selectedProvider else { return }
+            availableModels = [store.model]
+            modelDiscoveryStatus = error.localizedDescription
+        }
     }
 
     private func actionProposal(_ action: ClassWireAIPendingAction) -> some View {
