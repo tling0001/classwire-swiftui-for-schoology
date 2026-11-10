@@ -175,7 +175,7 @@ final class ClassWirePuterService: NSObject, WKUIDelegate, WKNavigationDelegate 
             let id = UUID().uuidString
             pending[id] = continuation
             let encodedPayload = payload.map(Self.jsString) ?? "null"
-            let script = "window.classWirePuterRequest(\(Self.jsString(id)), \(Self.jsString(operation)), \(encodedPayload));"
+            let script = "(() => { void window.classWirePuterRequest(\(Self.jsString(id)), \(Self.jsString(operation)), \(encodedPayload)); return true; })();"
             webView.evaluateJavaScript(script) { _, error in
                 if let error, let pending = self.pending.removeValue(forKey: id) { pending.resume(throwing: error) }
             }

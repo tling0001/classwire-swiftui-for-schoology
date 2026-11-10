@@ -1,5 +1,14 @@
 # Release notes
 
+## [2026.10.0-port.113]
+
+### Fixed
+- Fix Puter model refresh failing with WebKit's unsupported JavaScript result error by discarding the async bridge Promise and returning a supported Boolean from script evaluation.
+- Preserve the existing script-message response channel so model catalogues and other Puter operations still resolve asynchronously through the checked continuation.
+
+### Build
+- Increment the Apple bundle marketing version to `2026.10.113` and build number to `113`.
+
 ## [2026.10.0-port.112]
 
 ### Fixed
