@@ -475,7 +475,7 @@ struct ClassWireAIAssistantView: View {
                 modelDiscoveryStatus = models.isEmpty ? "No models returned" : "\(models.count) available"
             } catch {
                 availableModels = [store.model]
-                modelDiscoveryStatus = error.localizedDescription
+                modelDiscoveryStatus = "Puter’s model catalogue is temporarily unavailable. Your selected model remains available; try refreshing again later."
             }
             return
         }

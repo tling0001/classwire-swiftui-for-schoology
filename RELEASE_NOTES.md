@@ -1,3 +1,13 @@
+## [2026.10.0-port.117]
+
+### Fixed
+- Correct update-version comparison when the Xcode marketing-version patch component mirrors the port build number, so newer GitHub releases are detected instead of being treated as older than the installed app.
+- Load Puter model catalogues provider-by-provider with bounded concurrency and per-provider timeouts, allowing partial results when an individual provider is unavailable.
+- Keep the selected Puter model usable and show a non-blocking recovery message when catalogue discovery cannot complete.
+
+### Build
+- Increment the Apple bundle marketing version to `2026.10.117` and build number to `117`.
+
 ## [2026.10.0-port.116]
 
 ### Fixed

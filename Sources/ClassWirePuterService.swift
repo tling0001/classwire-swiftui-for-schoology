@@ -193,10 +193,10 @@ final class ClassWirePuterService: NSObject, WKUIDelegate, WKNavigationDelegate 
             if operation == "models" {
                 pendingTimeouts[id] = Task { [weak self] in
                     do {
-                        try await Task.sleep(for: .seconds(25))
+                        try await Task.sleep(for: .seconds(40))
                         guard let self, let pending = self.pending.removeValue(forKey: id) else { return }
                         self.pendingTimeouts.removeValue(forKey: id)
-                        pending.resume(throwing: ClassWireAIError.invalidResponse("Puter did not respond to the model catalogue request within 25 seconds. Check your connection and try refreshing the model list."))
+                        pending.resume(throwing: ClassWireAIError.invalidResponse("Puter did not respond to the model catalogue request within 40 seconds. Check your connection and try refreshing the model list."))
                     } catch { }
                 }
             }
@@ -250,8 +250,31 @@ final class ClassWirePuterService: NSObject, WKUIDelegate, WKNavigationDelegate 
       if(operation==='signOut'){await puter.auth.signOut();await report();send({id,result:true});return;}
       if(!puter.auth.isSignedIn())throw new Error('Connect your Puter account first.');
       let result;
-      if(operation==='models'){const catalogue=await puter.ai.listModels();result=(Array.isArray(catalogue)?catalogue:[])
-        .map(item=>typeof item==='string'?item:item?.id).filter(item=>typeof item==='string'&&item.length>0);}
+      if(operation==='models'){
+        const withTimeout=(promise,milliseconds,label)=>new Promise((resolve,reject)=>{
+          const timer=setTimeout(()=>reject(new Error(label)),milliseconds);
+          Promise.resolve(promise).then(value=>{clearTimeout(timer);resolve(value);},error=>{clearTimeout(timer);reject(error);});
+        });
+        const providers=await withTimeout(puter.ai.listModelProviders(),8000,'Puter did not return its model-provider list.');
+        const names=[...new Set((Array.isArray(providers)?providers:[]).filter(value=>typeof value==='string'&&value.length>0))];
+        if(!names.length)throw new Error('Puter did not report any available AI model providers.');
+        const models=new Set();let nextProvider=0;
+        const collectProvider=async()=>{
+          while(nextProvider<names.length){
+            const provider=names[nextProvider++];
+            try{
+              const catalogue=await withTimeout(puter.ai.listModels(provider),9000,'Provider model-list request timed out.');
+              for(const item of Array.isArray(catalogue)?catalogue:[]){
+                const id=typeof item==='string'?item:item?.id;
+                if(typeof id==='string'&&id.length>0)models.add(id);
+              }
+            }catch(_){}
+          }
+        };
+        await Promise.all(Array.from({length:Math.min(5,names.length)},()=>collectProvider()));
+        if(!models.size)throw new Error('Puter could not return a model catalogue from any provider. Your current model remains selected.');
+        result=[...models].sort();
+      }
       else if(operation==='chat'){const raw=atob(payload),bytes=Uint8Array.from(raw,c=>c.charCodeAt(0)),request=JSON.parse(new TextDecoder().decode(bytes));
         const response=await puter.ai.chat(request.messages,{model:request.model,tools:request.tools,toolChoice:'auto',normalize:true});
         const message=response?.message||response;let content=message?.content??'';

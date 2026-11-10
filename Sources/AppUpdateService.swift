@@ -517,11 +517,19 @@ final class AppUpdateService {
     #endif
     private static func versionParts(_ version: String) -> [Int] {
         let sections = version.split(separator: "-", omittingEmptySubsequences: false)
-        let marketing = sections.first.map { $0.split(separator: ".").compactMap { Int($0) } } ?? []
+        var marketing = sections.first.map { $0.split(separator: ".").compactMap { Int($0) } } ?? []
         let port = sections.dropFirst().first.flatMap { section -> Int? in
             guard section.hasPrefix("port.") else { return nil }
             return Int(section.dropFirst("port.".count))
         } ?? 0
+        // Xcode's marketing version carries the port build number as its patch
+        // component (2026.10.116), while GitHub tags keep the release line at
+        // 2026.10.0-port.116. Compare that patch as zero when it duplicates
+        // the port number, otherwise every installed build appears newer than
+        // every GitHub release in the same port series.
+        if port > 0, marketing.count == 3, marketing[2] == port {
+            marketing[2] = 0
+        }
         return marketing + [port]
     }
 }
