@@ -22,6 +22,7 @@ final class ClassWirePuterService: NSObject, WKUIDelegate, WKNavigationDelegate 
     @ObservationIgnored private var isReady = false
     @ObservationIgnored private var loadError: String?
     @ObservationIgnored private var pending: [String: CheckedContinuation<Data, Error>] = [:]
+    @ObservationIgnored private var pendingTimeouts: [String: Task<Void, Never>] = [:]
     @ObservationIgnored private var readyWaiters: [CheckedContinuation<Void, Error>] = []
 
     private override init() {
@@ -67,6 +68,7 @@ final class ClassWirePuterService: NSObject, WKUIDelegate, WKNavigationDelegate 
             return
         }
         guard let id = body["id"] as? String, let continuation = pending.removeValue(forKey: id) else { return }
+        pendingTimeouts.removeValue(forKey: id)?.cancel()
         if let error = body["error"] as? String {
             continuation.resume(throwing: ClassWireAIError.invalidResponse(error))
         } else {
@@ -188,10 +190,23 @@ final class ClassWirePuterService: NSObject, WKUIDelegate, WKNavigationDelegate 
         let responseData: Data = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Data, Error>) in
             let id = UUID().uuidString
             pending[id] = continuation
+            if operation == "models" {
+                pendingTimeouts[id] = Task { [weak self] in
+                    do {
+                        try await Task.sleep(for: .seconds(25))
+                        guard let self, let pending = self.pending.removeValue(forKey: id) else { return }
+                        self.pendingTimeouts.removeValue(forKey: id)
+                        pending.resume(throwing: ClassWireAIError.invalidResponse("Puter did not respond to the model catalogue request within 25 seconds. Check your connection and try refreshing the model list."))
+                    } catch { }
+                }
+            }
             let encodedPayload = payload.map(Self.jsString) ?? "null"
             let script = "(() => { void window.classWirePuterRequest(\(Self.jsString(id)), \(Self.jsString(operation)), \(encodedPayload)); return true; })();"
             webView.evaluateJavaScript(script) { _, error in
-                if let error, let pending = self.pending.removeValue(forKey: id) { pending.resume(throwing: error) }
+                if let error, let pending = self.pending.removeValue(forKey: id) {
+                    self.pendingTimeouts.removeValue(forKey: id)?.cancel()
+                    pending.resume(throwing: error)
+                }
             }
         }
         return try JSONSerialization.jsonObject(with: responseData, options: [.fragmentsAllowed])

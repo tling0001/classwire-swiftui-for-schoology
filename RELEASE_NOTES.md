@@ -1,3 +1,12 @@
+## [2026.10.0-port.116]
+
+### Fixed
+- Add a 25-second timeout to outstanding Puter WebKit bridge requests so model discovery cannot remain in an endless loading state when Puter's catalogue request stalls.
+- Surface a useful timeout error and preserve the currently selected model as the fallback when discovery does not complete.
+
+### Build
+- Increment the Apple bundle marketing version to `2026.10.116` and build number to `116`.
+
 # Release notes
 
 ## [2026.10.0-port.115]
