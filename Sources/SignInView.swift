@@ -213,8 +213,6 @@ struct SignInView: View {
                     #endif
                     .focused($focusedField, equals: .password)
                     .onSubmit { signIn() }
-            }
-            Section {
                 Button {
                     signIn()
                 } label: {

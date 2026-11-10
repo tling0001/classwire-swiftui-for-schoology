@@ -1,5 +1,18 @@
 # Release notes
 
+## [2026.10.0-port.123]
+
+### Sign-in layout
+- Place the Sign in action in the Account form section instead of a separate grouped section, removing the extra visual container around the button while retaining its prominent native button treatment.
+
+### Native list and settings backgrounds
+- Remove the explicit hidden scroll-content background from the members directory List so it uses the system-provided list background.
+- Audit SettingsView and its AI settings form: neither overrides the Form or scroll-content background. Keep the native grouped Form appearance unchanged.
+
+### Build
+- Increment the Apple bundle marketing version to `2026.10.123` and build number to `123`.
+
+
 ## [2026.10.0-port.122]
 
 ### Sign-in appearance

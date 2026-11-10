@@ -94,7 +94,6 @@ struct SchoologyPeopleDirectoryView: View {
                 }
             }
         }
-        .scrollContentBackground(.hidden)
         .contentMargins(.horizontal, 0, for: .scrollContent)
         .contentMargins(.bottom, 0, for: .scrollContent)
     }
