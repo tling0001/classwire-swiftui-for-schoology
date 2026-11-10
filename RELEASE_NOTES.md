@@ -1,5 +1,18 @@
 # Release notes
 
+## [2026.10.0-port.119]
+
+### Fixed
+- Use the current native bordered SwiftUI text-field style for username, password, and school search controls.
+- Load Puter.js with explicit success, failure, and timeout handling, and use the same authentication helper and model response shape as the working Tauri client.
+- Return Puter model IDs through the same `{ models: [...] }` bridge contract as Tauri, with bounded request timeouts and the underlying error shown when discovery fails.
+- Show role-specific AI quick starts: lesson planning, course activity, and announcement drafting for teachers; assignment, grades, materials, and study support for students.
+- Derive teacher quick starts from Schoology course admin flags, including the demo account role.
+
+### Build
+- Increment the Apple bundle marketing version to `2026.10.119` and build number to `119`.
+
+
 ## [2026.10.0-port.118]
 
 ### Fixed

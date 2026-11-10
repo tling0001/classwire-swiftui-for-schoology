@@ -93,6 +93,7 @@ struct SchoologyCourse: Identifiable, Sendable {
     let section: String
     let profileURL: URL?
     let schoolID: String?
+    var isAdmin: Bool = false
 
     static func decodeList(_ value: Any?) -> [SchoologyCourse] {
         SchoologyValue.list(value, keys: ["section", "sections", "items", "data", "response"]).compactMap { item in
@@ -106,7 +107,11 @@ struct SchoologyCourse: Identifiable, Sendable {
                 courseCode: SchoologyValue.string(item["course_code"] ?? item["courseCode"]),
                 section: SchoologyValue.string(item["section_title"] ?? item["sectionTitle"]),
                 profileURL: SchoologyValue.url(image),
-                schoolID: SchoologyValue.optionalString(item["school_id"] ?? item["schoolId"])
+                schoolID: SchoologyValue.optionalString(item["school_id"] ?? item["schoolId"]),
+                isAdmin: [item["admin"], item["is_admin"], item["isAdmin"]].contains { value in
+                    if let flag = value as? Bool { return flag }
+                    return ["1", "true", "yes"].contains(String(describing: value ?? "").lowercased())
+                }
             )
         }
     }

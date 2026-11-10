@@ -86,6 +86,11 @@ final class AppSession {
 
     var isSignedIn: Bool { auth != nil || isDemoMode }
 
+    var isTeacher: Bool {
+        if isDemoMode { return demoIsTeacher }
+        return courses.contains(where: \.isAdmin)
+    }
+
     func showPersonProfile(userID: String) {
         guard !userID.isEmpty else { return }
         pendingPersonProfileID = userID

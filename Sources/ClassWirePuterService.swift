@@ -124,7 +124,8 @@ final class ClassWirePuterService: NSObject, WKUIDelegate, WKNavigationDelegate 
     }
 
     func listModels() async throws -> [String] {
-        guard let models = try await request("models") as? [String] else {
+        guard let response = try await request("models") as? [String: Any],
+              let models = response["models"] as? [String] else {
             throw ClassWireAIError.invalidResponse("Puter returned an invalid model catalogue.")
         }
         return models
@@ -193,10 +194,10 @@ final class ClassWirePuterService: NSObject, WKUIDelegate, WKNavigationDelegate 
             if operation == "models" {
                 pendingTimeouts[id] = Task { [weak self] in
                     do {
-                        try await Task.sleep(for: .seconds(70))
+                        try await Task.sleep(for: .seconds(50))
                         guard let self, let pending = self.pending.removeValue(forKey: id) else { return }
                         self.pendingTimeouts.removeValue(forKey: id)
-                        pending.resume(throwing: ClassWireAIError.invalidResponse("Puter did not respond to the model catalogue request within 70 seconds. Check your connection and try refreshing the model list."))
+                        pending.resume(throwing: ClassWireAIError.invalidResponse("Puter did not respond to the model catalogue request within 50 seconds. Check your connection and try refreshing the model list."))
                     } catch { }
                 }
             }
@@ -234,49 +235,102 @@ final class ClassWirePuterService: NSObject, WKUIDelegate, WKNavigationDelegate 
     button:disabled{opacity:.55}</style></head><body><main><h1>Connect Puter</h1>
     <p>Sign in to Puter to use its AI models. Puter securely manages your account session.</p>
     <button id="connect" disabled>Loading Puter…</button><div id="status" role="status" aria-live="polite">Loading authentication…</div></main>
-    <script src="https://js.puter.com/v2/"></script><script>
-    (()=>{const button=document.getElementById('connect'),status=document.getElementById('status');
-    const send=value=>window.webkit.messageHandlers.classWirePuter.postMessage(value);
-    const userLabel=user=>user?.username||user?.email||user?.name||'Puter account';
-    let resolveReady;window.classWirePuterReady=new Promise(resolve=>{resolveReady=resolve;});
-    const report=async()=>{try{const signedIn=!!puter.auth.isSignedIn(),user=signedIn?await puter.auth.getUser():null;
-      send({type:'auth',signedIn,user:user?userLabel(user):''});button.textContent=signedIn?'Connected to Puter':'Connect with Puter';
-      status.textContent=signedIn?'Your Puter account is connected.':'Sign in to continue.';button.disabled=false;
-    }catch(error){status.textContent=String(error?.message||error);button.disabled=false;}};
-    window.classWirePuterRequest=async(id,operation,payload)=>{try{await window.classWirePuterReady;
-      if(operation==='status'){const signedIn=!!puter.auth.isSignedIn(),user=signedIn?await puter.auth.getUser():null;
-        send({type:'auth',signedIn,user:user?userLabel(user):''});send({id,result:{signedIn,user:user?userLabel(user):''}});return;}
-      if(operation==='signIn'){await puter.auth.signIn({request_auth:true});await report();send({id,result:true});return;}
-      if(operation==='signOut'){await puter.auth.signOut();await report();send({id,result:true});return;}
-      if(!puter.auth.isSignedIn())throw new Error('Connect your Puter account first.');
-      let result;
-      if(operation==='models'){
-        // Match the working Tauri client and Puter.js's documented all-provider call.
-        const catalogue=await new Promise((resolve,reject)=>{
-          const timer=setTimeout(()=>reject(new Error('Puter model catalogue request timed out after 60 seconds.')),60000);
-          Promise.resolve(puter.ai.listModels()).then(value=>{clearTimeout(timer);resolve(value);},error=>{clearTimeout(timer);reject(error);});
+    <script>
+    (() => {
+      const button = document.getElementById('connect');
+      const status = document.getElementById('status');
+      const send = value => window.webkit.messageHandlers.classWirePuter.postMessage(value);
+      let puterSDKPromise = null;
+      function ensurePuterSDK() {
+        if (window.puter) return Promise.resolve(window.puter);
+        if (puterSDKPromise) return puterSDKPromise;
+        puterSDKPromise = new Promise((resolve, reject) => {
+          const script = document.createElement('script');
+          script.src = 'https://js.puter.com/v2/';
+          script.async = true;
+          const timer = setTimeout(() => {
+            puterSDKPromise = null;
+            reject(new Error('Puter.js did not finish loading within 20 seconds.'));
+          }, 20000);
+          script.onload = () => {
+            clearTimeout(timer);
+            if (window.puter) resolve(window.puter);
+            else { puterSDKPromise = null; reject(new Error('Puter.js loaded but its API was not initialized.')); }
+          };
+          script.onerror = () => {
+            clearTimeout(timer);
+            puterSDKPromise = null;
+            reject(new Error('Could not load Puter.js. Check your internet connection and content restrictions.'));
+          };
+          document.head.appendChild(script);
         });
-        if(!Array.isArray(catalogue))throw new Error('Puter returned an invalid model catalogue response.');
-        result=[...new Set(catalogue.map(item=>typeof item==='string'?item:item?.id)
-          .filter(id=>typeof id==='string'&&id.length>0))].sort();
-        if(!result.length)throw new Error('Puter returned an empty model catalogue. Check that your Puter account can access AI models.');
+        return puterSDKPromise;
       }
-      else if(operation==='chat'){const raw=atob(payload),bytes=Uint8Array.from(raw,c=>c.charCodeAt(0)),request=JSON.parse(new TextDecoder().decode(bytes));
-        const response=await puter.ai.chat(request.messages,{model:request.model,tools:request.tools,toolChoice:'auto',normalize:true});
-        const message=response?.message||response;let content=message?.content??'';
-        if(Array.isArray(content))content=content.map(part=>part?.text||'').filter(Boolean).join('\\n');
-        const toolCalls=(message?.tool_calls||message?.toolCalls||[]).map(call=>{let args=call?.function?.arguments??call?.arguments??{};
-          if(typeof args==='string'){try{args=JSON.parse(args);}catch(_){args={};}}
-          return {name:call?.function?.name||call?.name,arguments:args};}).filter(call=>typeof call.name==='string');
-        result={text:typeof content==='string'?content:'',toolCalls};}
-      else throw new Error('Unsupported Puter operation.');
-      send({id,result});
-    }catch(error){send({id,error:String(error?.message||error)});}};
-    button.addEventListener('click',async()=>{button.disabled=true;status.textContent='Opening Puter sign-in…';
-      try{await puter.auth.signIn({request_auth:true});await report();}
-      catch(error){status.textContent=String(error?.message||error);button.disabled=false;}});
-    const poll=setInterval(()=>{if(window.puter){clearInterval(poll);resolveReady();report();}},100);
-    setTimeout(()=>{clearInterval(poll);if(!window.puter)status.textContent='Puter could not load. Check your internet connection.';},15000);
+      const userLabel = user => user?.username || user?.email || user?.name || 'Puter account';
+      async function authenticate(puter) {
+        if (typeof puter.ui?.authenticateWithPuter === 'function') await puter.ui.authenticateWithPuter();
+        else await puter.auth.signIn({ request_auth: true });
+      }
+      const report = async () => {
+        try {
+          const puter = await ensurePuterSDK();
+          const signedIn = !!puter.auth.isSignedIn();
+          const user = signedIn ? await puter.auth.getUser() : null;
+          send({ type: 'auth', signedIn, user: user ? userLabel(user) : '' });
+          button.textContent = signedIn ? 'Connected to Puter' : 'Connect with Puter';
+          status.textContent = signedIn ? 'Your Puter account is connected.' : 'Sign in to continue.';
+          button.disabled = false;
+        } catch (error) { status.textContent = String(error?.message || error); button.disabled = false; }
+      };
+      window.classWirePuterRequest = async (id, operation, payload) => {
+        try {
+          const puter = await ensurePuterSDK();
+          if (operation === 'status') {
+            const signedIn = !!puter.auth.isSignedIn(), user = signedIn ? await puter.auth.getUser() : null;
+            send({ type: 'auth', signedIn, user: user ? userLabel(user) : '' });
+            send({ id, result: { signedIn, user: user ? userLabel(user) : '' } });
+            return;
+          }
+          if (operation === 'signIn') { await authenticate(puter); await report(); send({ id, result: true }); return; }
+          if (operation === 'signOut') { await puter.auth.signOut(); await report(); send({ id, result: true }); return; }
+          if (!puter.auth.isSignedIn()) throw new Error('Connect your Puter account first.');
+          let result;
+          if (operation === 'models') {
+            let timer;
+            try {
+              const catalogue = await Promise.race([
+                puter.ai.listModels(),
+                new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('Puter model discovery timed out after 25 seconds. Check your connection and refresh the model list.')), 25000); })
+              ]);
+              if (!Array.isArray(catalogue)) throw new Error('Puter returned an invalid model catalogue response.');
+              const models = [...new Set(catalogue.map(item => typeof item === 'string' ? item : item?.id)
+                .filter(id => typeof id === 'string' && id.length > 0))].sort();
+              if (!models.length) throw new Error('Puter returned an empty model catalogue. Check that your Puter account can access AI models.');
+              result = { models };
+            } finally { clearTimeout(timer); }
+          } else if (operation === 'chat') {
+            const raw = atob(payload), bytes = Uint8Array.from(raw, character => character.charCodeAt(0));
+            const request = JSON.parse(new TextDecoder().decode(bytes));
+            const response = await puter.ai.chat(request.messages, { model: request.model, tools: request.tools, toolChoice: 'auto', normalize: true });
+            const message = response?.message || response;
+            let content = message?.content ?? '';
+            if (Array.isArray(content)) content = content.map(part => part?.text || '').filter(Boolean).join('\\n');
+            const toolCalls = (message?.tool_calls || message?.toolCalls || []).map(call => {
+              let args = call?.function?.arguments ?? call?.arguments ?? {};
+              if (typeof args === 'string') { try { args = JSON.parse(args); } catch (_) { args = {}; } }
+              return { name: call?.function?.name || call?.name, arguments: args };
+            }).filter(call => typeof call.name === 'string');
+            result = { text: typeof content === 'string' ? content : '', toolCalls };
+          } else throw new Error('Unsupported Puter operation.');
+          send({ id, result });
+        } catch (error) { send({ id, error: String(error?.message || error) }); }
+      };
+      button.addEventListener('click', async () => {
+        button.disabled = true; status.textContent = 'Opening Puter sign-in…';
+        try { const puter = await ensurePuterSDK(); await authenticate(puter); await report(); }
+        catch (error) { status.textContent = String(error?.message || error); button.disabled = false; }
+      });
+      ensurePuterSDK().then(report).catch(error => { status.textContent = String(error?.message || error); button.disabled = false; });
     })();
     </script></body></html>
     """

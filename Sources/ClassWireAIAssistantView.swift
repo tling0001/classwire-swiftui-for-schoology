@@ -225,12 +225,22 @@ struct ClassWireAIAssistantView: View {
                 .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16))
             }
 
-            VStack(spacing: 8) {
-                promptButton("Plan my week", subtitle: "What assignments are due soon?", prompt: "What assignments are due soon?", symbol: "calendar")
-                promptButton("Explore my courses", subtitle: "Give me a quick overview", prompt: "Summarize my courses", symbol: "books.vertical")
-                promptButton("Understand an assignment", subtitle: "Explain the assignment I am viewing", prompt: "Explain the assignment I am viewing", symbol: "doc.text")
-                promptButton("Review my progress", subtitle: "Show my grades", prompt: "Show my grades for my courses", symbol: "chart.bar")
-                promptButton("Find a message", subtitle: "Search my inbox and sent messages", prompt: "Search my recent messages for anything about assignments", symbol: "envelope")
+            if session.isTeacher {
+                VStack(spacing: 8) {
+                    promptButton("Plan a lesson", subtitle: "Build a lesson from course materials", prompt: "Help me create a lesson outline using the materials in my current course. Include learning objectives, activities, and a short assessment.", symbol: "book.closed")
+                    promptButton("Review class activity", subtitle: "Summarize recent course updates", prompt: "Summarize recent updates and upcoming work across my courses.", symbol: "chart.bar.xaxis")
+                    promptButton("Draft an announcement", subtitle: "Write an update for students", prompt: "Draft a concise course announcement about upcoming work. Do not publish it.", symbol: "megaphone")
+                    promptButton("Find key materials", subtitle: "Locate resources for the next lesson", prompt: "Find and summarize the most relevant materials in my current course for the next lesson.", symbol: "folder")
+                    promptButton("Prepare a study guide", subtitle: "Create review topics for students", prompt: "Create a student-friendly study guide using the learning materials in my current course.", symbol: "list.clipboard")
+                }
+            } else {
+                VStack(spacing: 8) {
+                    promptButton("Plan my week", subtitle: "What assignments are due soon?", prompt: "What assignments are due soon?", symbol: "calendar")
+                    promptButton("Understand an assignment", subtitle: "Explain the assignment I am viewing", prompt: "Explain the assignment I am viewing", symbol: "doc.text")
+                    promptButton("Review my grades", subtitle: "Check my course progress", prompt: "Show my grades for my courses", symbol: "chart.bar")
+                    promptButton("Find course materials", subtitle: "Locate a resource I need", prompt: "Find the materials in my current course that are relevant to my upcoming assignments.", symbol: "books.vertical")
+                    promptButton("Make a study guide", subtitle: "Prepare for an upcoming test", prompt: "Help me make a study guide using my course materials and upcoming assignments.", symbol: "graduationcap")
+                }
             }
 
             Label("You stay in control. Changes always require your confirmation.", systemImage: "checkmark.shield")
@@ -475,7 +485,7 @@ struct ClassWireAIAssistantView: View {
                 modelDiscoveryStatus = models.isEmpty ? "No models returned" : "\(models.count) available"
             } catch {
                 availableModels = [store.model]
-                modelDiscoveryStatus = "Puter model refresh failed. Your selected model is unchanged. Try again, or check your connection and Puter account access."
+                modelDiscoveryStatus = "Puter refresh failed: \(error.localizedDescription)"
             }
             return
         }

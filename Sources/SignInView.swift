@@ -126,7 +126,7 @@ struct SignInView: View {
                 HStack(spacing: 10) {
                     TextField("Enter your School or domain", text: $searchText)
                         .textContentType(.organizationName)
-                        .textFieldStyle(.roundedBorder)
+                        .textFieldStyle(.bordered)
                         #if os(iOS)
                         .textInputAutocapitalization(.never)
                         .submitLabel(.search)
@@ -205,7 +205,7 @@ struct SignInView: View {
             VStack(alignment: .leading, spacing: 14) {
                 TextField("Username or Email", text: $username)
                     .textContentType(.username)
-                    .textFieldStyle(.roundedBorder)
+                    .textFieldStyle(.bordered)
                     #if os(iOS)
                     .textInputAutocapitalization(.never)
                     .submitLabel(.next)
@@ -216,7 +216,7 @@ struct SignInView: View {
 
                 SecureField("Password", text: $password)
                     .textContentType(.password)
-                    .textFieldStyle(.roundedBorder)
+                    .textFieldStyle(.bordered)
                     #if os(iOS)
                     .submitLabel(.go)
                     #endif
