@@ -1,5 +1,14 @@
 # Release notes
 
+## [2026.10.0-port.115]
+
+### Changed
+- Remove the editable model ID field from AI Settings; choose and switch models from the message composer model menu instead.
+- Keep the selected model and per-provider defaults in the assistant store so composer selection and provider switching continue to work.
+
+### Build
+- Increment the Apple bundle marketing version to `2026.10.115` and build number to `115`.
+
 ## [2026.10.0-port.114]
 
 ### Puter sign-in

@@ -33,7 +33,6 @@ struct ClassWireAISettingsView: View {
                 store.persistSettings()
                 Task { await store.refreshKeyStatus() }
             }
-            .onChange(of: store.model) { _, _ in store.persistSettings() }
             .onChange(of: store.ollamaEndpoint) { _, _ in store.persistSettings() }
             .task {
                 await puterService.refreshAuthStatus()
@@ -48,7 +47,9 @@ struct ClassWireAISettingsView: View {
     private var providerSection: some View {
         Section("AI provider") {
             providerPicker
-            modelField
+            Text("Choose your model from the menu beside the message composer.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
             if store.provider == .puter {
                 puterControls
             } else if store.provider.requiresAPIKey {
@@ -97,14 +98,6 @@ struct ClassWireAISettingsView: View {
                 }
             }
         }
-    }
-
-    private var modelField: some View {
-        TextField("Model", text: $store.model)
-#if os(iOS)
-            .textInputAutocapitalization(.never)
-#endif
-            .autocorrectionDisabled()
     }
 
     private var apiKeyControls: some View {
