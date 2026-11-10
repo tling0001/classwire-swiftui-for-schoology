@@ -5,6 +5,7 @@ enum ClassWireAIProvider: String, CaseIterable, Codable, Identifiable, Equatable
     case openai
     case anthropic
     case ollama
+    case puter
 
     var id: String { rawValue }
 
@@ -14,6 +15,7 @@ enum ClassWireAIProvider: String, CaseIterable, Codable, Identifiable, Equatable
         case .openai: "OpenAI"
         case .anthropic: "Anthropic"
         case .ollama: "Ollama (local)"
+        case .puter: "Puter"
         }
     }
 
@@ -23,10 +25,11 @@ enum ClassWireAIProvider: String, CaseIterable, Codable, Identifiable, Equatable
         case .openai: "gpt-4.1-mini"
         case .anthropic: "claude-sonnet-4-20250514"
         case .ollama: "qwen3:8b"
+        case .puter: "gpt-4.1-mini"
         }
     }
 
-    var requiresAPIKey: Bool { self != .ollama }
+    var requiresAPIKey: Bool { self != .ollama && self != .puter }
 }
 
 struct ClassWireAIMessage: Identifiable, Codable, Equatable {
@@ -86,7 +89,7 @@ enum ClassWireAIError: LocalizedError {
         case .missingKey(let provider): "Add an API key for \(provider) in ClassWire AI settings."
         case .invalidModel: "Enter a valid model name."
         case .invalidResponse(let detail): detail
-        case .unsupportedProvider: "Choose Gemini, OpenAI, Anthropic, or Ollama."
+        case .unsupportedProvider: "Choose Gemini, OpenAI, Anthropic, Ollama, or Puter."
         case .action(let detail): detail
         }
     }

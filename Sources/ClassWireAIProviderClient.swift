@@ -32,6 +32,13 @@ enum ClassWireAIProviderClient {
         guard !messages.isEmpty else {
             throw ClassWireAIError.invalidResponse("There are no messages to send.")
         }
+        if provider == .puter {
+            guard ClassWirePuterService.shared.isSignedIn else {
+                throw ClassWireAIError.invalidResponse("Connect your Puter account in ClassWire AI settings before sending a message.")
+            }
+            let result = try await ClassWirePuterService.shared.chat(model: trimmedModel, messages: messages, tools: tools, systemPrompt: systemPrompt)
+            return Response(text: result.text, toolCalls: result.toolCalls.map { ToolCall(name: $0.name, arguments: $0.arguments) })
+        }
         if provider.requiresAPIKey && key.isEmpty {
             throw ClassWireAIError.missingKey(provider.title)
         }
@@ -46,6 +53,8 @@ enum ClassWireAIProviderClient {
             request = try geminiRequest(model: trimmedModel, key: key, messages: messages, tools: tools)
         case .ollama:
             request = try ollamaRequest(model: trimmedModel, endpoint: ollamaEndpoint, messages: messages, tools: tools)
+        case .puter:
+            throw ClassWireAIError.unsupportedProvider
         }
 
         let (data, response) = try await URLSession.shared.data(for: request)
@@ -72,6 +81,7 @@ enum ClassWireAIProviderClient {
         case .anthropic: result = parseAnthropic(root)
         case .gemini: result = parseGemini(root)
         case .ollama: result = parseOllama(root)
+        case .puter: throw ClassWireAIError.unsupportedProvider
         }
         guard !result.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !result.toolCalls.isEmpty else {
             throw ClassWireAIError.invalidResponse("\(provider.title) did not return text or a tool call.")

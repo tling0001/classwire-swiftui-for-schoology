@@ -5,6 +5,8 @@ struct ClassWireAISettingsView: View {
     @Bindable var store: ClassWireAIAssistantStore
     @State private var keyInput = ""
     @State private var keyStatus = ""
+    @State private var showingPuterConnect = false
+    @State private var puterService = ClassWirePuterService.shared
 
     var body: some View {
         NavigationStack {
@@ -34,6 +36,7 @@ struct ClassWireAISettingsView: View {
             .onChange(of: store.model) { _, _ in store.persistSettings() }
             .onChange(of: store.ollamaEndpoint) { _, _ in store.persistSettings() }
             .task {
+                await puterService.refreshAuthStatus()
                 await store.refreshKeyStatus()
                 if !store.googleAccountEmail.isEmpty {
                     await store.refreshGoogleProjects()
@@ -46,7 +49,9 @@ struct ClassWireAISettingsView: View {
         Section("AI provider") {
             providerPicker
             modelField
-            if store.provider.requiresAPIKey {
+            if store.provider == .puter {
+                puterControls
+            } else if store.provider.requiresAPIKey {
                 apiKeyControls
             } else {
                 ollamaControls
@@ -61,6 +66,28 @@ struct ClassWireAISettingsView: View {
                 Text(provider.title).tag(provider)
             }
         }
+    }
+
+    private var puterControls: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if puterService.isSignedIn {
+                Label("Connected to Puter", systemImage: "checkmark.circle.fill").foregroundStyle(.secondary)
+                if !puterService.accountLabel.isEmpty {
+                    Text(puterService.accountLabel).font(.footnote).foregroundStyle(.secondary)
+                }
+                Button("Disconnect Puter", role: .destructive) {
+                    Task { await puterService.signOut(); await store.refreshKeyStatus() }
+                }
+            } else {
+                Text("Connect your Puter account to use its AI models. Puter manages sign-in and usage authorization; ClassWire does not request or store a Puter API key.")
+                    .font(.footnote).foregroundStyle(.secondary)
+                Button("Connect Puter account", systemImage: "person.crop.circle.badge.checkmark") {
+                    showingPuterConnect = true
+                }.buttonStyle(.borderedProminent)
+            }
+        }
+        .sheet(isPresented: $showingPuterConnect) { ClassWirePuterConnectSheet(service: puterService) }
+        .onChange(of: puterService.isSignedIn) { _, _ in Task { await store.refreshKeyStatus() } }
     }
 
     private var modelField: some View {
@@ -198,6 +225,7 @@ struct ClassWireAISettingsView: View {
     private var privacySection: some View {
         Section("Privacy and security") {
             Label("API keys and Google refresh tokens are stored in Apple Keychain.", systemImage: "lock.shield")
+            Text("Puter authentication remains in its WebKit website session and is not copied into ClassWire settings or Keychain.")
             Text("Your prompts and the Schoology information needed to answer them are sent directly to the AI provider you select. ClassWire does not store provider keys in conversation history or UserDefaults.")
             Text("Conversation history is saved locally on this device. Avoid asking AI to process information you do not want sent to your selected provider.")
         }

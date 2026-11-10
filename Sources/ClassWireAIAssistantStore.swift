@@ -57,7 +57,12 @@ final class ClassWireAIAssistantStore {
     }
 
     func refreshKeyStatus() async {
-        hasSavedProviderKey = provider == .ollama || ClassWireAIKeychainStore.load(provider: provider) != nil
+        if provider == .puter {
+            await ClassWirePuterService.shared.refreshAuthStatus()
+            hasSavedProviderKey = ClassWirePuterService.shared.isSignedIn
+        } else {
+            hasSavedProviderKey = provider == .ollama || ClassWireAIKeychainStore.load(provider: provider) != nil
+        }
     }
 
     func saveProviderKey(_ value: String) throws {
@@ -161,6 +166,11 @@ final class ClassWireAIAssistantStore {
     func send(_ prompt: String, session: AppSession) async {
         let value = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !value.isEmpty, !isSending else { return }
+        if provider == .puter && !ClassWirePuterService.shared.isSignedIn {
+            errorMessage = "Connect your Puter account in ClassWire AI settings before sending a message."
+            status = "Puter sign-in required"
+            return
+        }
         if provider.requiresAPIKey && ClassWireAIKeychainStore.load(provider: provider) == nil {
             errorMessage = "Add your \(provider.title) API key in ClassWire AI settings before sending a message."
             status = "AI setup required"

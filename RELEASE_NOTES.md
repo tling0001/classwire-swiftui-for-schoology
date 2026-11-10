@@ -1,13 +1,18 @@
 # Release notes
 
-## [2026.10.0.110]
+## [2026.10.0-port.110]
 
 ### Fixed
-- Remove the extra outer margins around course and group member lists. Keep search and filter controls comfortably inset while allowing the list to fill its available area with a seamless system background in light and dark appearances.
+- Remove extra outer margins around course and group member lists while keeping search and filter controls inset and allowing the list to fill its available area.
+
+### Puter AI provider
+- Add a controlled WebKit bridge to Puter.js for Puter account authentication, dynamic model discovery, and chat requests.
+- Keep Puter authentication in WebKit website data; do not copy Puter tokens or API keys into app settings, Keychain, or conversation history.
+- Route Puter function calls through the existing Schoology tool pipeline and preserve explicit confirmation before write actions.
 
 ### Versioning
-- Change release identifiers to `MAJOR.MINOR.PATCH.ITERATION` (for example, `2026.10.0.110`) instead of the `-port.N` suffix.
-- Keep Apple's required three-component marketing version (`2026.10.0`) and increment the independent bundle build number to 110.
+- Keep the release identifier format `MAJOR.MINOR.PATCH-port.ITERATION` (release `2026.10.0-port.110`).
+- Set Apple's three-component bundle marketing version to `2026.10.110` and the bundle build number to `110`.
 
 
 ## [2026.10.0-port.109]

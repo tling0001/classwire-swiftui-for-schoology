@@ -8,7 +8,7 @@ options:
 settings:
   base:
     SWIFT_VERSION: "6.0"
-    MARKETING_VERSION: "2026.10.0"
+    MARKETING_VERSION: "2026.10.110"
     CURRENT_PROJECT_VERSION: "110"
     PRODUCT_NAME: ClassWire
     INFOPLIST_KEY_CFBundleDisplayName: ClassWire

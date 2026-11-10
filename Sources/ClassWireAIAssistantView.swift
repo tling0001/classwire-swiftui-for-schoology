@@ -454,6 +454,31 @@ struct ClassWireAIAssistantView: View {
         let selectedProvider = store.provider
         let selectedEndpoint = store.ollamaEndpoint
         let selectedKey = ClassWireAIKeychainStore.load(provider: selectedProvider) ?? ""
+        if selectedProvider == .puter {
+            guard ClassWirePuterService.shared.isSignedIn else {
+                availableModels = [store.model]
+                modelDiscoveryStatus = "Connect your Puter account in AI settings"
+                return
+            }
+            isRefreshingModels = true
+            modelDiscoveryStatus = "Loading Puter models…"
+            defer { isRefreshingModels = false }
+            do {
+                let models = try await ClassWirePuterService.shared.listModels()
+                guard store.provider == selectedProvider else { return }
+                let discovered = Array(Set(models)).sorted()
+                availableModels = discovered.isEmpty ? [store.model] : discovered
+                if !discovered.isEmpty && !discovered.contains(store.model), let first = discovered.first {
+                    store.model = first
+                    store.persistSettings()
+                }
+                modelDiscoveryStatus = models.isEmpty ? "No models returned" : "\(models.count) available"
+            } catch {
+                availableModels = [store.model]
+                modelDiscoveryStatus = error.localizedDescription
+            }
+            return
+        }
         guard selectedProvider == .ollama || !selectedKey.isEmpty else {
             availableModels = [store.model]
             modelDiscoveryStatus = "Add an API key to load models"
@@ -477,6 +502,8 @@ struct ClassWireAIAssistantView: View {
                 request = URLRequest(url: URL(string: "https://api.anthropic.com/v1/models?limit=100")!)
                 request.setValue(selectedKey, forHTTPHeaderField: "x-api-key")
                 request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
+            case .puter:
+                throw ClassWireAIError.unsupportedProvider
             case .ollama:
                 let base = selectedEndpoint.trimmingCharacters(in: .whitespacesAndNewlines).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
                 guard let baseURL = URL(string: base), ["http", "https"].contains(baseURL.scheme?.lowercased() ?? ""), baseURL.host != nil else {
@@ -511,6 +538,8 @@ struct ClassWireAIAssistantView: View {
                 models = (root["data"] as? [[String: Any]] ?? []).compactMap { $0["id"] as? String }.filter { $0.hasPrefix("claude-") }
             case .ollama:
                 models = (root["models"] as? [[String: Any]] ?? []).compactMap { ($0["name"] as? String) ?? ($0["model"] as? String) }
+            case .puter:
+                models = []
             }
             guard store.provider == selectedProvider, store.ollamaEndpoint == selectedEndpoint else { return }
             availableModels = Array(Set(models)).sorted()
