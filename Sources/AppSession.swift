@@ -1571,11 +1571,39 @@ final class AppSession {
             SchoologyValue.list(rawAssignment["links"] ?? rawAssignment["link"], keys: ["links", "link", "items"])
         let attachmentEntries = attachmentRows.map { ($0, false) } + linkRows.map { ($0, true) }
         let attachments = attachmentEntries.compactMap { item, fromLinksCollection -> SchoologyAttachment? in
-            guard let url = SchoologyValue.url(item["file_download_url"] ?? item["fileDownloadURL"] ?? item["download_path"] ?? item["downloadPath"] ?? item["link_url"] ?? item["linkURL"] ?? item["linkUrl"] ?? item["web_url"] ?? item["webUrl"] ?? item["url"] ?? item["href"]) else { return nil }
+            let originalURL = SchoologyValue.url(
+                item["file_download_url"] ?? item["fileDownloadURL"] ??
+                item["download_path"] ?? item["downloadPath"] ??
+                item["download_url"] ?? item["downloadUrl"] ??
+                item["resolveDownloadUrl"] ?? item["resolve_download_url"] ??
+                item["link_url"] ?? item["linkURL"] ?? item["linkUrl"] ??
+                item["web_url"] ?? item["webUrl"] ?? item["url"] ?? item["href"] ??
+                rawAssignment["file_download_url"] ?? rawAssignment["fileDownloadURL"] ??
+                rawAssignment["download_path"] ?? rawAssignment["downloadPath"]
+            )
+            let convertedURL = SchoologyValue.url(
+                item["file_converted_download_url"] ?? item["fileConvertedDownloadURL"] ??
+                item["converted_download_path"] ?? item["convertedDownloadPath"] ??
+                rawAssignment["file_converted_download_url"] ?? rawAssignment["fileConvertedDownloadURL"] ??
+                rawAssignment["converted_download_path"] ?? rawAssignment["convertedDownloadPath"]
+            )
+            let conversionStatus = SchoologyValue.string(
+                item["converted_status"] ?? item["convertedStatus"] ??
+                rawAssignment["converted_status"] ?? rawAssignment["convertedStatus"]
+            ).lowercased()
+            let convertedReady = convertedURL != nil &&
+                (conversionStatus.isEmpty || ["success", "converted", "1"].contains(conversionStatus))
+            let isLink = fromLinksCollection || SchoologyAttachment.isLinkRecord(item)
+            guard let url = originalURL ?? (isLink ? nil : convertedURL) else { return nil }
             return SchoologyAttachment(
-                title: SchoologyValue.string(item["filename"] ?? item["fileName"] ?? item["title"] ?? item["linkTitle"] ?? item["link_title"], fallback: url.lastPathComponent),
+                title: SchoologyValue.string(
+                    item["filename"] ?? item["fileName"] ?? item["file_title"] ?? item["fileTitle"] ??
+                    item["title"] ?? item["linkTitle"] ?? item["link_title"],
+                    fallback: url.lastPathComponent
+                ),
                 url: url,
-                isLink: fromLinksCollection || SchoologyAttachment.isLinkRecord(item)
+                viewURL: !isLink && convertedReady ? convertedURL : nil,
+                isLink: isLink
             )
         }
         let profile = SchoologyProfileItem.decodeList(["assignment": rawAssignment], keys: ["assignment"]).first ??

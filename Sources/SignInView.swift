@@ -183,8 +183,7 @@ struct SignInView: View {
             Section { instanceSwitch }
         }
         .formStyle(.grouped)
-        .scrollContentBackground(.hidden)
-        .background(.background)
+        // Keep Form's native grouped background, matching Settings and system dialogs.
         .frame(maxWidth: 520)
         .frame(maxWidth: .infinity)
     }
@@ -240,8 +239,7 @@ struct SignInView: View {
             }
         }
         .formStyle(.grouped)
-        .scrollContentBackground(.hidden)
-        .background(.background)
+        // Keep Form's native grouped background, matching Settings and system dialogs.
         .frame(maxWidth: 520)
         .frame(maxWidth: .infinity)
         .onAppear {

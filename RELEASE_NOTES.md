@@ -1,5 +1,19 @@
 # Release notes
 
+## [2026.10.0-port.122]
+
+### Sign-in appearance
+- Use the same native grouped Form background as Settings and system dialogs on the school-search and account sign-in screens, improving field/surface contrast in both light and dark appearances.
+
+### Assignment attachment previews
+- Preserve original attachment URLs for Download while passing Schoology's converted PDF URL separately to View.
+- Recognize converted-file URL and status variants from assignment attachment records, including converted-only records, using the same readiness rules as the desktop ports.
+- Keep links and audio/video attachments on their existing handling paths.
+
+### Build
+- Increment the Apple bundle marketing version to `2026.10.122` and build number to `122`.
+
+
 ## [2026.10.0-port.121]
 
 ### Sign-in
