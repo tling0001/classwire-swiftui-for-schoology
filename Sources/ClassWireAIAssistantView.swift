@@ -8,7 +8,7 @@ struct ClassWireAIAssistantView: View {
     @State private var historySearch = ""
     @State private var showingSettings = false
     @State private var showingHistory = false
-    @AppStorage("classwire.ai.onboarding.completed") private var hasCompletedFirstRun = false
+    @State private var hasCompletedFirstRun = false
     @FocusState private var composerFocused: Bool
     @State private var availableModels: [String] = []
     @State private var isRefreshingModels = false
@@ -84,7 +84,10 @@ struct ClassWireAIAssistantView: View {
                 }
             }
         }
-        .task { await store.refreshKeyStatus() }
+        .task(id: session.aiSessionID) {
+            hasCompletedFirstRun = false
+            await store.refreshKeyStatus()
+        }
         .environment(\.openURL, OpenURLAction { url in
             handleCitation(url)
         })
@@ -368,7 +371,27 @@ struct ClassWireAIAssistantView: View {
 
     @ViewBuilder
     private var statusContent: some View {
-        if !store.status.isEmpty {
+        if store.isSending {
+            HStack(spacing: 10) {
+                ProgressView()
+                    .controlSize(.small)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("ClassWire AI is thinking…")
+                        .font(.subheadline.weight(.medium))
+                    if !store.status.isEmpty {
+                        Text(store.status)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 11)
+            .background(.quaternary.opacity(0.45), in: RoundedRectangle(cornerRadius: 14))
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("ClassWire AI is thinking. \(store.status)")
+        } else if !store.status.isEmpty {
             Text(store.status)
                 .font(.caption)
                 .foregroundStyle(.secondary)

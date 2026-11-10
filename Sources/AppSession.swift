@@ -12,6 +12,7 @@ final class AppSession {
     var pendingPersonProfileID: String?
     var pendingAINavigation: ClassWireAINavigationRequest?
     var isAIAssistantPresented = false
+    var aiSessionID = UUID()
     var aiCurrentCourseID: String?
     var aiCurrentCourseTitle: String?
     var aiCurrentAssignmentID: String?
@@ -104,6 +105,7 @@ final class AppSession {
             await api.setCanadianServer(canadianServer)
             let profile = try await api.currentUser(auth: credentials)
             auth = credentials
+            aiSessionID = UUID()
             user = profile
             await SchoologyPushNotifications.registerIfAuthorized()
             await refreshPeopleDirectoryAvailability(auth: credentials)
@@ -178,6 +180,7 @@ final class AppSession {
         UserDefaults.standard.set(false, forKey: "classwire.demoMode")
         KeychainStore.save(verifiedCredentials)
         auth = verifiedCredentials
+        aiSessionID = UUID()
         user = profile
         await SchoologyPushNotifications.registerIfAuthorized()
         await refreshPeopleDirectoryAvailability(auth: verifiedCredentials)
@@ -1006,7 +1009,8 @@ final class AppSession {
             title: sectionTitle,
             courseTitle: courseTitle,
             overallGrade: gradeText,
-            imageURL: imageURL
+            imageURL: imageURL,
+            isGradeOverridden: allowsCustomOverallGrade && (!overrideString.isEmpty || (numericOverride != nil && !(numericOverride is NSNull)))
         )
     }
 
@@ -2682,6 +2686,7 @@ final class AppSession {
 
     func beginDemoMode() {
         // Keep saved Keychain credentials intact; demo data is isolated from the real account.
+        aiSessionID = UUID()
         auth = nil
         user = SchoologyUser(id: "demo-student", nameDisplay: "Alex Morgan", pictureURL: nil)
         isDemoMode = true
@@ -2705,6 +2710,8 @@ final class AppSession {
 
     func signOut() {
         let credentials = auth
+        aiSessionID = UUID()
+        isAIAssistantPresented = false
         isDemoMode = false
         UserDefaults.standard.set(false, forKey: "classwire.demoMode")
         Task { await SchoologyPushNotifications.unregisterForSignOut(auth: credentials) }

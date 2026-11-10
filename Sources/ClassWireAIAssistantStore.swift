@@ -98,6 +98,42 @@ final class ClassWireAIAssistantStore {
         }
     }
 
+    func configureGeminiAutomatically() async {
+        guard !isCreatingGeminiKey, !isConnectingGoogle else { return }
+        isCreatingGeminiKey = true
+        googleStatus = "Preparing your ClassWire AI Google Cloud project…"
+        defer {
+            isCreatingGeminiKey = false
+            isConnectingGoogle = false
+        }
+
+        do {
+            if googleAccountEmail.isEmpty {
+                isConnectingGoogle = true
+                googleStatus = "Connecting your Google account…"
+                let account = try await ClassWireGoogleCloudService.shared.connect()
+                googleAccountEmail = account.email
+                googleProjects = account.projects
+                UserDefaults.standard.set(account.email, forKey: "classwire.ai.google.email")
+            }
+
+            isConnectingGoogle = false
+            googleStatus = "Creating or reusing the ClassWire AI project and Gemini key…"
+            let setup = try await ClassWireGoogleCloudService.shared.createOrReuseClassWireProjectAndGeminiKey(
+                accountEmail: googleAccountEmail
+            )
+            selectedGoogleProjectID = setup.project.projectID
+            if !googleProjects.contains(where: { $0.projectID == setup.project.projectID }) {
+                googleProjects.append(setup.project)
+            }
+            try ClassWireAIKeychainStore.save(setup.key, provider: .gemini)
+            hasSavedProviderKey = provider == .gemini || ClassWireAIKeychainStore.load(provider: provider) != nil
+            googleStatus = "Gemini is ready. The ClassWire AI project and API key are saved securely."
+        } catch {
+            googleStatus = error.localizedDescription
+        }
+    }
+
     func refreshGoogleProjects() async {
         guard ClassWireAIKeychainStore.loadGoogleRefreshToken() != nil else {
             googleStatus = "Connect your Google account to load projects."

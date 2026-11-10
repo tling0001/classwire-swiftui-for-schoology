@@ -127,6 +127,62 @@ final class ClassWireGoogleCloudService: NSObject, ASWebAuthenticationPresentati
         return try await listProjects(accessToken: token)
     }
 
+    func createOrReuseClassWireProjectAndGeminiKey(accountEmail: String) async throws -> (project: GoogleCloudProject, key: String) {
+        let accessToken = try await refreshedAccessToken()
+        let projects = try await listProjects(accessToken: accessToken)
+        let project: GoogleCloudProject
+
+        if let existing = projects.first(where: {
+            $0.displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+                .localizedCaseInsensitiveCompare("ClassWire AI") == .orderedSame
+        }) {
+            project = existing
+        } else {
+            let digest = SHA256.hash(data: Data(accountEmail.lowercased().utf8))
+            let suffix = digest.prefix(5).map { String(format: "%02x", $0) }.joined()
+            let projectID = "classwire-ai-\(suffix)"
+            let projectURL = URL(string: "https://cloudresourcemanager.googleapis.com/v3/projects")!
+            do {
+                _ = try await googleRequest(
+                    projectURL,
+                    method: "POST",
+                    accessToken: accessToken,
+                    body: ["projectId": projectID, "displayName": "ClassWire AI"]
+                )
+            } catch ClassWireGoogleCloudError.requestFailed(let status, _) where status == 409 {
+                // A previous setup attempt may already have created this deterministic project.
+            }
+
+            var activeProject = false
+            for attempt in 0..<90 {
+                do {
+                    let result = try await googleGET(
+                        "https://cloudresourcemanager.googleapis.com/v3/projects/\(projectID)",
+                        accessToken: accessToken
+                    )
+                    let state = result["state"] as? String ?? ""
+                    if state == "ACTIVE" {
+                        activeProject = true
+                        break
+                    }
+                    if state == "DELETE_REQUESTED" {
+                        throw ClassWireGoogleCloudError.operationFailed("The existing ClassWire AI project is being deleted. Restore it in Google Cloud or use Advanced Gemini settings.")
+                    }
+                } catch ClassWireGoogleCloudError.requestFailed(let status, _) where status == 404 && attempt < 89 {
+                    // Project creation is eventually consistent.
+                }
+                if attempt < 89 { try await Task.sleep(for: .seconds(1)) }
+            }
+            guard activeProject else {
+                throw ClassWireGoogleCloudError.operationFailed("Google did not make the ClassWire AI project active. Check Google Cloud permissions and try again.")
+            }
+            project = GoogleCloudProject(projectID: projectID, displayName: "ClassWire AI")
+        }
+
+        let key = try await createOrReuseGeminiKey(projectID: project.projectID)
+        return (project, key)
+    }
+
     func createOrReuseGeminiKey(projectID: String) async throws -> String {
         let bytes = Array(projectID.utf8)
         guard (6...30).contains(bytes.count),

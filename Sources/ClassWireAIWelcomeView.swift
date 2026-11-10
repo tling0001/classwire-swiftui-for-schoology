@@ -24,7 +24,7 @@ struct ClassWireAIWelcomeView: View {
                     VStack(alignment: .leading, spacing: 10) {
                         Label("1. Choose an AI provider", systemImage: "cpu")
                             .font(.headline)
-                        Text("ClassWire supports Google Gemini, OpenAI, Anthropic, Ollama, and Puter. Your selected provider is currently \(provider.title).")
+                        Text("Choose Google Gemini, OpenAI, Anthropic, Ollama (local), or Puter. Your selected provider is currently \(provider.title). Configure AI to choose a provider, connect an account, or add an API key.")
                             .foregroundStyle(.secondary)
                         if isProviderConfigured {
                             Label("Provider setup is ready", systemImage: "checkmark.circle.fill")
@@ -33,7 +33,7 @@ struct ClassWireAIWelcomeView: View {
                             Label("Provider setup is not complete yet", systemImage: "exclamationmark.circle")
                                 .foregroundStyle(.secondary)
                         }
-                        Button(isProviderConfigured ? "Review AI settings" : "Set up \(provider.title)", systemImage: "gearshape") {
+                        Button("Configure AI", systemImage: "gearshape") {
                             onConfigureProvider()
                         }
                         .buttonStyle(.bordered)

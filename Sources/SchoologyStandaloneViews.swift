@@ -176,14 +176,26 @@ struct SchoologyGradesView: View {
                                         if course.courseTitle != course.title {
                                             Text(course.courseTitle).font(.subheadline).foregroundStyle(.secondary)
                                         }
+                                        if course.isGradeOverridden {
+                                            Label("Grade override", systemImage: "pencil.circle.fill")
+                                                .font(.caption.weight(.medium))
+                                                .foregroundStyle(.orange)
+                                                .accessibilityLabel("Teacher-entered overall grade override")
+                                        }
                                     }
                                     Spacer()
-                                    Text(SchoologyGradeValueFormatter.display(course.overallGrade)).font(.headline.monospacedDigit()).foregroundStyle(.primary)
+                                    Text(SchoologyGradeValueFormatter.display(course.overallGrade))
+                                        .font(.title3.monospacedDigit().weight(.semibold))
+                                        .foregroundStyle(.primary)
+                                        .padding(.horizontal, 11)
+                                        .padding(.vertical, 7)
+                                        .background(.quaternary.opacity(0.65), in: Capsule())
                                     Image(systemName: expandedCourses.contains(course.id) ? "chevron.up" : "chevron.down")
                                         .font(.caption.weight(.semibold))
                                         .foregroundStyle(.secondary)
                                 }
-                                .frame(minHeight: 56)
+                                .frame(minHeight: 64)
+                                .padding(.vertical, 3)
                                 .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)

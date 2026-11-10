@@ -39,9 +39,6 @@ struct ClassWireAISettingsView: View {
             .task {
                 await puterService.refreshAuthStatus()
                 await store.refreshKeyStatus()
-                if !store.googleAccountEmail.isEmpty {
-                    await store.refreshGoogleProjects()
-                }
             }
     }
 
@@ -164,60 +161,45 @@ struct ClassWireAISettingsView: View {
     }
 
     private var googleCloudSection: some View {
-        Section("Google Cloud") {
+        Section("Google Gemini") {
             if store.googleAccountEmail.isEmpty {
-                Button("Connect Google account", systemImage: "person.crop.circle.badge.checkmark") {
-                    Task { await store.connectGoogle() }
+                Text("Connect your Google account. ClassWire will automatically create or reuse a Google Cloud project named ClassWire AI, enable the required services, and create or reuse a Gemini API key.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                Button("Connect Google and set up Gemini", systemImage: "person.crop.circle.badge.checkmark") {
+                    Task { await store.configureGeminiAutomatically() }
                 }
-                .disabled(store.isConnectingGoogle)
+                .buttonStyle(.borderedProminent)
+                .disabled(store.isConnectingGoogle || store.isCreatingGeminiKey)
             } else {
                 Label("Connected as \(store.googleAccountEmail)", systemImage: "checkmark.circle.fill")
                     .foregroundStyle(.secondary)
-
-                if !store.googleProjects.isEmpty {
-                    Picker("Google Cloud project", selection: $store.selectedGoogleProjectID) {
-                        ForEach(store.googleProjects) { project in
-                            Text(project.displayName).tag(project.projectID)
-                        }
-                    }
-                    Button("Create or reuse Gemini API key", systemImage: "key.horizontal") {
-                        Task { await store.createGeminiKey(projectID: store.selectedGoogleProjectID) }
-                    }
-                    .disabled(store.selectedGoogleProjectID.isEmpty || store.isCreatingGeminiKey)
-                } else {
-                    Button("Load Google Cloud projects", systemImage: "arrow.clockwise") {
-                        Task { await store.refreshGoogleProjects() }
-                    }
-                    .disabled(store.isConnectingGoogle)
+                if store.hasSavedProviderKey {
+                    Label("Gemini is configured on this device", systemImage: "checkmark.seal.fill")
+                        .foregroundStyle(.green)
                 }
-
-                Button("Refresh projects", systemImage: "arrow.clockwise") {
-                    Task { await store.refreshGoogleProjects() }
+                Button("Set up or repair Gemini automatically", systemImage: "arrow.clockwise") {
+                    Task { await store.configureGeminiAutomatically() }
                 }
                 .disabled(store.isConnectingGoogle || store.isCreatingGeminiKey)
-
-                Button("Disconnect Google", role: .destructive) {
-                    store.disconnectGoogle()
-                }
+                NavigationLink("Advanced Gemini settings", destination: ClassWireGeminiAdvancedSettingsView(store: store))
             }
 
             if store.isConnectingGoogle || store.isCreatingGeminiKey {
-                ProgressView(store.isCreatingGeminiKey ? "Preparing Gemini API key…" : "Connecting to Google…")
+                ProgressView("Setting up Gemini…")
             }
             if !store.googleStatus.isEmpty {
-                if store.googleStatus.localizedCaseInsensitiveContains("failed") {
-                    Text(store.googleStatus)
-                        .font(.footnote)
-                        .foregroundStyle(.red)
-                        .textSelection(.enabled)
-                } else {
-                    Text(store.googleStatus)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                        .textSelection(.enabled)
-                }
+                Text(store.googleStatus)
+                    .font(.footnote)
+                    .foregroundStyle(
+                        store.googleStatus.localizedCaseInsensitiveContains("failed") ||
+                        store.googleStatus.localizedCaseInsensitiveContains("could not") ||
+                        store.googleStatus.localizedCaseInsensitiveContains("error")
+                        ? .red : .secondary
+                    )
+                    .textSelection(.enabled)
             }
-            Text("ClassWire requests Google Cloud access to list your projects, enable the required APIs, and create or reuse a Gemini-only API key. Google may require project permissions and billing setup. The generated key is saved in this device's Keychain.")
+            Text("Google may require permission to create projects, enable APIs, and manage API keys. Google Cloud billing or account restrictions may prevent automatic setup. Your Gemini key is stored in Apple Keychain.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
         }

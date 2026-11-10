@@ -68,6 +68,7 @@ struct SchoologyUserGradeCourse: Identifiable, Sendable {
     let courseTitle: String
     let overallGrade: String
     let imageURL: URL?
+    let isGradeOverridden: Bool
 
     static func decodeList(_ value: Any?) -> [Self] {
         SchoologyValue.list(value, keys: ["section", "sections", "grade", "grades", "items", "data", "response"]).compactMap { row in
@@ -92,7 +93,8 @@ struct SchoologyUserGradeCourse: Identifiable, Sendable {
                 title: SchoologyValue.string(row["section_title"] ?? row["sectionTitle"] ?? row["course_title"] ?? row["courseTitle"], fallback: "Course"),
                 courseTitle: SchoologyValue.string(row["course_title"] ?? row["courseTitle"] ?? row["section_title"] ?? row["sectionTitle"]),
                 overallGrade: gradeText.hasSuffix("%") || gradeText == "—" || gradeText.contains(where: { $0.isLetter }) ? gradeText : gradeText + "%",
-                imageURL: SchoologyValue.url(row["picture_url"] ?? row["pictureUrl"] ?? row["image_url"] ?? row["imageUrl"])
+                imageURL: SchoologyValue.url(row["picture_url"] ?? row["pictureUrl"] ?? row["image_url"] ?? row["imageUrl"]),
+                isGradeOverridden: !SchoologyValue.string(overrideText).isEmpty || (numericOverride != nil && !(numericOverride is NSNull))
             )
         }
     }

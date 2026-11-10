@@ -1,5 +1,21 @@
 # Release notes
 
+## [2026.10.0-port.128]
+
+### ClassWire AI onboarding and setup
+- Show the AI welcome/setup guide the first time the assistant is opened in each signed-in session; signing out and back in resets the guide without relying on a device-wide completion preference.
+- Make the Configure AI action explicit and keep provider selection, API-key entry, and account setup accessible from the welcome screen.
+- Automatically create or reuse a Google Cloud project named `ClassWire AI`, enable the required services, and create or reuse the Gemini API key after Google authorization.
+- Move manual project selection, project refresh, alternate-project key creation, and Google disconnect controls into Advanced Gemini settings.
+- Show an in-conversation thinking indicator with the current AI/Schoology tool activity while a response is being prepared.
+
+### Grades
+- Improve standalone course-grade rows with clearer grade summary treatments and spacing.
+- Display an explicit Grade override indicator beside the course name when Schoology's custom overall-grade override is active.
+
+### Build
+- Increment the iOS and macOS marketing version to `2026.10.128` and build number to `128`.
+
 ## [2026.10.0-port.127]
 
 ### ClassWire AI request reliability
