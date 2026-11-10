@@ -1,3 +1,14 @@
+# Release notes
+
+## [2026.10.0-port.118]
+
+### Fixed
+- Use Puter.js's documented all-provider `puter.ai.listModels()` request, matching the working Tauri client, instead of enumerating providers and issuing multiple provider-scoped requests.
+- Extend the model-catalogue request deadline and preserve the selected model with a clearer recovery message when Puter does not return a catalogue.
+
+### Build
+- Increment the Apple bundle marketing version to `2026.10.118` and build number to `118`.
+
 ## [2026.10.0-port.117]
 
 ### Fixed
@@ -16,8 +27,6 @@
 
 ### Build
 - Increment the Apple bundle marketing version to `2026.10.116` and build number to `116`.
-
-# Release notes
 
 ## [2026.10.0-port.115]
 
