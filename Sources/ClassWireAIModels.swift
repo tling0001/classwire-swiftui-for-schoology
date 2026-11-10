@@ -32,17 +32,59 @@ enum ClassWireAIProvider: String, CaseIterable, Codable, Identifiable, Equatable
     var requiresAPIKey: Bool { self != .ollama && self != .puter }
 }
 
+struct ClassWireAIFileAttachment: Identifiable, Equatable {
+    let id: UUID
+    let filename: String
+    let mimeType: String
+    let data: Data
+    let extractedText: String
+
+    init(filename: String, mimeType: String, data: Data, extractedText: String = "") {
+        id = UUID()
+        self.filename = filename
+        self.mimeType = mimeType
+        self.data = data
+        self.extractedText = extractedText
+    }
+
+    var isImage: Bool { mimeType.lowercased().hasPrefix("image/") }
+    var isPDF: Bool { mimeType.lowercased() == "application/pdf" }
+}
+
 struct ClassWireAIMessage: Identifiable, Codable, Equatable {
     let id: UUID
     var role: String
     var content: String
     var createdAt: Date
+    var attachments: [ClassWireAIFileAttachment] = []
 
-    init(role: String, content: String, createdAt: Date = .now) {
+    private enum CodingKeys: String, CodingKey {
+        case id, role, content, createdAt
+    }
+
+    init(role: String, content: String, attachments: [ClassWireAIFileAttachment] = [], createdAt: Date = .now) {
         id = UUID()
         self.role = role
         self.content = content
         self.createdAt = createdAt
+        self.attachments = attachments
+    }
+
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        id = try values.decode(UUID.self, forKey: .id)
+        role = try values.decode(String.self, forKey: .role)
+        content = try values.decode(String.self, forKey: .content)
+        createdAt = try values.decode(Date.self, forKey: .createdAt)
+        attachments = []
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var values = encoder.container(keyedBy: CodingKeys.self)
+        try values.encode(id, forKey: .id)
+        try values.encode(role, forKey: .role)
+        try values.encode(content, forKey: .content)
+        try values.encode(createdAt, forKey: .createdAt)
     }
 }
 

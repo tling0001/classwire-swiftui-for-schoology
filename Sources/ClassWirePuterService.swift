@@ -184,7 +184,14 @@ final class ClassWirePuterService: NSObject, WKUIDelegate, WKNavigationDelegate 
         }
         let payload: [String: Any] = [
             "model": model,
-            "messages": [["role": "system", "content": systemPrompt]] + messages.map { ["role": $0.role, "content": $0.content] },
+            "messages": [["role": "system", "content": systemPrompt]] + messages.map { message in
+                let documentText = message.attachments.compactMap { attachment -> String? in
+                    let text = attachment.extractedText.trimmingCharacters(in: .whitespacesAndNewlines)
+                    return text.isEmpty ? nil : "Document contents from \(attachment.filename):\n\(text.prefix(30_000))"
+                }.joined(separator: "\n\n")
+                let content = documentText.isEmpty ? message.content : message.content + "\n\n" + documentText
+                return ["role": message.role, "content": content]
+            },
             "tools": declarations,
             "toolChoice": "auto"
         ]

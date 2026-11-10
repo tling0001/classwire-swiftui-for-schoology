@@ -1,6 +1,6 @@
 # ClassWire Privacy Policy
 
-**Last updated: November 7, 2026**
+**Last updated: November 10, 2026**
 
 ClassWire is an independent client for accessing a user's existing Schoology account. This policy explains what information the app handles, where it is sent, how it is stored, and the choices available to users.
 
@@ -17,7 +17,9 @@ Depending on the features you use, ClassWire may handle:
 - **Sign-in information:** the username and password you enter for direct sign-in, a QR sign-in value you scan, or authentication information returned by your school's sign-in provider. Direct sign-in information is sent to Schoology's authentication service. For school/browser sign-in, authentication is handled by Schoology and the school's identity provider.
 - **Authentication tokens:** Schoology OAuth tokens and related credentials used to make authenticated requests. ClassWire stores the OAuth credentials in the device Keychain rather than storing the account password.
 - **Schoology account and learning information:** profile details, school and course memberships, course materials, assignments, grades, feedback, calendar events, group information, posts, comments, likes, messages, notifications, and resource metadata that the app requests and displays.
-- **Files and attachments:** files you choose to upload for supported assignment submissions or messages, and files you choose to download or preview.
+- **Files and attachments:** files you choose to upload for supported assignment submissions or messages, files you attach to AI prompts (including images, PDFs, and supported text documents), and files you choose to download or preview. Text may be extracted from supported documents to make their contents available to an AI provider.
+- **AI prompts and responses:** prompts you enter, AI conversation text, images or documents you attach, and relevant Schoology information retrieved by AI tools (which can include course details, assignments, grades, messages, materials, and other account data). AI-generated text and images are also handled by the app.
+- **AI provider and Google Cloud setup information:** the AI provider you select, model and connection settings, provider API keys, and (if you configure Gemini automatically) your Google account email, Google OAuth authorization, Google Cloud project identifiers, and Gemini API key.
 - **Notification registration information:** when you enable push notifications, Apple provides an APNs device token. ClassWire sends that token to Schoology together with the platform, device name, operating-system version, and app version so Schoology can associate the device with your account for notifications.
 - **App preferences:** settings such as appearance, selected Schoology region, and notification preferences.
 
@@ -30,6 +32,16 @@ ClassWire does not need to handle every category listed above for every user. Th
 ClassWire sends authentication requests and authenticated API requests to Schoology's U.S. or Canadian services, depending on the server region you select. This includes requests to read or update Schoology content. When you post a comment, send a message, submit coursework, upload a file, or change a supported setting, the corresponding information is sent to Schoology.
 
 When you use school sign-in, Schoology and your school's identity provider may process information under their own privacy terms.
+
+### ClassWire AI and external AI providers
+
+ClassWire AI sends the prompt and the relevant conversation context to the AI provider and model you select. Depending on your request and the tools the assistant uses, that context can include Schoology course information, assignments, grades, feedback, messages, materials, or other information retrieved from your signed-in account. If you attach an image, PDF, or supported text file, its image data or extracted text is sent to the selected provider so it can answer your request. AI-generated responses and any generated images are returned to ClassWire for display.
+
+Supported provider routes include Google Gemini, OpenAI, Anthropic, and Puter. If you configure Ollama, prompts and supported extracted document text are sent to the Ollama server URL you enter; that server may be on your own device, your local network, or a remote host. Image input is supported only by compatible provider/model combinations. Puter currently receives prompt text and extracted text from supported text-file attachments; it does not accept image or PDF attachments. Each provider processes information under its own terms, privacy policy, and retention settings. ClassWire does not operate these AI services and cannot control their retention, model-training, or deletion practices. Review the selected provider's terms before sending sensitive education information. Do not attach information unless you are authorized to share it.
+
+When you ask ClassWire AI to perform a Schoology action, the app displays a proposal and requires your explicit confirmation. If you confirm a file-based assignment submission, ClassWire uploads the selected attachment files to Schoology and creates the submission revision. The files are not submitted merely because you attached them to an AI prompt.
+
+For automatic Gemini setup, you may authorize ClassWire to access your Google account for Google Cloud project and API-key management. ClassWire uses Google Cloud APIs to find or create a project named ClassWire AI, enable required services, and create or reuse a Gemini API key. Google processes the OAuth authorization and Cloud management requests under Google's terms. The Google refresh token and resulting Gemini API key are stored in Apple Keychain. The Gemini API key is sent to Google's Gemini service when you use Gemini; it is not sent to other AI providers.
 
 ### Schoology web pages and external learning tools
 
@@ -46,7 +58,8 @@ ClassWire checks GitHub for published app update information and downloads relea
 ## 4. Local storage and security
 
 - OAuth credentials are stored in the Apple Keychain with device-only accessibility settings.
-- App preferences are stored locally using the platform's preferences storage.
+- App preferences and AI conversation text are stored locally using the platform's preferences storage. Attached file bytes are held in memory while the AI request and current assistant session are active; they are not included in the saved conversation history.
+- API keys for supported AI providers and the Google refresh token used for Gemini Cloud setup are stored in Apple Keychain. The Google account email and non-secret provider/model preferences are stored locally.
 - Schoology content is generally loaded for display while the app is running; some views and services may retain temporary in-memory data during the session.
 - Schoology web-session cookies are provided to the system WebKit website data store for embedded web pages. WebKit may retain website data according to its storage behavior.
 - Files you explicitly save or export are stored at the location you choose.
@@ -62,7 +75,8 @@ This does not prevent Schoology, Apple, GitHub, a school identity provider, or a
 ## 6. Retention and deletion
 
 - OAuth credentials remain in Keychain until you sign out or the credentials are otherwise replaced or removed. Signing out deletes the locally stored OAuth credentials and asks Schoology to unregister the active push token when possible.
-- App preferences remain on the device until changed or the app's local data is removed.
+- App preferences and saved AI conversation text remain on the device until changed, deleted in the app where supported, or the app's local data is removed. AI attachment bytes are not saved with conversation history and are released with the active session, subject to normal operating-system behavior.
+- AI API keys and the Google refresh token remain in Keychain until removed through the relevant AI settings or app data is removed. A Gemini key created in Google Cloud remains subject to Google's Cloud API-key management and deletion controls.
 - Temporary data held in memory is released as the app session ends, subject to normal operating-system behavior.
 - WebKit cookies and website data may remain in WebKit's website data store; signing out of ClassWire does not currently guarantee that every embedded-browser cookie is immediately erased.
 - Files downloaded or exported by you remain wherever you saved them until you delete them.

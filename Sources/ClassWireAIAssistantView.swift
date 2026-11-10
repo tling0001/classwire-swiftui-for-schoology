@@ -1,4 +1,7 @@
 import SwiftUI
+import UniformTypeIdentifiers
+import PDFKit
+import ImageIO
 
 struct ClassWireAIAssistantView: View {
     @Environment(AppSession.self) private var session
@@ -13,6 +16,8 @@ struct ClassWireAIAssistantView: View {
     @State private var availableModels: [String] = []
     @State private var isRefreshingModels = false
     @State private var modelDiscoveryStatus = ""
+    @State private var pendingAttachments: [ClassWireAIFileAttachment] = []
+    @State private var showingAIFileImporter = false
 
     private var filteredConversations: [ClassWireAIConversation] {
         let query = historySearch.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -92,6 +97,13 @@ struct ClassWireAIAssistantView: View {
             handleCitation(url)
         })
         .animation(reduceMotion ? nil : .snappy(duration: 0.2), value: store.activeConversationID)
+        .fileImporter(
+            isPresented: $showingAIFileImporter,
+            allowedContentTypes: [.item],
+            allowsMultipleSelection: true
+        ) { result in
+            importAIFiles(result)
+        }
     }
 
     private var conversationSidebar: some View {
@@ -320,16 +332,29 @@ struct ClassWireAIAssistantView: View {
                 Spacer(minLength: 36)
             }
 
-            Text(attributedMessage(message.content))
-                .textSelection(.enabled)
-                .font(.body)
-                .padding(12)
-                .frame(maxWidth: 680, alignment: .leading)
-                .fixedSize(horizontal: false, vertical: true)
-                .background(
-                    isUser ? SchoologyStyle.blue.opacity(0.12) : Color.secondary.opacity(0.08),
-                    in: RoundedRectangle(cornerRadius: 16)
-                )
+            VStack(alignment: .leading, spacing: 10) {
+                Text(attributedMessage(message.content))
+                    .textSelection(.enabled)
+                    .font(.body)
+                    .fixedSize(horizontal: false, vertical: true)
+                ForEach(message.attachments) { attachment in
+                    if attachment.isImage {
+                        aiImagePreview(attachment)
+                    } else {
+                        Label(attachment.filename, systemImage: attachment.isPDF ? "doc.richtext" : "doc.text")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                    }
+                }
+            }
+            .padding(12)
+            .frame(maxWidth: 680, alignment: .leading)
+            .fixedSize(horizontal: false, vertical: true)
+            .background(
+                isUser ? SchoologyStyle.blue.opacity(0.12) : Color.secondary.opacity(0.08),
+                in: RoundedRectangle(cornerRadius: 16)
+            )
 
             if !isUser {
                 Spacer(minLength: 36)
@@ -432,8 +457,49 @@ struct ClassWireAIAssistantView: View {
     }
 
     private var composerContent: some View {
-        VStack(spacing: 4) {
-            HStack(alignment: .bottom, spacing: 10) {
+        VStack(spacing: 8) {
+            if !pendingAttachments.isEmpty {
+                ScrollView(.horizontal) {
+                    HStack(spacing: 8) {
+                        ForEach(pendingAttachments) { attachment in
+                            HStack(spacing: 6) {
+                                Image(systemName: attachment.isImage ? "photo" : (attachment.isPDF ? "doc.richtext" : "doc.text"))
+                                    .foregroundStyle(SchoologyStyle.blue)
+                                Text(attachment.filename)
+                                    .font(.caption)
+                                    .lineLimit(1)
+                                    .truncationMode(.middle)
+                                Button("Remove", systemImage: "xmark.circle.fill") {
+                                    pendingAttachments.removeAll { $0.id == attachment.id }
+                                }
+                                .labelStyle(.iconOnly)
+                                .buttonStyle(.plain)
+                                .accessibilityLabel("Remove \(attachment.filename)")
+                            }
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 7)
+                            .background(.quaternary.opacity(0.6), in: Capsule())
+                        }
+                    }
+                }
+                .scrollIndicators(.hidden)
+            }
+            HStack(alignment: .bottom, spacing: 8) {
+                Menu {
+                    Button("Choose Files", systemImage: "doc.badge.plus") {
+                        showingAIFileImporter = true
+                    }
+                } label: {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.title2)
+                        .foregroundStyle(SchoologyStyle.blue)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+                }
+                .accessibilityLabel("Add files to AI message")
+                .accessibilityHint("Choose images, PDFs, or text documents to attach.")
+                .disabled(store.isSending || pendingAttachments.count >= 5)
+
                 TextField("Ask about your Schoology work…", text: $draft, axis: .vertical)
                     .lineLimit(1...5)
                     .textFieldStyle(.plain)
@@ -452,7 +518,7 @@ struct ClassWireAIAssistantView: View {
                         .background(SchoologyStyle.blue, in: Circle())
                 }
                 .buttonStyle(.plain)
-                .disabled(store.isSending || draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .disabled(store.isSending || (draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && pendingAttachments.isEmpty))
                 .accessibilityLabel("Send message")
                 .accessibilityHint("Sends your question to ClassWire AI.")
             }
@@ -646,6 +712,14 @@ struct ClassWireAIAssistantView: View {
                     .padding(10)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(.background, in: RoundedRectangle(cornerRadius: 10))
+            } else if action.type == "submit_assignment_files" {
+                Label("Files to upload", systemImage: "paperclip")
+                    .font(.subheadline.weight(.semibold))
+                ForEach((action.values["file_names"] ?? "").components(separatedBy: "\n").filter { !$0.isEmpty }, id: \.self) { name in
+                    Label(name, systemImage: "doc")
+                        .font(.callout)
+                        .lineLimit(2)
+                }
             } else if action.type == "post_course_update" {
                 Text(action.values["body"] ?? "")
                     .font(.body)
@@ -688,10 +762,91 @@ struct ClassWireAIAssistantView: View {
 
     private func sendDraft() {
         let value = draft
-        guard !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        guard !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !pendingAttachments.isEmpty else { return }
+        let attachments = pendingAttachments
+        pendingAttachments = []
         draft = ""
         composerFocused = false
-        Task { await store.send(value, session: session) }
+        Task { await store.send(value, attachments: attachments, session: session) }
+    }
+
+    private func importAIFiles(_ result: Result<[URL], Error>) {
+        switch result {
+        case .failure(let error):
+            store.errorMessage = error.localizedDescription
+        case .success(let urls):
+            Task { @MainActor in
+                for url in urls {
+                    guard pendingAttachments.count < 5 else {
+                        store.errorMessage = "You can attach up to five files to one AI message."
+                        break
+                    }
+                    if pendingAttachments.contains(where: { $0.filename == url.lastPathComponent }) { continue }
+                    let scoped = url.startAccessingSecurityScopedResource()
+                    defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+                    do {
+                        let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+                        let size = (attributes[.size] as? NSNumber)?.intValue ?? 0
+                        guard size > 0, size <= 10 * 1024 * 1024 else {
+                            throw ClassWireAIError.invalidResponse("Each AI attachment must be between 1 byte and 10 MB.")
+                        }
+                        let data = try Data(contentsOf: url)
+                        let existingBytes = pendingAttachments.reduce(0) { $0 + $1.data.count }
+                        guard existingBytes + data.count <= 20 * 1024 * 1024 else {
+                            throw ClassWireAIError.invalidResponse("AI attachments are limited to 20 MB total per message.")
+                        }
+                        let ext = url.pathExtension.lowercased()
+                        let type = UTType(filenameExtension: ext)
+                        let mime = type?.preferredMIMEType ?? "application/octet-stream"
+                        if type?.conforms(to: .image) == true {
+                            guard ["image/png", "image/jpeg", "image/webp", "image/gif"].contains(mime.lowercased()) else {
+                                throw ClassWireAIError.invalidResponse("Use PNG, JPEG, WebP, or GIF images for AI image attachments.")
+                            }
+                            pendingAttachments.append(ClassWireAIFileAttachment(
+                                filename: url.lastPathComponent, mimeType: mime, data: data
+                            ))
+                        } else if ext == "pdf" {
+                            let text = PDFDocument(data: data)?.string ?? ""
+                            pendingAttachments.append(ClassWireAIFileAttachment(
+                                filename: url.lastPathComponent,
+                                mimeType: "application/pdf",
+                                data: data,
+                                extractedText: String(text.prefix(30_000))
+                            ))
+                        } else if ["txt", "md", "csv", "json", "xml", "html"].contains(ext),
+                                  let text = String(data: data, encoding: .utf8) {
+                            pendingAttachments.append(ClassWireAIFileAttachment(
+                                filename: url.lastPathComponent,
+                                mimeType: mime == "application/octet-stream" ? "text/plain" : mime,
+                                data: data,
+                                extractedText: String(text.prefix(30_000))
+                            ))
+                        } else {
+                            throw ClassWireAIError.invalidResponse("Unsupported AI attachment. Choose an image, PDF, or UTF-8 text, Markdown, CSV, JSON, XML, or HTML file.")
+                        }
+                    } catch {
+                        store.errorMessage = error.localizedDescription
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func aiImagePreview(_ attachment: ClassWireAIFileAttachment) -> some View {
+        if let source = CGImageSourceCreateWithData(attachment.data as CFData, nil),
+           let cgImage = CGImageSourceCreateImageAtIndex(source, 0, nil) {
+            Image(decorative: cgImage, scale: 1)
+                .resizable()
+                .scaledToFit()
+                .frame(maxWidth: 440, maxHeight: 320)
+                .clipShape(.rect(cornerRadius: 12))
+                .accessibilityLabel(attachment.filename)
+        } else {
+            Label(attachment.filename, systemImage: "photo")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
     }
 
     private func attributedMessage(_ raw: String) -> AttributedString {

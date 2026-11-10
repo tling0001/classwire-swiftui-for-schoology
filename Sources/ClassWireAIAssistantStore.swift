@@ -29,6 +29,7 @@ final class ClassWireAIAssistantStore {
     var googleStatus = ""
     var isConnectingGoogle = false
     var isCreatingGeminiKey = false
+    private var pendingSubmissionFiles: [ClassWireAIFileAttachment] = []
 
     var activeConversation: ClassWireAIConversation? {
         conversations.first { $0.id == activeConversationID }
@@ -199,9 +200,9 @@ final class ClassWireAIAssistantStore {
         saveConversations()
     }
 
-    func send(_ prompt: String, session: AppSession) async {
+    func send(_ prompt: String, attachments: [ClassWireAIFileAttachment] = [], session: AppSession) async {
         let value = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !value.isEmpty, !isSending else { return }
+        guard (!value.isEmpty || !attachments.isEmpty), !isSending else { return }
         if provider == .puter && !ClassWirePuterService.shared.isSignedIn {
             errorMessage = "Connect your Puter account in ClassWire AI settings before sending a message."
             status = "Puter sign-in required"
@@ -214,7 +215,8 @@ final class ClassWireAIAssistantStore {
         }
 
         if activeConversation == nil { createConversation() }
-        appendMessage(role: "user", content: value)
+        let attachmentSummary = attachments.isEmpty ? "" : "\n\nAttached files: " + attachments.map(\.filename).joined(separator: ", ")
+        appendMessage(role: "user", content: value + attachmentSummary, attachments: attachments)
         pendingAction = nil
         errorMessage = nil
         isSending = true
@@ -224,10 +226,12 @@ final class ClassWireAIAssistantStore {
         do {
             guard let conversation = activeConversation else { throw ClassWireAIError.invalidResponse("Could not open the active conversation.") }
             var history = conversation.messages.suffix(12).map {
-                ClassWireAIMessage(role: $0.role, content: String($0.content.prefix(9_000)))
+                ClassWireAIMessage(role: $0.role, content: String($0.content.prefix(9_000)), attachments: $0.attachments)
             }
             var answer = ""
             var preparedAction: ClassWireAIPendingAction?
+            var generatedImages: [ClassWireAIFileAttachment] = []
+            var generatedFiles: [ClassWireAIFileAttachment] = []
 
             for pass in 0..<6 {
                 status = pass == 0 ? "Choosing Schoology tools…" : "Reading Schoology API results…"
@@ -239,6 +243,7 @@ final class ClassWireAIAssistantStore {
                     messages: history,
                     tools: ClassWireAIToolService.definitions
                 )
+                generatedImages.append(contentsOf: response.generatedImages)
                 guard !response.toolCalls.isEmpty else {
                     answer = response.text
                     break
@@ -246,6 +251,55 @@ final class ClassWireAIAssistantStore {
 
                 var results: [[String: Any]] = []
                 for call in response.toolCalls.prefix(6) {
+                    if call.name == "create_ai_file" {
+                        let filename = (call.arguments["filename"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+                        let fileContent = call.arguments["content"] as? String ?? ""
+                        let ext = URL(fileURLWithPath: filename).pathExtension.lowercased()
+                        guard !filename.isEmpty, filename.count <= 120,
+                              ["txt", "md", "csv", "json"].contains(ext),
+                              !fileContent.isEmpty, fileContent.utf8.count <= 1_000_000,
+                              !filename.contains("/"), !filename.contains("\\") else {
+                            results.append(["tool": call.name, "error": "Use a simple filename ending in .txt, .md, .csv, or .json, and keep the generated file under 1 MB."])
+                            continue
+                        }
+                        let mime = ext == "json" ? "application/json" : (ext == "csv" ? "text/csv" : "text/plain")
+                        let file = ClassWireAIFileAttachment(
+                            filename: filename,
+                            mimeType: mime,
+                            data: Data(fileContent.utf8),
+                            extractedText: fileContent
+                        )
+                        generatedFiles.append(file)
+                        results.append(["tool": call.name, "result": ["filename": filename, "message": "Created and attached the file."]])
+                        continue
+                    }
+                    if call.name == "submit_assignment_files" {
+                        guard let sectionID = call.arguments["section_id"].map({ String(describing: $0) }),
+                              let assignmentID = call.arguments["assignment_id"].map({ String(describing: $0) }),
+                              !sectionID.isEmpty, !assignmentID.isEmpty else {
+                            results.append(["tool": call.name, "error": "A Schoology section_id and assignment_id are required."])
+                            continue
+                        }
+                        let allFiles = conversation.messages.flatMap(\.attachments) + generatedImages + generatedFiles
+                        let requestedNames = call.arguments["filenames"] as? [String]
+                            ?? (call.arguments["filename"] as? String).map { [$0] }
+                            ?? []
+                        let selected = requestedNames.isEmpty ? allFiles : allFiles.filter { requestedNames.contains($0.filename) }
+                        var unique: [ClassWireAIFileAttachment] = []
+                        for file in selected where !unique.contains(where: { $0.id == file.id }) { unique.append(file) }
+                        guard !unique.isEmpty else {
+                            results.append(["tool": call.name, "error": "No matching attached files were found. Attach a file or generate a file first."])
+                            continue
+                        }
+                        pendingSubmissionFiles = unique
+                        preparedAction = ClassWireAIPendingAction(
+                            type: "submit_assignment_files",
+                            values: ["section_id": sectionID, "assignment_id": assignmentID, "file_names": unique.map(\.filename).joined(separator: "\n")],
+                            title: "Submit attached files to Schoology",
+                            summary: "Upload \(unique.count) file(s) to assignment \(assignmentID) in course section \(sectionID). Nothing is uploaded until you confirm."
+                        )
+                        break
+                    }
                     do {
                         switch try await ClassWireAIToolService.run(name: call.name, arguments: call.arguments, session: session) {
                         case .data(let result):
@@ -270,10 +324,10 @@ final class ClassWireAIAssistantStore {
             }
 
             if pendingAction != nil {
-                appendMessage(role: "assistant", content: "I prepared the requested Schoology action. Review the details below and confirm before anything changes.")
+                appendMessage(role: "assistant", content: "I prepared the requested Schoology action. Review the details below and confirm before anything changes.", attachments: generatedImages + generatedFiles)
                 status = "Waiting for your confirmation"
             } else {
-                appendMessage(role: "assistant", content: answer.isEmpty ? "I could not produce an answer. Try asking in a different way." : answer)
+                appendMessage(role: "assistant", content: answer.isEmpty ? "I could not produce an answer. Try asking in a different way." : answer, attachments: generatedImages + generatedFiles)
                 status = "Schoology tools checked"
             }
         } catch {
@@ -302,6 +356,29 @@ final class ClassWireAIAssistantStore {
                 }
                 try await session.submitAssignmentText(sectionID: sectionID, gradeItemID: context.gradeItemID, text: text, draft: false)
                 appendMessage(role: "assistant", content: "The assignment text was submitted successfully.")
+
+            case "submit_assignment_files":
+                guard let sectionID = action.values["section_id"],
+                      let assignmentID = action.values["assignment_id"],
+                      !pendingSubmissionFiles.isEmpty else {
+                    throw ClassWireAIError.action("The file submission proposal is incomplete or its attached files are no longer available. Attach the files again and retry.")
+                }
+                let context = try await session.loadAssignmentContext(sectionID: sectionID, assignmentID: assignmentID)
+                guard context.canSubmit && !context.isTeacher else {
+                    throw ClassWireAIError.action("This account cannot submit files to the selected assignment.")
+                }
+                var fileIDs: [String] = []
+                for file in pendingSubmissionFiles {
+                    guard !file.data.isEmpty else { continue }
+                    let fileID = try await session.uploadAssignmentFile(data: file.data, filename: file.filename, mime: file.mimeType)
+                    fileIDs.append(fileID)
+                }
+                guard !fileIDs.isEmpty else { throw ClassWireAIError.action("There were no valid files to upload.") }
+                try await session.submitAssignmentFiles(
+                    fileIDs: fileIDs, resourceIDs: [], sectionID: sectionID, assignmentID: assignmentID
+                )
+                appendMessage(role: "assistant", content: "The attached file(s) were uploaded and submitted successfully to Schoology.")
+                pendingSubmissionFiles = []
 
             case "send_message":
                 guard let name = action.values["recipient_name"],
@@ -361,13 +438,14 @@ final class ClassWireAIAssistantStore {
 
     func cancelPendingAction() {
         pendingAction = nil
+        pendingSubmissionFiles = []
         status = "Proposal cancelled. Nothing was changed."
     }
 
-    private func appendMessage(role: String, content: String) {
+    private func appendMessage(role: String, content: String, attachments: [ClassWireAIFileAttachment] = []) {
         guard let id = activeConversationID,
               let index = conversations.firstIndex(where: { $0.id == id }) else { return }
-        conversations[index].messages.append(ClassWireAIMessage(role: role, content: content))
+        conversations[index].messages.append(ClassWireAIMessage(role: role, content: content, attachments: attachments))
         conversations[index].messages = Array(conversations[index].messages.suffix(80))
         conversations[index].updatedAt = .now
         if role == "user" && conversations[index].messages.filter({ $0.role == "user" }).count == 1 {

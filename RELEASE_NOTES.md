@@ -1,5 +1,26 @@
 # Release notes
 
+## [2026.10.0-port.129]
+
+### Build repair
+- Fix the missing `isGradeOverridden` argument in the demo grade-course initializer that caused both iOS and macOS Swift compilation to fail in port.128.
+
+### ClassWire AI file and image support
+- Add a plus-button file picker to the AI composer, with removable attachment chips and a five-file limit.
+- Accept PNG, JPEG, WebP, GIF, PDF, UTF-8 text, Markdown, CSV, JSON, XML, and HTML attachments up to 10 MB each.
+- Send supported images to compatible OpenAI, Anthropic, Gemini, and Ollama vision models; send PDF data to Gemini and Anthropic and extracted PDF/text contents to supported text routes. Puter reports unsupported image/PDF input rather than silently ignoring it.
+- Render Gemini inline image outputs in the conversation when an image-capable Gemini model is selected.
+- Let ClassWire AI create real TXT, Markdown, CSV, and JSON file attachments and keep generated files available in the current conversation.
+- Add a review-and-confirm Schoology file-submission action that uploads selected user-attached or AI-generated files and creates an assignment submission revision. No file is uploaded to Schoology merely by attaching it to an AI prompt.
+- Keep attachment bytes in memory only; saved conversation history stores message text and does not persist attached file contents.
+
+### Privacy
+- Update the privacy policy to explain AI provider data sharing, attached images/documents, extracted document text, generated AI content, Google Cloud Gemini setup, Keychain storage, and confirmed assignment file uploads.
+- Update the policy revision date to November 10, 2026.
+
+### Build
+- Increment the iOS and macOS marketing version to `2026.10.129` and build number to `129`.
+
 ## [2026.10.0-port.128]
 
 ### ClassWire AI onboarding and setup

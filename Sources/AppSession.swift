@@ -2616,7 +2616,7 @@ final class AppSession {
         ]
     }
     private var demoGradeCourses: [SchoologyUserGradeCourse] {
-        courses.map { c in SchoologyUserGradeCourse(id:c.id,title:c.title,courseTitle:c.title,overallGrade:c.id == "demo-biology" ? "A- (91.4%)" : (c.id == "demo-algebra" ? "B+ (88%)" : "A (95%)"),imageURL:c.profileURL) }
+        courses.map { c in SchoologyUserGradeCourse(id:c.id,title:c.title,courseTitle:c.title,overallGrade:c.id == "demo-biology" ? "A- (91.4%)" : (c.id == "demo-algebra" ? "B+ (88%)" : "A (95%)"),imageURL:c.profileURL,isGradeOverridden:false) }
     }
     private func demoAssignments(for id:String)->[SchoologyProfileItem] {
         let values:[(String,String,String)] = id == "demo-biology" ? [("demo-assignment-1","Cell Structure Lab","Due in 2 days"),("demo-assignment-2","Cell Transport Worksheet","Due in 5 days")] : (id == "demo-algebra" ? [("demo-assignment-3","Quadratic Functions","Due in 4 days")] : [("demo-assignment-4","Primary Source Analysis","Due in 6 days")])

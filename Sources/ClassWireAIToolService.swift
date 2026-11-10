@@ -56,6 +56,15 @@ enum ClassWireAIToolService {
             "assignment_id": ["type": "integer"],
             "section_id": ["type": "integer"]
         ], required: ["markdown"]),
+        tool("create_ai_file", "Create a real text-based file attachment from content you generated. Supported formats are .txt, .md, .csv, and .json. The app keeps the generated file attached to this conversation so it can be submitted to a Schoology assignment after the user reviews and confirms.", [
+            "filename": ["type": "string", "description": "Filename ending in .txt, .md, .csv, or .json."],
+            "content": ["type": "string", "description": "Complete file contents."]
+        ], required: ["filename", "content"]),
+        tool("submit_assignment_files", "PROPOSE uploading one or more files already attached in this AI conversation (including AI-generated images or documents) to a Schoology assignment submission. Only use filenames that appear in the attached-file list. This action never runs until the user reviews and explicitly confirms it.", [
+            "filenames": ["type": "array", "items": ["type": "string"], "description": "Exact filenames from attached files or AI-generated files. Omit to include all files attached in this conversation."],
+            "assignment_id": ["type": "integer", "description": "Schoology assignment ID."],
+            "section_id": ["type": "integer", "description": "Schoology course section ID."]
+        ], required: ["assignment_id", "section_id"]),
         tool("send_message", "PROPOSE a Schoology message. The user must review and explicitly confirm before it is sent.", [
             "recipient_name": ["type": "string"],
             "subject": ["type": "string"],
