@@ -189,8 +189,6 @@ struct SchoologyCommands: Commands {
                 .keyboardShortcut("2", modifiers: .command)
             Button("Messages") { session.destination = .messages }
                 .keyboardShortcut("3", modifiers: .command)
-            Button("ClassWire AI") { session.destination = .aiAssistant }
-                .keyboardShortcut("4", modifiers: .command)
             Divider()
             Button("Sign Out") { session.signOut() }
         }

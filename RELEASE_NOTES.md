@@ -1,5 +1,19 @@
 # Release notes
 
+## [2026.10.0-port.104]
+
+### ClassWire AI floating assistant
+- Move ClassWire AI out of the main navigation sidebar and expose it through a floating Liquid Glass assistant button.
+- Open the full, functional native SwiftUI assistant in an adaptive floating panel on iPad and Mac, and in a system sheet on compact iPhone layouts.
+- Add a press-and-hold context menu on iOS/iPadOS and secondary-click context menu on macOS to hide the floating button.
+- Add a Settings toggle to show or hide the floating assistant button; the preference is shared across app launches.
+- Keep existing conversation history, provider configuration, Google Cloud setup, Schoology tools, citation navigation, and explicit confirmation for write actions.
+- Route any legacy ClassWire AI destination directly to the real assistant instead of a placeholder.
+
+### Build
+- Increment the iOS and macOS bundle build number to 104.
+
+
 ## [2026.10.0-port.103]
 
 ### Google OAuth and SwiftUI archive fixes

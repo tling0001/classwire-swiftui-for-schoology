@@ -14,6 +14,7 @@ struct SettingsView: View {
     @State private var showingIOSInstallNotice = false
     @State private var installError: String?
     @State private var classicInstallError: String?
+    @AppStorage("classwire.ai.floatingButtonVisible") private var aiAssistantButtonVisible = true
 
     var body: some View {
         Form {
@@ -28,6 +29,13 @@ struct SettingsView: View {
                 }
                 .schoologyNavigationTabPickerStyle()
                 .tint(settingsAccent)
+            }
+
+            Section("ClassWire AI") {
+                Toggle("Show floating AI button", isOn: $aiAssistantButtonVisible)
+                Text("The floating ClassWire AI button opens your assistant. You can also hide it from the button’s context menu.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
             }
 
             SchoologyNotificationSettingsSection()

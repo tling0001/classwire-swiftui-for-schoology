@@ -17,6 +17,7 @@ struct DestinationView: View {
             case .home: HomeView()
             case .courses: CourseListView()
             case .groups: GroupListView()
+            case .aiAssistant: ClassWireAIAssistantView()
             case .messages: MessagesView()
             case .notifications: NotificationsView()
             case .resources: SchoologyResourcesView()

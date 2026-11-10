@@ -49,6 +49,11 @@ struct RootView: View {
             rootNavigationContent
             #endif
         }
+        .overlay {
+            if session.isSignedIn {
+                ClassWireAIFloatingAssistantOverlay()
+            }
+        }
         .onOpenURL(perform: handleIncomingURL)
         .animation(reduceMotion ? nil : .snappy(duration: 0.24), value: session.isSignedIn)
         #if os(macOS)
@@ -260,7 +265,6 @@ private struct SchoologySidebar: View {
         }
 
         Section("Communication") {
-            destinationRow(.aiAssistant)
             ForEach([AppDestination.messages, .notifications, .requests]) { item in
                 destinationRow(item)
             }
