@@ -1,5 +1,18 @@
 # Release notes
 
+## [2026.10.0-port.109]
+
+### AI model selection
+- Add a model picker beneath the chat composer. Google Gemini, OpenAI, and Anthropic models are discovered from their authenticated official model-list APIs; Ollama models are read from the configured server's local model list.
+- Keep the current model selectable if discovery is temporarily unavailable, and retain the chosen model per provider.
+
+### iOS keyboard
+- Dismiss the on-screen keyboard when tapping the conversation area outside the message composer, and allow interactive keyboard dismissal while scrolling.
+
+### Build
+- Increment the iOS and macOS bundle build number to 109.
+
+
 ## [2026.10.0-port.108]
 
 ### AI assignments
