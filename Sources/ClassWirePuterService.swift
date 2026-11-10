@@ -19,7 +19,7 @@ final class ClassWirePuterService: NSObject, WKUIDelegate, WKNavigationDelegate 
     @ObservationIgnored private var scriptHandler: ClassWirePuterScriptHandler!
     @ObservationIgnored private var isReady = false
     @ObservationIgnored private var loadError: String?
-    @ObservationIgnored private var pending: [String: CheckedContinuation<Any, Error>] = [:]
+    @ObservationIgnored private var pending: [String: CheckedContinuation<Data, Error>] = [:]
     @ObservationIgnored private var readyWaiters: [CheckedContinuation<Void, Error>] = []
 
     private override init() {
@@ -68,7 +68,18 @@ final class ClassWirePuterService: NSObject, WKUIDelegate, WKNavigationDelegate 
         if let error = body["error"] as? String {
             continuation.resume(throwing: ClassWireAIError.invalidResponse(error))
         } else {
-            continuation.resume(returning: body["result"] ?? NSNull())
+            let result = body["result"] ?? NSNull()
+            do {
+                let data = try JSONSerialization.data(
+                    withJSONObject: result,
+                    options: [.fragmentsAllowed, .sortedKeys]
+                )
+                continuation.resume(returning: data)
+            } catch {
+                continuation.resume(
+                    throwing: ClassWireAIError.invalidResponse("Puter returned a response that could not be decoded.")
+                )
+            }
         }
     }
 
@@ -160,7 +171,7 @@ final class ClassWirePuterService: NSObject, WKUIDelegate, WKNavigationDelegate 
 
     private func request(_ operation: String, payload: String? = nil) async throws -> Any {
         try await waitUntilReady()
-        return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Any, Error>) in
+        let responseData: Data = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Data, Error>) in
             let id = UUID().uuidString
             pending[id] = continuation
             let encodedPayload = payload.map(Self.jsString) ?? "null"
@@ -169,6 +180,7 @@ final class ClassWirePuterService: NSObject, WKUIDelegate, WKNavigationDelegate 
                 if let error, let pending = self.pending.removeValue(forKey: id) { pending.resume(throwing: error) }
             }
         }
+        return try JSONSerialization.jsonObject(with: responseData, options: [.fragmentsAllowed])
     }
 
     private func waitUntilReady() async throws {

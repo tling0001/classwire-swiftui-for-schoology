@@ -1,5 +1,15 @@
 # Release notes
 
+## [2026.10.0-port.112]
+
+### Fixed
+- Resolve the Swift 6 region-isolation error in the Puter WebKit bridge by passing JSON-encoded `Data` through checked continuations instead of transferring non-Sendable `Any` values.
+- Decode bridge results back into Foundation values on the main actor, preserving the existing model catalogue, authentication status, chat response, and sign-out result behavior.
+- Keep the bridge's JavaScript response validation and explicit error propagation intact.
+
+### Build
+- Increment the Apple bundle marketing version to `2026.10.112` and build number to `112`.
+
 ## [2026.10.0-port.111]
 
 ### Fixed
