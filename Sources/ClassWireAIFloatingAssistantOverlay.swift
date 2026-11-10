@@ -57,7 +57,7 @@ struct ClassWireAIFloatingAssistantOverlay: View {
         } label: {
             Image(systemName: isPresented ? "sparkles.rectangle.stack.fill" : "sparkles")
                 .font(.system(size: 23, weight: .semibold))
-                .foregroundStyle(SchoologyStyle.blue)
+                .foregroundStyle(.primary)
                 .frame(width: 58, height: 58)
                 .contentShape(Circle())
         }
@@ -152,7 +152,8 @@ private struct ClassWireAIGlassButtonModifier: ViewModifier {
     @ViewBuilder
     func body(content: Content) -> some View {
         if #available(iOS 26.0, macOS 26.0, *) {
-            content.glassEffect(.regular.tint(SchoologyStyle.blue.opacity(0.18)).interactive(), in: .circle)
+            // Keep this utility control neutral; color is reserved for actions with semantic meaning.
+            content.glassEffect(.regular.interactive(), in: .circle)
         } else {
             content
                 .background(.regularMaterial, in: Circle())

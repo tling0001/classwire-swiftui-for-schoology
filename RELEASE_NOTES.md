@@ -1,5 +1,15 @@
 # Release notes
 
+## [2026.10.0-port.106]
+
+### Fixed
+- Correct Google IAM service-account creation to nest displayName and description under serviceAccount, matching Google's REST request schema.
+- Remove the blue accent tint from the floating ClassWire AI button and use neutral system foreground and Liquid Glass styling.
+
+### Build
+- Increment the iOS and macOS bundle build number to 106.
+
+
 ## [2026.10.0-port.105]
 
 ### ClassWire AI layout

@@ -148,8 +148,10 @@ final class ClassWireGoogleCloudService: NSObject, ASWebAuthenticationPresentati
             var createComponents = URLComponents(string: "https://iam.googleapis.com/v1/projects/\(projectID)/serviceAccounts")!
             createComponents.queryItems = [URLQueryItem(name: "accountId", value: "classwire-gemini")]
             let body: [String: Any] = [
-                "displayName": "ClassWire Gemini",
-                "description": "Dedicated service-account identity for this user's ClassWire Gemini authorization key. No service-account private key is created."
+                "serviceAccount": [
+                    "displayName": "ClassWire Gemini",
+                    "description": "Dedicated service-account identity for this user's ClassWire Gemini authorization key. No service-account private key is created."
+                ]
             ]
             do {
                 _ = try await googleRequest(createComponents.url!, method: "POST", accessToken: accessToken, body: body)
