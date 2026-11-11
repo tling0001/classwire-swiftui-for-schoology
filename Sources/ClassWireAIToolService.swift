@@ -142,7 +142,7 @@ enum ClassWireAIToolService {
         if !session.courses.isEmpty {
             return session.courses.map { ["id": $0.id, "title": $0.title, "course_title": $0.title] }
         }
-        let root = try await api("users/\(session.auth?.userID ?? "")/sections", session: session, params: ["start": "0", "limit": "200"])
+        let root = try await api("users/\(session.learningUserID)/sections", session: session, params: ["start": "0", "limit": "200"])
         return rows(root, "section", "sections")
     }
 
@@ -179,7 +179,7 @@ enum ClassWireAIToolService {
             if !session.groups.isEmpty {
                 return .data(session.groups.map { ["id": $0.id, "name": $0.title, "citation": "[[group:\($0.id)|\($0.title)]]"] })
             }
-            let root = try await api("users/\(auth.userID)/groups", session: session, params: ["start": "0", "limit": "100"])
+            let root = try await api("users/\(session.learningUserID)/groups", session: session, params: ["start": "0", "limit": "100"])
             return .data(rows(root, "group", "groups").map { row in
                 let id = text(row["id"] ?? row["group_id"])
                 let title = text(row["name"] ?? row["title"], fallback: "Group")
@@ -191,7 +191,7 @@ enum ClassWireAIToolService {
             let formatter = DateFormatter()
             formatter.calendar = Calendar(identifier: .gregorian)
             formatter.dateFormat = "yyyy-MM-dd"
-            let root = try await api("users/\(auth.userID)/events", session: session, params: [
+            let root = try await api("users/\(session.learningUserID)/events", session: session, params: [
                 "start_date": formatter.string(from: .now), "start": "0", "limit": "100"
             ])
             let cutoff = Date.now.addingTimeInterval(Double(days) * 86_400)
@@ -245,7 +245,7 @@ enum ClassWireAIToolService {
             let periods = try await api("sections/\(courseID)/grading_periods", session: session)
             let categories = try await api("sections/\(courseID)/grading_categories", session: session)
             let items = try await api("sections/\(courseID)/grade_items", session: session, params: ["limit": "500"])
-            let grades = try await api("users/\(auth.userID)/grades", session: session, params: ["section_id": courseID])
+            let grades = try await api("users/\(session.learningUserID)/grades", session: session, params: ["section_id": courseID])
             return .data([
                 "course": section["section"] ?? section,
                 "gradingPeriods": rows(periods, "grading_period", "grading_periods"),
@@ -335,7 +335,7 @@ enum ClassWireAIToolService {
                   let submissionID = number(arguments["submission_id"]) else {
                 throw ClassWireAIError.action("Valid section_id and submission_id values are required.")
             }
-            let userID = number(arguments["user_id"]) ?? Int(auth.userID) ?? 0
+            let userID = number(arguments["user_id"]) ?? Int(session.learningUserID) ?? 0
             guard userID > 0 else { throw ClassWireAIError.action("A valid user ID is required.") }
             let root = try await api("sections/\(sectionID)/submissions/\(submissionID)/\(userID)", session: session, params: [
                 "all_revisions": "TRUE", "with_annotations": "TRUE", "with_attachments": "TRUE"

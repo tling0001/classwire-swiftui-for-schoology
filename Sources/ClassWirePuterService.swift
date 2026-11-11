@@ -2,6 +2,7 @@ import Foundation
 import Observation
 import SwiftUI
 import WebKit
+import Network
 
 @MainActor
 @Observable
@@ -22,6 +23,7 @@ final class ClassWirePuterService: NSObject, WKUIDelegate, WKNavigationDelegate 
     @ObservationIgnored private var isReady = false
     @ObservationIgnored private var loadError: String?
     @ObservationIgnored private var readyTimeoutTask: Task<Void, Never>?
+    @ObservationIgnored private var localHTTPListener: NWListener?
     @ObservationIgnored private var pending: [String: CheckedContinuation<Data, Error>] = [:]
     @ObservationIgnored private var pendingTimeouts: [String: Task<Void, Never>] = [:]
     @ObservationIgnored private var readyWaiters: [CheckedContinuation<Void, Error>] = []
@@ -37,13 +39,51 @@ final class ClassWirePuterService: NSObject, WKUIDelegate, WKNavigationDelegate 
         webView = WKWebView(frame: .zero, configuration: configuration)
         webView.uiDelegate = self
         webView.navigationDelegate = self
-        webView.loadHTMLString(Self.bridgeHTML, baseURL: URL(string: "http://localhost"))
+        startLocalBridgeServer()
         readyTimeoutTask = Task { [weak self] in
             do { try await Task.sleep(for: .seconds(25)) } catch { return }
             guard let self, !self.isReady else { return }
             self.failReadyWaiters(ClassWireAIError.invalidResponse(
                 "Puter's embedded browser did not finish loading within 25 seconds."
             ))
+        }
+    }
+
+    private func startLocalBridgeServer() {
+        do {
+            let parameters = NWParameters.tcp
+            parameters.requiredLocalEndpoint = .hostPort(host: .ipv4(.loopback), port: .any)
+            let listener = try NWListener(using: parameters)
+            localHTTPListener = listener
+            listener.newConnectionHandler = { [weak self] connection in
+                Task { @MainActor [weak self] in self?.serveBridgeRequest(connection) }
+            }
+            listener.stateUpdateHandler = { [weak self, weak listener] state in
+                Task { @MainActor [weak self, weak listener] in
+                    guard let self, let listener else { return }
+                    switch state {
+                    case .ready:
+                        guard let port = listener.port?.rawValue, let url = URL(string: "http://localhost:\(port)/") else {
+                            self.failReadyWaiters(ClassWireAIError.invalidResponse("Puter's local web origin could not be created.")); return
+                        }
+                        self.webView.load(URLRequest(url: url))
+                    case .failed(let error):
+                        self.failReadyWaiters(ClassWireAIError.invalidResponse("Puter's localhost bridge could not start: \(error.localizedDescription)"))
+                    default: break
+                    }
+                }
+            }
+            listener.start(queue: DispatchQueue(label: "com.classwire.puter.local-http"))
+        } catch { failReadyWaiters(ClassWireAIError.invalidResponse("Puter's localhost bridge could not start: \(error.localizedDescription)")) }
+    }
+
+    private func serveBridgeRequest(_ connection: NWConnection) {
+        let body = Data(Self.bridgeHTML.utf8)
+        connection.start(queue: DispatchQueue(label: "com.classwire.puter.local-http-client"))
+        connection.receive(minimumIncompleteLength: 1, maximumLength: 16_384) { _, _, _, _ in
+            let header = Data(("HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: \(body.count)\r\nCache-Control: no-store\r\nConnection: close\r\nX-Content-Type-Options: nosniff\r\n\r\n").utf8)
+            var response = header; response.append(body)
+            connection.send(content: response, completion: .contentProcessed { _ in connection.cancel() })
         }
     }
 
@@ -76,11 +116,13 @@ final class ClassWirePuterService: NSObject, WKUIDelegate, WKNavigationDelegate 
     }
 
     func receive(_ message: WKScriptMessage) {
-        guard message.name == "classWirePuter", message.frameInfo.isMainFrame,
-              message.frameInfo.securityOrigin.protocol == "http",
-              message.frameInfo.securityOrigin.host == "localhost",
-              let body = message.body as? [String: Any],
-              let type = body["type"] as? String else { return }
+        guard message.name == "classWirePuter", message.frameInfo.isMainFrame else { return }
+        let origin = message.frameInfo.securityOrigin
+        guard origin.protocol == "http", origin.host == "localhost" else {
+            signInError = "Puter bridge origin was not a real localhost HTTP origin (received \(origin.protocol)://\(origin.host)). Restart ClassWire and try again."
+            return
+        }
+        guard let body = message.body as? [String: Any], let type = body["type"] as? String else { return }
         if type == "auth" {
             isSignedIn = body["signedIn"] as? Bool ?? false
             accountLabel = body["user"] as? String ?? ""
@@ -305,14 +347,11 @@ final class ClassWirePuterService: NSObject, WKUIDelegate, WKNavigationDelegate 
     private static let bridgeHTML = """
     <!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1">
     <style>:root{color-scheme:light dark;font:-apple-system-body}body{margin:0;padding:24px;background:transparent;color:CanvasText}
-    main{max-width:520px;margin:0 auto}h1{font-size:22px;margin:0 0 8px}p,#status{color:GrayText;line-height:1.45}
-    button{font:inherit;font-weight:600;border:0;border-radius:12px;padding:13px 18px;min-height:48px;background:#1769aa;color:white;width:100%}
-    button:disabled{opacity:.55}</style></head><body><main><h1>Connect Puter</h1>
-    <p>Sign in to Puter to use its AI models. Puter securely manages your account session.</p>
-    <button id="connect" disabled>Loading Puter…</button><div id="status" role="status" aria-live="polite">Loading authentication…</div></main>
+    main{max-width:520px;margin:0 auto}h1{font-size:22px;margin:0 0 8px}p,#status{color:GrayText;line-height:1.45}</style></head><body><main><h1>Sign in to Puter</h1>
+    <p>Puter securely manages your account session. ClassWire will open the sign-in flow when you choose Connect Puter.</p>
+    <div id="status" role="status" aria-live="polite">Loading Puter authentication…</div></main>
     <script>
     (() => {
-      const button = document.getElementById('connect');
       const status = document.getElementById('status');
       const send = value => window.webkit.messageHandlers.classWirePuter.postMessage(value);
       let puterSDKPromise = null;
@@ -377,14 +416,16 @@ final class ClassWirePuterService: NSObject, WKUIDelegate, WKNavigationDelegate 
         return { signedIn, user: '' };
       }
       async function authenticate(puter) {
-        // Prefer the working Tauri-compatible Auth FALLBACK path in embedded WebKit.
-        if (typeof puter.auth?.signIn === 'function') {
+        // Match Tauri: present Puter's in-page authentication dialog first; use signIn as fallback.
+        if (typeof puter.ui?.authenticateWithPuter === 'function') {
           try {
-            await withTimeout(puter.auth.signIn({ request_auth: true }), 150000, 'Puter sign-in');
-          } catch (primaryError) {
-            if (typeof puter.ui?.authenticateWithPuter !== 'function') throw primaryError;
             await withTimeout(puter.ui.authenticateWithPuter(), 150000, 'Puter sign-in');
+          } catch (primaryError) {
+            if (typeof puter.auth?.signIn !== 'function') throw primaryError;
+            await withTimeout(puter.auth.signIn({ request_auth: true }), 150000, 'Puter sign-in');
           }
+        } else if (typeof puter.auth?.signIn === 'function') {
+          await withTimeout(puter.auth.signIn({ request_auth: true }), 150000, 'Puter sign-in');
         } else if (typeof puter.ui?.authenticateWithPuter === 'function') {
           await withTimeout(puter.ui.authenticateWithPuter(), 150000, 'Puter sign-in');
         } else {
@@ -396,15 +437,9 @@ final class ClassWirePuterService: NSObject, WKUIDelegate, WKNavigationDelegate 
         try {
           const puter = await ensurePuterSDK();
           const snapshot = publishAuthStatus(puter);
-          button.textContent = snapshot.signedIn ? 'Connected to Puter' : 'Connect with Puter';
-          status.textContent = snapshot.signedIn ? 'Your Puter account is connected.' : 'Sign in to continue.';
-          button.disabled = false;
+          status.textContent = snapshot.signedIn ? 'Your Puter account is connected.' : 'Puter is ready. Choose Connect Puter in ClassWire to sign in.';
           return snapshot;
-        } catch (error) {
-          status.textContent = errorText(error);
-          button.disabled = false;
-          throw error;
-        }
+        } catch (error) { status.textContent = errorText(error); throw error; }
       };
       window.classWirePuterRequest = async (id, operation, payload) => {
         try {
@@ -486,12 +521,7 @@ final class ClassWirePuterService: NSObject, WKUIDelegate, WKNavigationDelegate 
           send({ id, result });
         } catch (error) { send({ id, error: errorText(error) }); }
       };
-      button.addEventListener('click', async () => {
-        button.disabled = true; status.textContent = 'Opening Puter sign-in…';
-        try { const puter = await ensurePuterSDK(); await authenticate(puter); await report(); }
-        catch (error) { status.textContent = errorText(error); button.disabled = false; }
-      });
-      ensurePuterSDK().then(report).catch(error => { status.textContent = errorText(error); button.disabled = false; });
+      ensurePuterSDK().then(report).catch(error => { status.textContent = errorText(error); });
     })();
     </script></body></html>
     """
@@ -542,6 +572,10 @@ struct ClassWirePuterConnectSheet: View {
                 }
             }
         }
+        #if os(macOS)
+        .frame(minWidth: 420, idealWidth: 520, minHeight: 420, idealHeight: 600)
+        #else
         .frame(minWidth: 320, minHeight: 360)
+        #endif
     }
 }

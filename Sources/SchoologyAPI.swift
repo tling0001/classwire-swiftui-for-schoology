@@ -186,10 +186,24 @@ actor SchoologyAPI {
         let data = try await get("users/me", auth: auth)
         guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
               let id = json["id"] else { throw SchoologyAPIError.invalidResponse }
+        let rawChildren = json["child_uids"] ?? json["childUids"] ?? json["children_uids"] ?? []
+        let childUIDs: [String]
+        if let values = rawChildren as? [Any] {
+            childUIDs = values.compactMap { value in
+                if let item = value as? [String: Any] {
+                    let childID = SchoologyValue.string(item["id"] ?? item["uid"] ?? item["user_id"] ?? item["userId"])
+                    return childID.isEmpty ? nil : childID
+                }
+                let childID = SchoologyValue.string(value)
+                return childID.isEmpty ? nil : childID
+            }
+        } else if let value = rawChildren as? String {
+            childUIDs = value.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+        } else { childUIDs = [] }
         return SchoologyUser(
             id: String(describing: id),
             nameDisplay: json["name_display"] as? String ?? json["name"] as? String ?? "ClassWire user",
-            pictureURL: URL(string: json["picture_url"] as? String ?? "")
+            pictureURL: URL(string: json["picture_url"] as? String ?? ""), childUIDs: childUIDs
         )
     }
 

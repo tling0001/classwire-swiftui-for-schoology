@@ -15,11 +15,13 @@ struct SchoologyUser: Codable, Identifiable, Sendable {
     var id: String
     var nameDisplay: String
     var pictureURL: URL?
+    var childUIDs: [String]? = nil
 
     enum CodingKeys: String, CodingKey {
         case id
         case nameDisplay = "name_display"
         case pictureURL = "picture_url"
+        case childUIDs = "child_uids"
     }
 }
 

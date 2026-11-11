@@ -7,6 +7,9 @@ import SwiftUI
 final class AppSession {
     var auth: SchoologyAuth?
     var user: SchoologyUser?
+    var parentChildren: [SchoologyUser] = []
+    var selectedStudent: SchoologyUser?
+    var learningUserID: String { selectedStudent?.id ?? auth?.userID ?? "" }
     var peopleDirectoryEnabled = false
     var destination: AppDestination = .home
     var pendingPersonProfileID: String?
@@ -102,6 +105,8 @@ final class AppSession {
     }
 
     func restore(_ credentials: SchoologyAuth) async {
+        selectedStudent = nil
+        parentChildren = []
         isLoading = true
         defer { isLoading = false }
         do {
@@ -110,6 +115,7 @@ final class AppSession {
             auth = credentials
             aiSessionID = UUID()
             user = profile
+            await loadParentChildren()
             await SchoologyPushNotifications.registerIfAuthorized()
             await refreshPeopleDirectoryAvailability(auth: credentials)
             await refresh()
@@ -187,6 +193,7 @@ final class AppSession {
         hasCompletedAIWelcomeForLogin = false
         UserDefaults.standard.set(false, forKey: "classwire.ai.welcome.completed")
         user = profile
+        await loadParentChildren()
         await SchoologyPushNotifications.registerIfAuthorized()
         await refreshPeopleDirectoryAvailability(auth: verifiedCredentials)
         destination = .home
@@ -203,7 +210,40 @@ final class AppSession {
         }
     }
 
+    func loadParentChildren() async {
+        guard let auth, let parent = user else { parentChildren = []; return }
+        let ids = Array(Set((parent.childUIDs ?? []).filter { !$0.isEmpty && $0 != auth.userID }))
+        guard !ids.isEmpty else { parentChildren = []; selectedStudent = nil; return }
+        var children: [SchoologyUser] = []
+        for childID in ids {
+            do {
+                let data = try await api.get("users/\(childID)", auth: auth)
+                let root = Self.object(data)
+                let profile = (root["user"] as? [String: Any]) ?? root
+                let id = SchoologyValue.string(profile["id"] ?? profile["uid"] ?? childID)
+                let name = SchoologyValue.string(profile["name_display"] ?? profile["display_name"] ?? profile["name"])
+                let picture = SchoologyValue.string(profile["picture_url"] ?? profile["pictureUrl"] ?? profile["picture"])
+                children.append(SchoologyUser(id: id.isEmpty ? childID : id, nameDisplay: name.isEmpty ? "Student" : name, pictureURL: URL(string: picture), childUIDs: []))
+            } catch { children.append(SchoologyUser(id: childID, nameDisplay: "Student", pictureURL: nil, childUIDs: [])) }
+        }
+        parentChildren = children.sorted { $0.nameDisplay.localizedCaseInsensitiveCompare($1.nameDisplay) == .orderedAscending }
+        if let selectedStudent, !parentChildren.contains(where: { $0.id == selectedStudent.id }) { self.selectedStudent = nil }
+    }
+
+    func selectLearningStudent(_ student: SchoologyUser?) async {
+        guard auth != nil else { return }
+        selectedStudent = student?.id == auth?.userID ? nil : student
+        courses = []; groups = []; upcomingEvents = []; calendarUpcomingEvents = []; calendarMonthEvents = []
+        userGradeCourses = []; hasLoadedUserGrades = false; userGradesError = nil
+        hasLoadedHomeCourses = false; hasLoadedHomeUpcoming = false
+        hasLoadedCalendarUpcoming = false; calendarLoadedMonth = ""; calendarError = nil
+        aiCurrentCourseID = nil; aiCurrentCourseTitle = nil; aiCurrentAssignmentID = nil; aiCurrentAssignmentTitle = nil
+        destination = .home; homeSection = .recent
+        await refresh()
+    }
+
     func refresh() async {
+        let learningUserID = selectedStudent?.id ?? auth?.userID ?? ""
         if isDemoMode { return }
         guard let auth else { return }
         isRefreshing = true
@@ -212,9 +252,9 @@ final class AppSession {
         async let activityRequest = fetchHomeData(path: "recent", auth: auth, params: [
             "start": "0", "limit": "20", "with_attachments": "TRUE", "richtext": "1"
         ])
-        async let courseRequest = fetchHomeData(path: "users/\(auth.userID)/sections", auth: auth, params: ["limit": "100"])
-        async let groupRequest = fetchHomeData(path: "users/\(auth.userID)/groups", auth: auth, params: ["limit": "100"])
-        async let upcomingRequest = fetchHomeData(path: "users/\(auth.userID)/events", auth: auth, params: [
+        async let courseRequest = fetchHomeData(path: "users/\(learningUserID)/sections", auth: auth, params: ["limit": "100"])
+        async let groupRequest = fetchHomeData(path: "users/\(learningUserID)/groups", auth: auth, params: ["limit": "100"])
+        async let upcomingRequest = fetchHomeData(path: "users/\(learningUserID)/events", auth: auth, params: [
             "start_date": Self.apiDate(Date()), "start": "0", "limit": "50"
         ])
 
@@ -487,7 +527,7 @@ final class AppSession {
         } catch let error as SchoologyAPIError {
             guard case .http(403, _) = error else { throw error }
         }
-        let sectionData = try await api.get("users/\(auth.userID)/sections", auth: auth, params: ["limit": "100"])
+        let sectionData = try await api.get("users/\(selectedStudent?.id ?? auth.userID)/sections", auth: auth, params: ["limit": "100"])
         let sections = SchoologyCourse.decodeList(Self.object(sectionData))
         var peopleByID: [String: SchoologyProfileItem] = [:]
         if let user {
@@ -506,13 +546,14 @@ final class AppSession {
     }
 
     func loadCourseGradebook(courseID: String) async throws -> SchoologyGradebook {
+        let learningUserID = selectedStudent?.id ?? auth?.userID ?? ""
         if isDemoMode { return demoGradebook(for: courseID) }
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         async let sectionRequest = api.get("sections/\(courseID)", auth: auth)
         async let periodsRequest = api.get("sections/\(courseID)/grading_periods", auth: auth)
         async let categoriesRequest = api.get("sections/\(courseID)/grading_categories", auth: auth)
         async let itemsRequest = api.get("sections/\(courseID)/grade_items", auth: auth, params: ["limit": "2000"])
-        async let userGradesRequest = api.get("users/\(auth.userID)/grades", auth: auth, params: ["section_id": courseID])
+        async let userGradesRequest = api.get("users/\(learningUserID)/grades", auth: auth, params: ["section_id": courseID])
         async let sectionGradesRequest = try? await api.get("sections/\(courseID)/grades", auth: auth)
         async let gradingScalesRequest = try? await api.get("sections/\(courseID)/grading_scales", auth: auth)
         async let enrollmentsRequest = try? await api.get("sections/\(courseID)/enrollments", auth: auth,
@@ -556,7 +597,7 @@ final class AppSession {
         let enrollmentRows = SchoologyValue.list(Self.object(enrollmentsData ?? Data()),
             keys: ["enrollment", "enrollments", "items"])
         let myEnrollment = enrollmentRows.first {
-            SchoologyValue.string($0["uid"] ?? $0["user_id"] ?? $0["userId"]) == auth.userID
+            SchoologyValue.string($0["uid"] ?? $0["user_id"] ?? $0["userId"]) == learningUserID
         }
         let enrollmentID = SchoologyValue.string(myEnrollment?["id"])
         let resolvedSectionGrade = sectionGradeRows.first {
@@ -866,6 +907,7 @@ final class AppSession {
     }
 
     func loadUserGradeCourses(force: Bool = false) async {
+        let learningUserID = selectedStudent?.id ?? auth?.userID ?? ""
         if isDemoMode { userGradeCourses = demoGradeCourses; hasLoadedUserGrades = true; return }
         guard let auth, !isLoadingUserGrades else { return }
         if hasLoadedUserGrades && !force { return }
@@ -873,7 +915,7 @@ final class AppSession {
         userGradesError = nil
         defer { isLoadingUserGrades = false }
         do {
-            let data = try await api.get("users/\(auth.userID)/grades", auth: auth)
+            let data = try await api.get("users/\(learningUserID)/grades", auth: auth)
             let courses = SchoologyUserGradeCourse.decodeList(Self.object(data))
             var hydratedCourses: [SchoologyUserGradeCourse] = []
             hydratedCourses.reserveCapacity(courses.count)
@@ -909,7 +951,7 @@ final class AppSession {
         let enrollmentRows = SchoologyValue.list(Self.object(enrollmentsData ?? Data()),
             keys: ["enrollment", "enrollments", "items"])
         let myEnrollment = enrollmentRows.first {
-            SchoologyValue.string($0["uid"] ?? $0["user_id"] ?? $0["userId"]) == auth.userID
+            SchoologyValue.string($0["uid"] ?? $0["user_id"] ?? $0["userId"]) == learningUserID
         }
         let enrollmentID = SchoologyValue.string(myEnrollment?["id"])
         let finalRecord = finalRows.first {
@@ -1034,6 +1076,7 @@ final class AppSession {
             return
         }
         guard let auth, !isLoadingCalendar else { return }
+        let learningUserID = selectedStudent?.id ?? auth.userID
         let calendar = Calendar.current
         guard let interval = calendar.dateInterval(of: .month, for: month) else { return }
         let key = String(Self.apiDate(interval.start).prefix(7))
@@ -1054,7 +1097,7 @@ final class AppSession {
             let pageSize = 20
 
             while true {
-                let data = try await api.get("users/\(auth.userID)/events", auth: auth, params: [
+                let data = try await api.get("users/\(learningUserID)/events", auth: auth, params: [
                     "start_date": Self.apiDate(interval.start),
                     "end_date": Self.apiDate(interval.end),
                     "start": String(offset),
@@ -1083,12 +1126,13 @@ final class AppSession {
     func loadCalendarUpcoming(force: Bool = false) async {
         if isDemoMode { calendarUpcomingEvents = upcomingEvents; hasLoadedCalendarUpcoming = true; return }
         guard let auth, !isLoadingCalendar else { return }
+        let learningUserID = selectedStudent?.id ?? auth.userID
         if hasLoadedCalendarUpcoming && !force { return }
         isLoadingCalendar = true
         calendarError = nil
         defer { isLoadingCalendar = false }
         do {
-            let data = try await api.get("users/\(auth.userID)/events", auth: auth, params: [
+            let data = try await api.get("users/\(learningUserID)/events", auth: auth, params: [
                 "start_date": Self.apiDate(Date()), "start": "0", "limit": "100"
             ])
             calendarUpcomingEvents = SchoologyUpcomingEvent.decodeList(Self.object(data))
@@ -1540,6 +1584,7 @@ final class AppSession {
 
 
     func loadAssignmentContext(sectionID: String, assignmentID: String) async throws -> SchoologyAssignmentContext {
+        let learningUserID = selectedStudent?.id ?? auth?.userID ?? ""
         if isDemoMode {
             let assignment = demoAssignments(for: sectionID).first { $0.id == assignmentID }
                 ?? demoAssignments(for: sectionID).first
@@ -1551,7 +1596,7 @@ final class AppSession {
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         async let assignmentRequest = api.get("sections/\(sectionID)/assignments/\(assignmentID)", auth: auth, params: ["richtext": "1", "with_attachments": "TRUE"])
         async let sectionRequest = try? await api.get("sections/\(sectionID)", auth: auth)
-        async let enrollmentRequest = try? await api.get("sections/\(sectionID)/enrollments", auth: auth, params: ["uid": auth.userID, "enrollment_status": "1"])
+        async let enrollmentRequest = try? await api.get("sections/\(sectionID)/enrollments", auth: auth, params: ["uid": learningUserID, "enrollment_status": "1"])
         let (assignmentData, sectionData, enrollmentData) = try await (assignmentRequest, sectionRequest, enrollmentRequest)
         let assignmentRoot = Self.object(assignmentData)
         let rawAssignment = (assignmentRoot["assignment"] as? [String: Any]) ?? assignmentRoot
@@ -1633,6 +1678,7 @@ final class AppSession {
     }
 
     func loadAssignmentSubmissions(sectionID: String, context: SchoologyAssignmentContext) async throws -> SchoologyAssignmentSubmissionSummary {
+        let learningUserID = selectedStudent?.id ?? auth?.userID ?? ""
         if isDemoMode {
             return SchoologyAssignmentSubmissionSummary(grade: context.currentGrade, teacherComment: context.teacherComment,
                 revisions: demoAssignmentRevisions[context.assignment.id] ?? [], students: [])
@@ -1697,7 +1743,7 @@ final class AppSession {
         var gradeParams = ["assignment_id": context.gradeItemID]
         if let enrollmentID = context.enrollmentID { gradeParams["enrollment_id"] = enrollmentID }
         async let gradeRequest = api.get("sections/\(sectionID)/grades", auth: auth, params: gradeParams)
-        async let submissionRequest = try? await api.get("sections/\(sectionID)/submissions/\(context.gradeItemID)/\(auth.userID)", auth: auth, params: ["with_attachments": "TRUE", "all_revisions": "TRUE", "start": "0", "limit": "200"])
+        async let submissionRequest = try? await api.get("sections/\(sectionID)/submissions/\(context.gradeItemID)/\(learningUserID)", auth: auth, params: ["with_attachments": "TRUE", "all_revisions": "TRUE", "start": "0", "limit": "200"])
         let (gradeData, submissionData) = try await (gradeRequest, submissionRequest)
         let grade = SchoologyValue.list(Self.object(gradeData), keys: ["grade", "grades", "items"]).first ?? [:]
         let root = submissionData.map(Self.object) ?? [:]
@@ -2754,6 +2800,8 @@ final class AppSession {
         KeychainStore.clear()
         auth = nil
         user = nil
+        parentChildren = []
+        selectedStudent = nil
         peopleDirectoryEnabled = false
         courses = []
         groups = []
