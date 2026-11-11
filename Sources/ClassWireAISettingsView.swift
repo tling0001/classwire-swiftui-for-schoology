@@ -50,6 +50,12 @@ struct ClassWireAISettingsView: View {
                 .foregroundStyle(.secondary)
             if store.provider == .puter {
                 puterControls
+                if let error = puterService.signInError {
+                    Label(error, systemImage: "exclamationmark.triangle.fill")
+                        .font(.footnote)
+                        .foregroundStyle(.red)
+                        .textSelection(.enabled)
+                }
             } else if store.provider.requiresAPIKey {
                 apiKeyControls
             } else {

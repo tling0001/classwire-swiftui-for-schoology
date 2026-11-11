@@ -1,5 +1,6 @@
 import SwiftUI
 import UniformTypeIdentifiers
+import PhotosUI
 import PDFKit
 import ImageIO
 
@@ -16,6 +17,7 @@ struct ClassWireAIAssistantView: View {
     @State private var isRefreshingModels = false
     @State private var modelDiscoveryStatus = ""
     @State private var pendingAttachments: [ClassWireAIFileAttachment] = []
+    @State private var selectedAIPhotos: [PhotosPickerItem] = []
     @State private var showingAIFileImporter = false
 
     private var filteredConversations: [ClassWireAIConversation] {
@@ -95,6 +97,9 @@ struct ClassWireAIAssistantView: View {
             handleCitation(url)
         })
         .animation(reduceMotion ? nil : .snappy(duration: 0.2), value: store.activeConversationID)
+        .onChange(of: selectedAIPhotos) { _, items in
+            Task { await importAIPhotos(items) }
+        }
         .fileImporter(
             isPresented: $showingAIFileImporter,
             allowedContentTypes: [.item],
@@ -495,7 +500,23 @@ struct ClassWireAIAssistantView: View {
                         .contentShape(Rectangle())
                 }
                 .accessibilityLabel("Add files to AI message")
-                .accessibilityHint("Choose images, PDFs, or text documents to attach.")
+                .accessibilityHint("Choose documents or other files to attach.")
+                .disabled(store.isSending || pendingAttachments.count >= 5)
+
+                PhotosPicker(
+                    selection: $selectedAIPhotos,
+                    maxSelectionCount: max(1, 5 - pendingAttachments.count),
+                    matching: .images
+                ) {
+                    Label("Add photos", systemImage: "photo")
+                        .labelStyle(.iconOnly)
+                        .font(.title2)
+                        .foregroundStyle(SchoologyStyle.blue)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+                }
+                .accessibilityLabel("Add photos to AI message")
+                .accessibilityHint("Choose photos from your photo library.")
                 .disabled(store.isSending || pendingAttachments.count >= 5)
 
                 TextField("Ask about your Schoology work…", text: $draft, axis: .vertical)
@@ -591,7 +612,9 @@ struct ClassWireAIAssistantView: View {
                 await puterService.refreshAuthStatus()
                 guard puterService.isSignedIn else {
                     availableModels = [store.model]
-                    modelDiscoveryStatus = "Connect your Puter account in AI settings"
+                    modelDiscoveryStatus = puterService.signInError.map {
+                        "Puter connection check failed: \($0)"
+                    } ?? "Connect your Puter account in AI settings"
                     return
                 }
                 modelDiscoveryStatus = "Loading Puter models…"
@@ -766,6 +789,38 @@ struct ClassWireAIAssistantView: View {
         draft = ""
         composerFocused = false
         Task { await store.send(value, attachments: attachments, session: session) }
+    }
+
+    @MainActor
+    private func importAIPhotos(_ items: [PhotosPickerItem]) async {
+        for item in items {
+            guard pendingAttachments.count < 5 else {
+                store.errorMessage = "You can attach up to five files to one AI message."
+                break
+            }
+            do {
+                guard let data = try await item.loadTransferable(type: Data.self) else {
+                    throw ClassWireAIError.invalidResponse("The selected photo could not be loaded.")
+                }
+                let currentBytes = pendingAttachments.reduce(0) { $0 + $1.data.count }
+                guard !data.isEmpty, data.count <= 10 * 1024 * 1024,
+                      currentBytes + data.count <= 20 * 1024 * 1024 else {
+                    throw ClassWireAIError.invalidResponse("AI photos must be at most 10 MB each and 20 MB total per message.")
+                }
+                let type = item.supportedContentTypes.first(where: { $0.conforms(to: .image) }) ?? .jpeg
+                let mime = type.preferredMIMEType ?? "image/jpeg"
+                let ext = type.preferredFilenameExtension ?? "jpg"
+                let filename = "Photo-\(UUID().uuidString.prefix(8)).\(ext)"
+                pendingAttachments.append(ClassWireAIFileAttachment(
+                    filename: filename,
+                    mimeType: mime,
+                    data: data
+                ))
+            } catch {
+                store.errorMessage = error.localizedDescription
+            }
+        }
+        selectedAIPhotos = []
     }
 
     private func importAIFiles(_ result: Result<[URL], Error>) {

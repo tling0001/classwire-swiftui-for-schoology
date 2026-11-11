@@ -1,5 +1,24 @@
 # Release notes
 
+## [2026.10.0-port.133]
+
+### Puter reliability and authentication
+- Prefer the working Tauri-compatible `puter.auth.signIn({ request_auth: true })` path in SwiftUI, retaining the newer UI authentication helper only as a fallback.
+- Publish Puter authentication state immediately instead of waiting for `getUser()`, which could leave model refresh stuck while a profile lookup stalled.
+- Add bounded native and JavaScript timeouts for Puter status, model discovery, sign-in, and chat requests, with actionable errors rather than indefinite loading indicators.
+- Normalize nested and top-level Puter chat response/tool-call shapes and close an authentication popup after a successful sign-in event.
+- Forward image attachments to Puter using its documented multimodal media-URL-array chat overload; retain extracted PDF text for document context.
+
+### AI files and image generation
+- Add a native Photos picker alongside the existing file importer for AI photo attachments, preserving size limits and accessible 44-point controls.
+- Add Gemini image generation through the dedicated `gemini-3.1-flash-image` model, including generated-image attachments that can be included in a confirmed Schoology assignment file submission.
+- Preserve the existing multi-provider image/PDF multimodal handling and explicit confirmation requirement for assignment uploads; show per-file upload and submission progress.
+- Accept image-only Gemini responses as successful results.
+
+### Build
+- Increment the iOS and macOS marketing version to `2026.10.133` and build number to `133`.
+
+
 ## [2026.10.0-port.132]
 
 ### ClassWire AI welcome persistence

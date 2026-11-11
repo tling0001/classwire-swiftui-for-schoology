@@ -84,6 +84,10 @@ final class ClassWirePuterService: NSObject, WKUIDelegate, WKNavigationDelegate 
         if type == "auth" {
             isSignedIn = body["signedIn"] as? Bool ?? false
             accountLabel = body["user"] as? String ?? ""
+            if isSignedIn {
+                signInError = nil
+                if popupWebView != nil { closePopup() }
+            }
             return
         }
         guard let id = body["id"] as? String, let continuation = pending.removeValue(forKey: id) else { return }
@@ -182,6 +186,7 @@ final class ClassWirePuterService: NSObject, WKUIDelegate, WKNavigationDelegate 
                 "parameters": tool["parameters"] ?? ["type": "object", "properties": [:]]
             ]]
         }
+        let latestUserMessageID = messages.last(where: { $0.role == "user" })?.id
         let payload: [String: Any] = [
             "model": model,
             "messages": [["role": "system", "content": systemPrompt]] + messages.map { message in
@@ -190,7 +195,19 @@ final class ClassWirePuterService: NSObject, WKUIDelegate, WKNavigationDelegate 
                     return text.isEmpty ? nil : "Document contents from \(attachment.filename):\n\(text.prefix(30_000))"
                 }.joined(separator: "\n\n")
                 let content = documentText.isEmpty ? message.content : message.content + "\n\n" + documentText
-                return ["role": message.role, "content": content]
+                return [
+                    "role": message.role,
+                    "content": content,
+                    "attachments": message.id == latestUserMessageID
+                        ? message.attachments.filter(\.isImage).map { attachment in
+                            [
+                                "filename": attachment.filename,
+                                "mimeType": attachment.mimeType,
+                                "data": attachment.data.base64EncodedString()
+                            ]
+                        }
+                        : []
+                ] as [String: Any]
             },
             "tools": declarations,
             "toolChoice": "auto"
@@ -241,15 +258,23 @@ final class ClassWirePuterService: NSObject, WKUIDelegate, WKNavigationDelegate 
         let responseData: Data = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Data, Error>) in
             let id = UUID().uuidString
             pending[id] = continuation
-            if operation == "models" {
-                pendingTimeouts[id] = Task { [weak self] in
-                    do {
-                        try await Task.sleep(for: .seconds(50))
-                        guard let self, let pending = self.pending.removeValue(forKey: id) else { return }
-                        self.pendingTimeouts.removeValue(forKey: id)
-                        pending.resume(throwing: ClassWireAIError.invalidResponse("Puter did not respond to the model catalogue request within 50 seconds. Check your connection and try refreshing the model list."))
-                    } catch { }
-                }
+            let timeoutSeconds: Double = switch operation {
+            case "status": 30
+            case "models": 40
+            case "chat": 190
+            case "generateImage": 240
+            case "signIn": 180
+            default: 25
+            }
+            pendingTimeouts[id] = Task { [weak self] in
+                do {
+                    try await Task.sleep(for: .seconds(timeoutSeconds))
+                    guard let self, let pending = self.pending.removeValue(forKey: id) else { return }
+                    self.pendingTimeouts.removeValue(forKey: id)
+                    pending.resume(throwing: ClassWireAIError.invalidResponse(
+                        "Puter did not respond to the \(operation) request within \(Int(timeoutSeconds)) seconds. Check your connection and Puter sign-in, then try again."
+                    ))
+                } catch { }
             }
             let encodedPayload = payload.map(Self.jsString) ?? "null"
             let script = "(() => { void window.classWirePuterRequest(\(Self.jsString(id)), \(Self.jsString(operation)), \(encodedPayload)); return true; })();"
@@ -319,28 +344,75 @@ final class ClassWirePuterService: NSObject, WKUIDelegate, WKNavigationDelegate 
       const userLabel = user => user?.username || user?.email || user?.name || 'Puter account';
       const errorText = error => error?.msg || error?.message || error?.error ||
         (typeof error === 'string' ? error : (() => { try { return JSON.stringify(error); } catch (_) { return String(error); } })());
+      function withTimeout(promise, milliseconds, label) {
+        let timer;
+        return Promise.race([
+          Promise.resolve(promise),
+          new Promise((_, reject) => {
+            timer = setTimeout(() => reject(new Error(label + ' timed out after ' + Math.round(milliseconds / 1000) + ' seconds.')), milliseconds);
+          })
+        ]).finally(() => clearTimeout(timer));
+      }
+      function withAbortTimeout(start, milliseconds, label) {
+        const controller = new AbortController();
+        let timer;
+        return Promise.race([
+          Promise.resolve().then(() => start(controller.signal)),
+          new Promise((_, reject) => {
+            timer = setTimeout(() => {
+              controller.abort();
+              reject(new Error(label + ' timed out after ' + Math.round(milliseconds / 1000) + ' seconds.'));
+            }, milliseconds);
+          })
+        ]).finally(() => clearTimeout(timer));
+      }
+      function publishAuthStatus(puter) {
+        const signedIn = !!puter.auth.isSignedIn();
+        send({ type: 'auth', signedIn, user: '' });
+        if (signedIn && typeof puter.auth.getUser === 'function') {
+          withTimeout(puter.auth.getUser(), 8000, 'Puter profile lookup')
+            .then(user => send({ type: 'auth', signedIn: true, user: user ? userLabel(user) : '' }))
+            .catch(() => {});
+        }
+        return { signedIn, user: '' };
+      }
       async function authenticate(puter) {
-        if (typeof puter.ui?.authenticateWithPuter === 'function') await puter.ui.authenticateWithPuter();
-        else await puter.auth.signIn({ request_auth: true });
+        // Prefer the working Tauri-compatible Auth FALLBACK path in embedded WebKit.
+        if (typeof puter.auth?.signIn === 'function') {
+          try {
+            await withTimeout(puter.auth.signIn({ request_auth: true }), 150000, 'Puter sign-in');
+          } catch (primaryError) {
+            if (typeof puter.ui?.authenticateWithPuter !== 'function') throw primaryError;
+            await withTimeout(puter.ui.authenticateWithPuter(), 150000, 'Puter sign-in');
+          }
+        } else if (typeof puter.ui?.authenticateWithPuter === 'function') {
+          await withTimeout(puter.ui.authenticateWithPuter(), 150000, 'Puter sign-in');
+        } else {
+          throw new Error('Puter does not expose a supported sign-in method.');
+        }
+        if (!puter.auth.isSignedIn()) throw new Error('Puter sign-in returned without an authenticated session. Try connecting again.');
       }
       const report = async () => {
         try {
           const puter = await ensurePuterSDK();
-          const signedIn = !!puter.auth.isSignedIn();
-          const user = signedIn ? await puter.auth.getUser() : null;
-          send({ type: 'auth', signedIn, user: user ? userLabel(user) : '' });
-          button.textContent = signedIn ? 'Connected to Puter' : 'Connect with Puter';
-          status.textContent = signedIn ? 'Your Puter account is connected.' : 'Sign in to continue.';
+          const snapshot = publishAuthStatus(puter);
+          button.textContent = snapshot.signedIn ? 'Connected to Puter' : 'Connect with Puter';
+          status.textContent = snapshot.signedIn ? 'Your Puter account is connected.' : 'Sign in to continue.';
           button.disabled = false;
-        } catch (error) { status.textContent = errorText(error); button.disabled = false; }
+          return snapshot;
+        } catch (error) {
+          status.textContent = errorText(error);
+          button.disabled = false;
+          throw error;
+        }
       };
       window.classWirePuterRequest = async (id, operation, payload) => {
         try {
           const puter = await ensurePuterSDK();
           if (operation === 'status') {
-            const signedIn = !!puter.auth.isSignedIn(), user = signedIn ? await puter.auth.getUser() : null;
-            send({ type: 'auth', signedIn, user: user ? userLabel(user) : '' });
-            send({ id, result: { signedIn, user: user ? userLabel(user) : '' } });
+            const snapshot = publishAuthStatus(puter);
+            // Do not wait for an optional profile lookup before replying to native model refresh.
+            send({ id, result: snapshot });
             return;
           }
           if (operation === 'signIn') { await authenticate(puter); await report(); send({ id, result: true }); return; }
@@ -363,11 +435,48 @@ final class ClassWirePuterService: NSObject, WKUIDelegate, WKNavigationDelegate 
           } else if (operation === 'chat') {
             const raw = atob(payload), bytes = Uint8Array.from(raw, character => character.charCodeAt(0));
             const request = JSON.parse(new TextDecoder().decode(bytes));
-            const response = await puter.ai.chat(request.messages, { model: request.model, tools: request.tools, toolChoice: 'auto', normalize: true });
-            const message = response?.message || response;
-            let content = message?.content ?? '';
+            const options = {
+              model: request.model,
+              tools: request.tools,
+              toolChoice: 'auto',
+              normalize: true
+            };
+            const images = (request.messages || []).flatMap(message => message.attachments || [])
+              .filter(attachment => typeof attachment.mimeType === 'string' &&
+                attachment.mimeType.toLowerCase().startsWith('image/') &&
+                typeof attachment.data === 'string' && attachment.data.length > 0)
+              .slice(-5);
+            if (images.some(image => image.data.length > 5 * 1024 * 1024 * 4 / 3 + 16)) {
+              throw new Error('Puter image attachments are limited to 5 MB each. Resize the image or use Gemini/Anthropic for larger images.');
+            }
+            let response;
+            if (images.length) {
+              const transcript = (request.messages || []).map(message =>
+                String(message.role || 'user').toUpperCase() + ':\\n' + String(message.content || '')
+              ).join('\\n\\n');
+              const media = images.map(image => 'data:' + image.mimeType + ';base64,' + image.data);
+              response = await withAbortTimeout(
+                signal => puter.ai.chat(transcript, media, false, { ...options, signal }),
+                180000,
+                'Puter AI chat'
+              );
+            } else {
+              const chatMessages = (request.messages || []).map(message => ({
+                role: message.role,
+                content: message.content
+              }));
+              response = await withAbortTimeout(
+                signal => puter.ai.chat(chatMessages, { ...options, signal }),
+                180000,
+                'Puter AI chat'
+              );
+            }
+            const message = response?.message || response || {};
+            let content = message?.content ?? response?.content ?? '';
             if (Array.isArray(content)) content = content.map(part => part?.text || '').filter(Boolean).join('\\n');
-            const toolCalls = (message?.tool_calls || message?.toolCalls || []).map(call => {
+            const rawCalls = message?.tool_calls || message?.toolCalls ||
+              response?.tool_calls || response?.toolCalls || [];
+            const toolCalls = rawCalls.map(call => {
               let args = call?.function?.arguments ?? call?.arguments ?? {};
               if (typeof args === 'string') { try { args = JSON.parse(args); } catch (_) { args = {}; } }
               return { name: call?.function?.name || call?.name, arguments: args };

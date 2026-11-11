@@ -60,6 +60,9 @@ enum ClassWireAIToolService {
             "assignment_id": ["type": "integer"],
             "section_id": ["type": "integer"]
         ], required: ["markdown"]),
+        tool("generate_ai_image", "Generate a real image using Google's Gemini image model. Use when the user asks to create, draw, illustrate, or edit an image. The generated image is attached to the conversation and can later be submitted to an assignment after explicit confirmation.", [
+            "prompt": ["type": "string", "description": "Detailed visual description of the image to generate."]
+        ], required: ["prompt"]),
         tool("create_ai_file", "Create a real text-based file attachment from content you generated. Supported formats are .txt, .md, .csv, and .json. The app keeps the generated file attached to this conversation so it can be submitted to a Schoology assignment after the user reviews and confirms.", [
             "filename": ["type": "string", "description": "Filename ending in .txt, .md, .csv, or .json."],
             "content": ["type": "string", "description": "Complete file contents."]

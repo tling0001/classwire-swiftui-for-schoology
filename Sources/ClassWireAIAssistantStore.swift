@@ -235,22 +235,65 @@ final class ClassWireAIAssistantStore {
 
             for pass in 0..<6 {
                 status = pass == 0 ? "Choosing Schoology tools…" : "Reading Schoology API results…"
+                let tools: [[String: Any]]
+                if provider == .gemini && model.localizedCaseInsensitiveContains("image") {
+                    // Gemini image-generation models do not support function calling.
+                    tools = []
+                } else if provider == .gemini {
+                    tools = ClassWireAIToolService.definitions
+                } else {
+                    tools = ClassWireAIToolService.definitions.filter {
+                        ($0["name"] as? String) != "generate_ai_image"
+                    }
+                }
                 let response = try await ClassWireAIProviderClient.complete(
                     provider: provider,
                     model: model,
                     key: ClassWireAIKeychainStore.load(provider: provider) ?? "",
                     ollamaEndpoint: ollamaEndpoint,
                     messages: history,
-                    tools: ClassWireAIToolService.definitions
+                    tools: tools
                 )
                 generatedImages.append(contentsOf: response.generatedImages)
                 guard !response.toolCalls.isEmpty else {
                     answer = response.text
+                    if answer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !response.generatedImages.isEmpty {
+                        answer = "Here is the image I generated with Gemini."
+                    }
                     break
                 }
 
                 var results: [[String: Any]] = []
                 for call in response.toolCalls.prefix(6) {
+                    if call.name == "generate_ai_image" {
+                        let prompt = (call.arguments["prompt"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+                        guard provider == .gemini else {
+                            results.append(["tool": call.name, "error": "Select Google Gemini in AI settings to generate images."])
+                            continue
+                        }
+                        guard !prompt.isEmpty, prompt.count <= 8_000 else {
+                            results.append(["tool": call.name, "error": "Provide an image prompt between 1 and 8,000 characters."])
+                            continue
+                        }
+                        let imageResponse = try await ClassWireAIProviderClient.complete(
+                            provider: .gemini,
+                            model: "gemini-3.1-flash-image",
+                            key: ClassWireAIKeychainStore.load(provider: .gemini) ?? "",
+                            ollamaEndpoint: ollamaEndpoint,
+                            messages: [ClassWireAIMessage(role: "user", content: prompt)],
+                            tools: []
+                        )
+                        guard !imageResponse.generatedImages.isEmpty else {
+                            results.append(["tool": call.name, "error": "Gemini did not return an image. Try a more specific prompt."])
+                            continue
+                        }
+                        generatedImages.append(contentsOf: imageResponse.generatedImages)
+                        results.append(["tool": call.name, "result": [
+                            "message": "Gemini generated and attached \(imageResponse.generatedImages.count) image(s).",
+                            "filenames": imageResponse.generatedImages.map(\.filename)
+                        ]])
+                        continue
+                    }
                     if call.name == "create_ai_file" {
                         let filename = (call.arguments["filename"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
                         let fileContent = call.arguments["content"] as? String ?? ""
@@ -368,12 +411,15 @@ final class ClassWireAIAssistantStore {
                     throw ClassWireAIError.action("This account cannot submit files to the selected assignment.")
                 }
                 var fileIDs: [String] = []
-                for file in pendingSubmissionFiles {
+                let totalFiles = pendingSubmissionFiles.count
+                for (index, file) in pendingSubmissionFiles.enumerated() {
                     guard !file.data.isEmpty else { continue }
+                    status = "Uploading file \(index + 1) of \(totalFiles)…"
                     let fileID = try await session.uploadAssignmentFile(data: file.data, filename: file.filename, mime: file.mimeType)
                     fileIDs.append(fileID)
                 }
                 guard !fileIDs.isEmpty else { throw ClassWireAIError.action("There were no valid files to upload.") }
+                status = "Submitting \(fileIDs.count) file(s) to Schoology…"
                 try await session.submitAssignmentFiles(
                     fileIDs: fileIDs, resourceIDs: [], sectionID: sectionID, assignmentID: assignmentID
                 )
