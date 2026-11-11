@@ -31,18 +31,12 @@ struct SchoologyGradebookView: View {
                                 } else {
                                     VStack(alignment: .leading, spacing: 0) {
                                         ForEach(category.assignments) { assignment in
-                                            Group {
-                                                if assignment.itemType.lowercased().contains("assignment") {
-                                                    NavigationLink {
-                                                        SchoologyAssignmentDetailView(sectionID: gradebook.courseID, assignmentID: assignment.id, title: assignment.title)
-                                                    } label: {
-                                                        SchoologyGradeAssignmentRow(assignment: assignment)
-                                                    }
-                                                    .buttonStyle(.plain)
-                                                } else {
-                                                    SchoologyGradeAssignmentRow(assignment: assignment)
-                                                }
+                                            NavigationLink {
+                                                SchoologyGradebookItemDestinationView(courseID: gradebook.courseID, assignment: assignment)
+                                            } label: {
+                                                SchoologyGradeAssignmentRow(assignment: assignment)
                                             }
+                                            .buttonStyle(.plain)
                                             .padding(.leading, 8)
                                             if assignment.id != category.assignments.last?.id {
                                                 Divider()
