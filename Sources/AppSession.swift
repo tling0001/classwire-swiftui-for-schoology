@@ -13,10 +13,8 @@ final class AppSession {
     var pendingAINavigation: ClassWireAINavigationRequest?
     var isAIAssistantPresented = false
     var aiSessionID = UUID()
-    private var completedAIWelcomeSessionID: UUID?
-    var hasCompletedAIWelcomeForCurrentSession: Bool {
-        completedAIWelcomeSessionID == aiSessionID
-    }
+    private var hasCompletedAIWelcomeForLogin = UserDefaults.standard.bool(forKey: "classwire.ai.welcome.completed")
+    var hasCompletedAIWelcomeForCurrentSession: Bool { hasCompletedAIWelcomeForLogin }
     var aiCurrentCourseID: String?
     var aiCurrentCourseTitle: String?
     var aiCurrentAssignmentID: String?
@@ -61,6 +59,7 @@ final class AppSession {
     private var demoEventAttachments: [String: [SchoologyAttachment]] = [:]
     private var demoTeacherGrades: [String: SchoologyTeacherGrade] = [:]
     var messageErrors: [String: String] = [:]
+    var aiMessageRecipientCandidates: [SchoologyMessageRecipient] = []
     var activities: [SchoologyActivity] = []
     var upcomingEvents: [SchoologyUpcomingEvent] = []
     var hasLoadedHomeActivities = false
@@ -185,6 +184,8 @@ final class AppSession {
         KeychainStore.save(verifiedCredentials)
         auth = verifiedCredentials
         aiSessionID = UUID()
+        hasCompletedAIWelcomeForLogin = false
+        UserDefaults.standard.set(false, forKey: "classwire.ai.welcome.completed")
         user = profile
         await SchoologyPushNotifications.registerIfAuthorized()
         await refreshPeopleDirectoryAvailability(auth: verifiedCredentials)
@@ -254,7 +255,8 @@ final class AppSession {
     }
 
     func completeAIWelcomeForCurrentSession() {
-        completedAIWelcomeSessionID = aiSessionID
+        hasCompletedAIWelcomeForLogin = true
+        UserDefaults.standard.set(true, forKey: "classwire.ai.welcome.completed")
     }
 
     func setAICourseContext(courseID: String, title: String) {
@@ -1896,14 +1898,34 @@ final class AppSession {
         ])
     }
 
-    func searchMessageRecipients(_ query: String) async throws -> [SchoologyMessageRecipient] {
-        if isDemoMode {
-            let value = query.trimmingCharacters(in: .whitespacesAndNewlines)
-            return demoPeople.filter { $0.title.localizedStandardContains(value) }.map { SchoologyMessageRecipient(id: $0.id, name: $0.title) }
+    func searchMessageRecipients(_ query: String, limit: Int = 25) async throws -> [SchoologyMessageRecipient] {
+        let value = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard value.count >= 2 else {
+            aiMessageRecipientCandidates = []
+            return []
         }
-        guard let auth else { throw SchoologyAPIError.notSignedIn }
-        let data = try await api.get("messages/recipients", auth: auth, params: ["name": query, "limit": "10"])
-        return SchoologyMessageRecipient.decodeList(data)
+        let results: [SchoologyMessageRecipient]
+        if isDemoMode {
+            results = demoPeople.filter { $0.title.localizedStandardContains(value) }
+                .map { SchoologyMessageRecipient(id: $0.id, name: $0.title) }
+        } else {
+            guard let auth else { throw SchoologyAPIError.notSignedIn }
+            let data = try await api.get("messages/recipients", auth: auth, params: ["name": value, "limit": String(min(max(limit, 1), 50))])
+            results = SchoologyMessageRecipient.decodeList(data)
+        }
+        var latest: [String: SchoologyMessageRecipient] = [:]
+        for recipient in results where !recipient.id.isEmpty && !recipient.name.isEmpty { latest[recipient.id] = recipient }
+        let searchResults = latest.values.sorted {
+            let order = $0.name.localizedCaseInsensitiveCompare($1.name)
+            return order == .orderedSame ? $0.id < $1.id : order == .orderedAscending
+        }
+        var verified = Dictionary(uniqueKeysWithValues: aiMessageRecipientCandidates.map { ($0.id, $0) })
+        for recipient in searchResults { verified[recipient.id] = recipient }
+        aiMessageRecipientCandidates = verified.values.sorted {
+            let order = $0.name.localizedCaseInsensitiveCompare($1.name)
+            return order == .orderedSame ? $0.id < $1.id : order == .orderedAscending
+        }
+        return searchResults
     }
 
     func uploadMessageFile(data: Data, filename: String, mime: String) async throws -> String {
@@ -2695,6 +2717,9 @@ final class AppSession {
     func beginDemoMode() {
         // Keep saved Keychain credentials intact; demo data is isolated from the real account.
         aiSessionID = UUID()
+        hasCompletedAIWelcomeForLogin = false
+        UserDefaults.standard.set(false, forKey: "classwire.ai.welcome.completed")
+        aiMessageRecipientCandidates = []
         auth = nil
         user = SchoologyUser(id: "demo-student", nameDisplay: "Alex Morgan", pictureURL: nil)
         isDemoMode = true
@@ -2719,6 +2744,9 @@ final class AppSession {
     func signOut() {
         let credentials = auth
         aiSessionID = UUID()
+        hasCompletedAIWelcomeForLogin = false
+        UserDefaults.standard.set(false, forKey: "classwire.ai.welcome.completed")
+        aiMessageRecipientCandidates = []
         isAIAssistantPresented = false
         isDemoMode = false
         UserDefaults.standard.set(false, forKey: "classwire.demoMode")

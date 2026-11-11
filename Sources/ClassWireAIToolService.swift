@@ -37,6 +37,10 @@ enum ClassWireAIToolService {
             "message_id": ["type": "integer"],
             "folder": ["type": "string", "enum": ["inbox", "sent", "both"]]
         ], required: ["message_id"]),
+        tool("search_message_recipients", "Search Schoology's actual message-recipient directory before composing a message. Returns selectable recipient IDs and display names. Always call this first; never invent or guess a recipient ID.", [
+            "query": ["type": "string", "description": "At least two characters of the intended person's name."],
+            "limit": ["type": "integer", "description": "Maximum number of matching recipients, from 1 to 50."]
+        ], required: ["query"]),
         tool("get_current_assignment", "Get the full details for the assignment currently open in ClassWire."),
         tool("get_assignment_submission", "Get a student's assignment submission and revision history. submission_id is the Schoology submission ID, not the assignment ID.", [
             "section_id": ["type": "integer"],
@@ -65,11 +69,12 @@ enum ClassWireAIToolService {
             "assignment_id": ["type": "integer", "description": "Schoology assignment ID."],
             "section_id": ["type": "integer", "description": "Schoology course section ID."]
         ], required: ["assignment_id", "section_id"]),
-        tool("send_message", "PROPOSE a Schoology message. Write the message body in Markdown, including paragraphs, headings, bold, italic, links, and lists where useful. Preserve intentional line breaks exactly: use a newline for a new line and a blank line for a new paragraph; never collapse a multi-line message into one paragraph. The app converts the reviewed Markdown to safe Schoology rich-text HTML. The user must review and explicitly confirm before it is sent.", [
-            "recipient_name": ["type": "string"],
+        tool("send_message", "PROPOSE a Schoology message to the exact person selected from search_message_recipients. Pass the recipient_id returned by Schoology; never guess an ID. Write the body in Markdown and preserve intentional newlines. The app converts the reviewed Markdown to safe Schoology rich-text HTML. The user must review and explicitly confirm before it is sent.", [
+            "recipient_id": ["type": "integer", "description": "Exact ID returned by search_message_recipients."],
+            "recipient_name": ["type": "string", "description": "Display name returned with that recipient ID."],
             "subject": ["type": "string"],
             "message": ["type": "string"]
-        ], required: ["recipient_name", "subject", "message"]),
+        ], required: ["recipient_id", "recipient_name", "subject", "message"]),
         tool("post_course_update", "PROPOSE a course update. Write the body in Markdown, including paragraphs, headings, bold, italic, links, and lists where useful. The app converts the reviewed Markdown to safe Schoology rich-text HTML. The user must review and explicitly confirm before it is posted.", [
             "body": ["type": "string"],
             "course_id": ["type": "integer"]
@@ -306,6 +311,13 @@ enum ClassWireAIToolService {
             guard !results.isEmpty else { throw ClassWireAIError.action("Schoology returned no details for message \(id).") }
             return .data(["requestedMessageId": id, "folders": folders, "results": results])
 
+        case "search_message_recipients":
+            let query = text(arguments["query"]).trimmingCharacters(in: .whitespacesAndNewlines)
+            guard query.count >= 2 else { throw ClassWireAIError.action("Enter at least two characters of the recipient's name.") }
+            let limit = min(max(number(arguments["limit"]) ?? 25, 1), 50)
+            let recipients = try await session.searchMessageRecipients(query, limit: limit)
+            return .data(["query": query, "recipients": recipients.map { ["id": $0.id, "name": $0.name] }])
+
         case "get_current_assignment":
             guard let sectionID = session.aiCurrentCourseID, let assignmentID = session.aiCurrentAssignmentID else {
                 throw ClassWireAIError.action("No assignment is currently open. Open an assignment first.")
@@ -364,18 +376,24 @@ enum ClassWireAIToolService {
             ))
 
         case "send_message":
-            let recipient = text(arguments["recipient_name"]).trimmingCharacters(in: .whitespacesAndNewlines)
+            let recipientID = text(arguments["recipient_id"]).trimmingCharacters(in: .whitespacesAndNewlines)
+            let requestedName = text(arguments["recipient_name"]).trimmingCharacters(in: .whitespacesAndNewlines)
             let subject = text(arguments["subject"]).trimmingCharacters(in: .whitespacesAndNewlines)
             let messageMarkdown = text(arguments["message"]).trimmingCharacters(in: .whitespacesAndNewlines)
             let messageHTML = ClassWireAIMarkdownHTML.encode(messageMarkdown)
-            guard !recipient.isEmpty, !subject.isEmpty, !messageMarkdown.isEmpty, !messageHTML.isEmpty else {
-                throw ClassWireAIError.action("Recipient, subject, and message are required.")
+            guard !recipientID.isEmpty, Int(recipientID) != nil,
+                  !requestedName.isEmpty, !subject.isEmpty,
+                  !messageMarkdown.isEmpty, !messageHTML.isEmpty else {
+                throw ClassWireAIError.action("A verified recipient ID, recipient name, subject, and message are required.")
+            }
+            guard let recipient = session.aiMessageRecipientCandidates.first(where: { $0.id == recipientID }) else {
+                throw ClassWireAIError.action("Search Schoology message recipients first, then choose a recipient ID returned by that search. No message was sent.")
             }
             return .action(ClassWireAIPendingAction(
                 type: name,
-                values: ["recipient_name": recipient, "subject": subject, "message": messageHTML, "preview_markdown": messageMarkdown],
+                values: ["recipient_id": recipient.id, "recipient_name": recipient.name, "subject": subject, "message": messageHTML, "preview_markdown": messageMarkdown],
                 title: "Send Schoology message",
-                summary: "Send “\(subject)” to \(recipient). Review the full message before confirming."
+                summary: "Send “\(subject)” to \(recipient.name). Review the recipient and full message before confirming."
             ))
 
         case "post_course_update":

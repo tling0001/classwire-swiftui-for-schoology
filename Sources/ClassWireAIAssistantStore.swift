@@ -381,20 +381,15 @@ final class ClassWireAIAssistantStore {
                 pendingSubmissionFiles = []
 
             case "send_message":
-                guard let name = action.values["recipient_name"],
+                guard let recipientID = action.values["recipient_id"],
+                      Int(recipientID) != nil,
+                      let name = action.values["recipient_name"],
                       let subject = action.values["subject"],
                       let message = action.values["message"] else {
-                    throw ClassWireAIError.action("The message proposal is incomplete.")
+                    throw ClassWireAIError.action("The message proposal is incomplete or has no verified recipient ID.")
                 }
-                let recipients = try await session.searchMessageRecipients(name)
-                let matches = recipients.filter { $0.name.localizedCaseInsensitiveCompare(name) == .orderedSame }
-                guard matches.count == 1, let recipient = matches.first else {
-                    throw ClassWireAIError.action(matches.isEmpty
-                        ? "No exact recipient match was found. Use Messages to select the intended person."
-                        : "More than one exact recipient matched. Use Messages to select the intended person.")
-                }
-                try await session.sendMessage(recipientIDs: [recipient.id], subject: subject, message: message)
-                appendMessage(role: "assistant", content: "The Schoology message was sent successfully to \(recipient.name).")
+                try await session.sendMessage(recipientIDs: [recipientID], subject: subject, message: message)
+                appendMessage(role: "assistant", content: "The Schoology message was sent successfully to \(name).")
 
             case "post_course_update":
                 guard let courseID = action.values["course_id"], let body = action.values["body"] else {

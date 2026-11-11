@@ -770,7 +770,10 @@ actor SchoologyAPI {
         // Schoology can redirect API requests. Match the Tauri host's behavior:
         // disable automatic redirect replay and create a fresh OAuth signature for
         // every same-host HTTPS redirect.
-        let session = URLSession(configuration: .ephemeral)
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.urlCache = nil
+        configuration.requestCachePolicy = .reloadIgnoringLocalAndRemoteCacheData
+        let session = URLSession(configuration: configuration)
         let redirectDelegate = NoRedirectDelegate()
         defer { session.invalidateAndCancel() }
 
@@ -853,7 +856,7 @@ actor SchoologyAPI {
                     replayRetryCount += 1
                     // Give the replay cache time to settle, then refresh server time
                     // and build a completely new nonce/signature pair.
-                    try? await Task.sleep(for: .milliseconds(replayRetryCount * 300))
+                    try? await Task.sleep(for: .milliseconds(replayRetryCount * 500))
                     await syncServerTime(force: true)
                     continue
                 }

@@ -1,5 +1,25 @@
 # Release notes
 
+## [2026.10.0-port.132]
+
+### ClassWire AI welcome persistence
+- Persist AI welcome completion across app launches for the current signed-in session.
+- Reset the welcome completion marker on a fresh sign-in, sign-out, or entry into demo mode.
+
+### AI Schoology message recipients
+- Add a dedicated Schoology recipient-search tool so the AI can inspect real available recipients before proposing a message.
+- Require the AI to select a recipient ID returned by Schoology; validate that ID against the latest search results and show the resolved display name in the confirmation.
+- Remove the fragile second exact-name lookup during confirmation and send to the already verified recipient ID.
+- Increase recipient lookup capacity to 25 by default (up to 50), deduplicate results, and sort names consistently.
+
+### OAuth request reliability
+- Generate OAuth nonces from one process-random prefix and a strictly increasing process-wide sequence.
+- Disable URL caching at the URLSession configuration level for signed Schoology API requests.
+- Increase the bounded replay-retry backoff while refreshing server time and generating a new signature on every retry.
+
+### Build
+- Increment the iOS and macOS marketing version to `2026.10.132` and build number to `132`.
+
 ## [2026.10.0-port.131]
 
 ### OAuth recipient lookup reliability
