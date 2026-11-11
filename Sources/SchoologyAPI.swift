@@ -860,12 +860,13 @@ actor SchoologyAPI {
                 continue
             }
 
-            if signed, replayRetryCount < 3, http.statusCode == 401 {
+            if signed, replayRetryCount < 5, http.statusCode == 401 {
                 let responseText = String(decoding: data.prefix(1_200), as: UTF8.self)
                     .lowercased()
+                let normalizedReplayText = String(responseText.filter { $0.isLetter || $0.isNumber })
                 let isReplayRejection =
-                    responseText.contains("duplicate timestamp/nonce combination") ||
-                    responseText.contains("possible replay attack")
+                    normalizedReplayText.contains("duplicatetimestampnoncecombination") ||
+                    normalizedReplayText.contains("possiblereplayattack")
                 if isReplayRejection {
                     // The server rejected this request before processing it.
                     // Rebuild the Authorization header on the next pass so both
@@ -873,7 +874,7 @@ actor SchoologyAPI {
                     replayRetryCount += 1
                     // Give the replay cache time to settle, then refresh server time
                     // and build a completely new nonce/signature pair.
-                    try? await Task.sleep(for: .milliseconds(replayRetryCount * 500))
+                    try? await Task.sleep(for: .milliseconds(replayRetryCount * 350))
                     await syncServerTime(force: true)
                     continue
                 }
