@@ -65,7 +65,7 @@ enum ClassWireAIToolService {
             "assignment_id": ["type": "integer", "description": "Schoology assignment ID."],
             "section_id": ["type": "integer", "description": "Schoology course section ID."]
         ], required: ["assignment_id", "section_id"]),
-        tool("send_message", "PROPOSE a Schoology message. Write the message body in Markdown, including paragraphs, headings, bold, italic, links, and lists where useful. The app converts the reviewed Markdown to safe Schoology rich-text HTML. The user must review and explicitly confirm before it is sent.", [
+        tool("send_message", "PROPOSE a Schoology message. Write the message body in Markdown, including paragraphs, headings, bold, italic, links, and lists where useful. Preserve intentional line breaks exactly: use a newline for a new line and a blank line for a new paragraph; never collapse a multi-line message into one paragraph. The app converts the reviewed Markdown to safe Schoology rich-text HTML. The user must review and explicitly confirm before it is sent.", [
             "recipient_name": ["type": "string"],
             "subject": ["type": "string"],
             "message": ["type": "string"]

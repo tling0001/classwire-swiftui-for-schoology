@@ -13,7 +13,7 @@ enum ClassWireAIMarkdownHTML {
 
         func flushParagraph() {
             guard !paragraph.isEmpty else { return }
-            output.append("<p>" + paragraph.map(inline).joined(separator: "<br>") + "</p>")
+            output.append("<p>" + paragraph.map(inline).joined(separator: "<br />") + "</p>")
             paragraph.removeAll(keepingCapacity: true)
         }
 

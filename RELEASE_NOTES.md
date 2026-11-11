@@ -1,5 +1,21 @@
 # Release notes
 
+## [2026.10.0-port.131]
+
+### OAuth recipient lookup reliability
+- Compare the current recipient lookup with the fixed comments path: both use the same shared OAuth signer, while comments use JSON POST and recipient lookup is a signed GET.
+- Make OAuth nonces process-wide across all SchoologyAPI actor instances, using a shared cryptographically-random 128-bit prefix per request and a monotonic 64-bit sequence, matching the Tauri nonce format.
+- Disable URL response caching for signed Schoology API requests, including the AI/native Messages `GET /v1/messages/recipients` lookup, and send explicit no-cache headers so a previous GET response cannot be replayed in place of a newly signed request.
+- Keep the explicit duplicate timestamp/nonce retry, but use Swift's Duration-based Task.sleep API.
+
+### AI message line breaks
+- Tell the AI message tool to preserve intentional newlines and paragraph breaks instead of flattening message text.
+- Emit explicit HTML line-break elements between adjacent lines when converting AI Markdown to Schoology rich text.
+- Keep normal message sending's CRLF normalization, which preserves interior line breaks in the JSON message body.
+
+### Build
+- Increment the iOS and macOS marketing version to `2026.10.131` and build number to `131`.
+
 ## [2026.10.0-port.130]
 
 ### ClassWire AI request authentication

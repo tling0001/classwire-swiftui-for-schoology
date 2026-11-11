@@ -1,6 +1,5 @@
 import Foundation
 import CryptoKit
-import Security
 
 private final class NoRedirectDelegate: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
     func urlSession(
@@ -40,11 +39,8 @@ actor SchoologyAPI {
     private let userAgent = "okhttp/4.8.0"
     private var timeOffset: Int64 = 0
     private var lastServerTimeSync: Date?
-    private var recentOAuthNonces = Set<String>()
-    private var oauthNonceOrder: [String] = []
     private var recentOAuthPairs = Set<String>()
     private var oauthPairOrder: [String] = []
-    private var oauthNonceCounter: UInt64 = 0
     private var useCanadianServer = false
     private let imageDataCache: NSCache<NSString, NSData> = {
         let cache = NSCache<NSString, NSData>()
@@ -209,7 +205,7 @@ actor SchoologyAPI {
         request.setValue("Android", forHTTPHeaderField: "X-Schoology-Client")
         request.setValue("2026.10.0", forHTTPHeaderField: "X-Schoology-App-Version")
         request.setValue(mobileCookie, forHTTPHeaderField: "Cookie")
-        request.setValue(try authorization(method: "GET", url: url, auth: auth, extra: []), forHTTPHeaderField: "Authorization")
+        request.setValue(try await authorization(method: "GET", url: url, auth: auth, extra: []), forHTTPHeaderField: "Authorization")
         let session = URLSession(configuration: .ephemeral)
         defer { session.invalidateAndCancel() }
         let (data, response) = try await session.data(for: request, delegate: NoRedirectDelegate())
@@ -422,7 +418,12 @@ actor SchoologyAPI {
             return cached as Data
         }
         await syncServerTime()
-        let session = URLSession(configuration: .ephemeral)
+        let configuration = URLSessionConfiguration.ephemeral
+        // OAuth-signed GETs must always reach Schoology with their newly generated
+        // Authorization header; never replay a cached response for a signed request.
+        configuration.urlCache = nil
+        configuration.requestCachePolicy = .reloadIgnoringLocalAndRemoteCacheData
+        let session = URLSession(configuration: configuration)
         let redirectDelegate = NoRedirectDelegate()
         defer { session.invalidateAndCancel() }
 
@@ -442,7 +443,7 @@ actor SchoologyAPI {
             if requestHost == apiHost.lowercased() {
                 request.setValue("Android", forHTTPHeaderField: "X-Schoology-Client")
                 request.setValue("2026.10.0", forHTTPHeaderField: "X-Schoology-App-Version")
-                request.setValue(try authorization(method: "GET", url: currentURL, auth: auth, extra: []), forHTTPHeaderField: "Authorization")
+                request.setValue(try await authorization(method: "GET", url: currentURL, auth: auth, extra: []), forHTTPHeaderField: "Authorization")
             }
 
             let (data, response) = try await session.data(for: request, delegate: redirectDelegate)
@@ -511,7 +512,7 @@ actor SchoologyAPI {
             if currentURL.host?.caseInsensitiveCompare(apiHost) == .orderedSame {
                 request.setValue("Android", forHTTPHeaderField: "X-Schoology-Client")
                 request.setValue("2026.10.0", forHTTPHeaderField: "X-Schoology-App-Version")
-                request.setValue(try authorization(method: "GET", url: currentURL, auth: auth, extra: []), forHTTPHeaderField: "Authorization")
+                request.setValue(try await authorization(method: "GET", url: currentURL, auth: auth, extra: []), forHTTPHeaderField: "Authorization")
             }
             let (data, response) = try await session.data(for: request, delegate: redirectDelegate)
             guard let http = response as? HTTPURLResponse else { throw SchoologyAPIError.invalidResponse }
@@ -618,8 +619,8 @@ actor SchoologyAPI {
         }
         guard let url = URL(string: "https://\(webHost)/oauth/timestamp") else { return }
         var request = URLRequest(url: url)
-        request.cachePolicy = .reloadIgnoringLocalCacheData
-        request.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
+        request.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
+        request.setValue("no-cache, no-store", forHTTPHeaderField: "Cache-Control")
         request.timeoutInterval = 15
         if let (data, response) = try? await URLSession.shared.data(for: request),
            (response as? HTTPURLResponse).map({ (200..<300).contains($0.statusCode) }) == true,
@@ -629,43 +630,16 @@ actor SchoologyAPI {
         }
     }
 
-    private func nextOAuthNonce() -> String {
-        // Match the Tauri signer exactly: 128 bits from Apple's system CSPRNG
-        // followed by a monotonically increasing 64-bit sequence.
-        var randomBytes = [UInt8](repeating: 0, count: 16)
-        let randomStatus = randomBytes.withUnsafeMutableBytes { buffer -> OSStatus in
-            guard let baseAddress = buffer.baseAddress else { return errSecParam }
-            return SecRandomCopyBytes(kSecRandomDefault, buffer.count, baseAddress)
-        }
-        let randomPart: String
-        if randomStatus == errSecSuccess {
-            randomPart = randomBytes.map { String(format: "%02x", $0) }.joined()
-        } else {
-            // UUID is a system-random fallback if SecRandomCopyBytes is unavailable.
-            randomPart = UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased()
-        }
-
-        var nonce = ""
-        repeat {
-            oauthNonceCounter &+= 1
-            nonce = randomPart + String(format: "%016llx", CUnsignedLongLong(oauthNonceCounter))
-        } while recentOAuthNonces.contains(nonce)
-
-        recentOAuthNonces.insert(nonce)
-        oauthNonceOrder.append(nonce)
-        if oauthNonceOrder.count > 8192 {
-            let expired = oauthNonceOrder.removeFirst()
-            recentOAuthNonces.remove(expired)
-        }
-        return nonce
+    private func nextOAuthNonce() async -> String {
+        await OAuthNonceGenerator.shared.nextNonce()
     }
 
-    private func nextOAuthPair() -> (nonce: String, timestamp: Int64) {
+    private func nextOAuthPair() async -> (nonce: String, timestamp: Int64) {
         let timestamp = Int64(Date.now.timeIntervalSince1970) + timeOffset
-        var nonce = nextOAuthNonce()
+        var nonce = await nextOAuthNonce()
         var pair = "\(timestamp):\(nonce)"
         while recentOAuthPairs.contains(pair) {
-            nonce = nextOAuthNonce()
+            nonce = await nextOAuthNonce()
             pair = "\(timestamp):\(nonce)"
         }
         recentOAuthPairs.insert(pair)
@@ -677,8 +651,8 @@ actor SchoologyAPI {
         return (nonce, timestamp)
     }
 
-    private func plaintextAuthorization(auth: SchoologyAuth) -> String {
-        let (nonce, timestamp) = nextOAuthPair()
+    private func plaintextAuthorization(auth: SchoologyAuth) async -> String {
+        let (nonce, timestamp) = await nextOAuthPair()
         let fields = [
             ("oauth_consumer_key", consumerKey),
             ("oauth_nonce", nonce),
@@ -723,7 +697,7 @@ actor SchoologyAPI {
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
         request.setValue(String(multipart.count), forHTTPHeaderField: "Content-Length")
         request.setValue(mobileCookie, forHTTPHeaderField: "Cookie")
-        request.setValue(plaintextAuthorization(auth: auth), forHTTPHeaderField: "Authorization")
+        request.setValue(await plaintextAuthorization(auth: auth), forHTTPHeaderField: "Authorization")
         let (uploadedData, uploadedResponse) = try await URLSession.shared.data(for: request)
         try validate(uploadedResponse, data: uploadedData)
         let uploaded = try JSONSerialization.jsonObject(with: uploadedData) as? [String: Any] ?? [:]
@@ -766,7 +740,7 @@ actor SchoologyAPI {
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
         request.setValue(String(multipart.count), forHTTPHeaderField: "Content-Length")
         request.setValue(mobileCookie, forHTTPHeaderField: "Cookie")
-        request.setValue(plaintextAuthorization(auth: auth), forHTTPHeaderField: "Authorization")
+        request.setValue(await plaintextAuthorization(auth: auth), forHTTPHeaderField: "Authorization")
         let (uploadedData, uploadedResponse) = try await URLSession.shared.data(for: request)
         try validate(uploadedResponse, data: uploadedData)
         let uploaded = try JSONSerialization.jsonObject(with: uploadedData) as? [String: Any] ?? [:]
@@ -811,6 +785,9 @@ actor SchoologyAPI {
         for _ in 0...8 {
             var request = URLRequest(url: currentURL)
             request.httpMethod = currentMethod
+            request.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
+            request.setValue("no-cache, no-store", forHTTPHeaderField: "Cache-Control")
+            request.setValue("no-cache", forHTTPHeaderField: "Pragma")
             request.timeoutInterval = 45
             request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
             request.setValue("application/json", forHTTPHeaderField: "Accept")
@@ -835,7 +812,7 @@ actor SchoologyAPI {
             }
             if signed {
                 request.setValue(
-                    try authorization(method: currentMethod, url: currentURL, auth: auth, extra: extra),
+                    try await authorization(method: currentMethod, url: currentURL, auth: auth, extra: extra),
                     forHTTPHeaderField: "Authorization"
                 )
             }
@@ -876,7 +853,7 @@ actor SchoologyAPI {
                     replayRetryCount += 1
                     // Give the replay cache time to settle, then refresh server time
                     // and build a completely new nonce/signature pair.
-                    try? await Task.sleep(nanoseconds: UInt64(replayRetryCount) * 300_000_000)
+                    try? await Task.sleep(for: .milliseconds(replayRetryCount * 300))
                     await syncServerTime(force: true)
                     continue
                 }
@@ -895,8 +872,8 @@ actor SchoologyAPI {
         throw SchoologyAPIError.invalidResponse
     }
 
-    private func authorization(method: String, url: URL, auth: SchoologyAuth?, extra: [(String, String)]) throws -> String {
-        let (nonce, timestamp) = nextOAuthPair()
+    private func authorization(method: String, url: URL, auth: SchoologyAuth?, extra: [(String, String)]) async throws -> String {
+        let (nonce, timestamp) = await nextOAuthPair()
         var pairs = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.map { ($0.name, $0.value ?? "") } ?? []
         pairs += [
             ("oauth_consumer_key", consumerKey),
