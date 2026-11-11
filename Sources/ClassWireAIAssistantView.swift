@@ -93,6 +93,17 @@ struct ClassWireAIAssistantView: View {
         .task(id: session.aiSessionID) {
             await store.refreshKeyStatus()
         }
+        .onChange(of: session.aiResetID) { _, _ in
+            store.resetInMemoryState()
+            draft = ""
+            historySearch = ""
+            showingSettings = false
+            showingHistory = false
+            pendingAttachments = []
+            selectedAIPhotos = []
+            availableModels = []
+            modelDiscoveryStatus = ""
+        }
         .environment(\.openURL, OpenURLAction { url in
             handleCitation(url)
         })
@@ -129,8 +140,17 @@ struct ClassWireAIAssistantView: View {
                 .padding(.bottom, 8)
 
             if filteredConversations.isEmpty {
-                ContentUnavailableView.search(text: historySearch)
+                if historySearch.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    ContentUnavailableView(
+                        "No conversations yet",
+                        systemImage: "bubble.left.and.bubble.right",
+                        description: Text("Start a conversation to see it here.")
+                    )
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    ContentUnavailableView.search(text: historySearch)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
             } else {
                 List {
                     ForEach(filteredConversations) { conversation in
@@ -368,7 +388,7 @@ struct ClassWireAIAssistantView: View {
 
     @ViewBuilder
     private var conversationMessages: some View {
-        if let conversation = store.activeConversation, conversation.messages.isEmpty {
+        if store.activeConversation?.messages.isEmpty ?? true {
             welcomeContent
         } else {
             ForEach(store.activeConversation?.messages ?? []) { message in

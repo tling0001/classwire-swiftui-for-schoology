@@ -16,6 +16,7 @@ final class AppSession {
     var pendingAINavigation: ClassWireAINavigationRequest?
     var isAIAssistantPresented = false
     var aiSessionID = UUID()
+    var aiResetID = UUID()
     private var hasCompletedAIWelcomeForLogin = UserDefaults.standard.bool(forKey: "classwire.ai.welcome.completed")
     var hasCompletedAIWelcomeForCurrentSession: Bool { hasCompletedAIWelcomeForLogin }
     var aiCurrentCourseID: String?
@@ -2790,6 +2791,8 @@ final class AppSession {
     func signOut() {
         let credentials = auth
         aiSessionID = UUID()
+        aiResetID = UUID()
+        ClassWireAIAssistantStore.clearPersistedDataForSignOut()
         hasCompletedAIWelcomeForLogin = false
         UserDefaults.standard.set(false, forKey: "classwire.ai.welcome.completed")
         aiMessageRecipientCandidates = []

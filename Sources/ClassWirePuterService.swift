@@ -284,7 +284,10 @@ final class ClassWirePuterService: NSObject, WKUIDelegate, WKNavigationDelegate 
 
     func signOut() async {
         do { _ = try await request("signOut") }
-        catch { isSignedIn = false; accountLabel = "" }
+        catch { /* Clear local state even if Puter's sign-out endpoint is unavailable. */ }
+        isSignedIn = false
+        accountLabel = ""
+        signInError = nil
     }
 
     func closePopup() {

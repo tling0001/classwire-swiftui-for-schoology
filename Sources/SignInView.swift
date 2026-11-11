@@ -15,6 +15,8 @@ struct SignInView: View {
     @State private var canadian = false
     @State private var searching = false
     @State private var showingDemoConfirmation = false
+    @State private var showingLAUSDConfirmation = false
+    @State private var isLAUSDLogin = false
 
     private enum Mode {
         case welcome, school, credentials, schoolBrowser, qr
@@ -231,6 +233,12 @@ struct SignInView: View {
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
                 .disabled(username.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || password.isEmpty || session.isLoading)
+                .alert("Your school uses SSO/Remote Authentication", isPresented: $showingLAUSDConfirmation) {
+                    Button("Continue", action: beginLAUSDSignIn)
+                    Button("Cancel", role: .cancel) { }
+                } message: {
+                    Text("Your school is currently using SSO/Remote Authentication. Did you mean to log in from https://lms.lausd.net?")
+                }
             }
             Section {
                 instanceSwitch
@@ -364,7 +372,13 @@ struct SignInView: View {
             mode = .welcome
         case .schoolBrowser:
             session.cancelSchoolSignIn()
-            mode = .school
+            if isLAUSDLogin {
+                isLAUSDLogin = false
+                selectedSchool = nil
+                mode = .credentials
+            } else {
+                mode = .school
+            }
         case .qr:
             mode = .welcome
         }
@@ -381,6 +395,11 @@ struct SignInView: View {
     private func signIn() {
         focusedField = nil
         let normalizedUsername = username.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if selectedSchool == nil && isLAUSDAddress(normalizedUsername) {
+            session.errorMessage = nil
+            showingLAUSDConfirmation = true
+            return
+        }
         if selectedSchool == nil && normalizedUsername == "tester@classwire.app" {
             guard password == "ClassWireDemo2026!" else {
                 session.errorMessage = "The ClassWire demo password is incorrect."
@@ -397,6 +416,31 @@ struct SignInView: View {
                 schoolID: selectedSchool?.id,
                 canadian: canadian
             )
+        }
+    }
+
+    private func isLAUSDAddress(_ value: String) -> Bool {
+        guard let separator = value.lastIndex(of: "@") else { return false }
+        let localPart = value[..<separator]
+        let domain = value[value.index(after: separator)...]
+        guard !localPart.isEmpty else { return false }
+        return domain == "lausd.net" || domain.hasSuffix(".lausd.net") ||
+            domain == "lauds.net" || domain.hasSuffix(".lauds.net")
+    }
+
+    private func beginLAUSDSignIn() {
+        guard let school = SchoologySchool(json: [
+            "id": "lausd-remote-auth",
+            "title": "Los Angeles Unified School District",
+            "domain": "lms.lausd.net",
+            "login_type": "oath"
+        ]) else { return }
+        selectedSchool = school
+        isLAUSDLogin = true
+        session.errorMessage = nil
+        mode = .schoolBrowser
+        Task {
+            await session.signInThroughSchool(domain: "lms.lausd.net", canadian: canadian)
         }
     }
 

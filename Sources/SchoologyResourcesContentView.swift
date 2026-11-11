@@ -41,8 +41,8 @@ struct SchoologyResourcesContentView: View {
     }
 }
 
-/// Shared recursive row for course Materials, group resources, collections,
-/// the standalone Resources page, and the resource picker.
+/// Shared recursive row for group resources, collections, the standalone Resources
+/// page, and the resource picker. Its native folder disclosure rows mirror Course Materials.
 struct SchoologyInlineResourceItemRow: View {
     @Environment(AppSession.self) private var session
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -55,13 +55,18 @@ struct SchoologyInlineResourceItemRow: View {
     @State private var loadError: String?
 
     var body: some View {
-        VStack(spacing: 0) {
-            if item.isFolder { folderRow }
-            else if let selection { selectableItemRow(selection) }
-            else if case .course(let courseID) = source { courseItemRow(courseID: courseID) }
-            else { resourceItemRow }
+        if item.isFolder {
+            folderRow
+        } else if let selection {
+            selectableItemRow(selection)
+                .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
+        } else if case .course(let courseID) = source {
+            courseItemRow(courseID: courseID)
+                .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
+        } else {
+            resourceItemRow
+                .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
         }
-        .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
     }
 
     private var folderRow: some View {
@@ -114,6 +119,7 @@ struct SchoologyInlineResourceItemRow: View {
             .padding(.vertical, 8)
             .contentShape(Rectangle())
         }
+        .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
         .animation(reduceMotion ? nil : .snappy(duration: 0.24), value: isExpanded)
         .onChange(of: isExpanded) { _, expanded in
             guard expanded, children == nil, !isLoading else { return }
@@ -164,7 +170,7 @@ struct SchoologyInlineResourceItemRow: View {
         if isLinkMaterial, let url = item.url ?? item.fileViewURL {
             Link(destination: url) {
                 Label(item.title, systemImage: "link")
-                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .contentShape(Rectangle())
             }
         } else if let attachment {
@@ -174,7 +180,7 @@ struct SchoologyInlineResourceItemRow: View {
                 SchoologyEmbeddedWebView(url: url, title: item.title)
             } label: {
                 Label(item.title, systemImage: resourceSymbol)
-                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .contentShape(Rectangle())
             }
         } else {
@@ -182,7 +188,7 @@ struct SchoologyInlineResourceItemRow: View {
                 SchoologyProfileItemDetailSheet(item: item)
             } label: {
                 Label(item.title, systemImage: resourceSymbol)
-                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .contentShape(Rectangle())
             }
         }
@@ -228,7 +234,7 @@ struct SchoologyInlineResourceItemRow: View {
     private var resourceSymbol: String {
         let kind = item.kind.lowercased()
         if isLinkMaterial { return "link" }
-        if kind.contains("assignment") { return "pencil" }
+        if kind.contains("assignment") { return "pencil.circle.fill" }
         if kind.contains("page") { return "doc.text" }
         if kind.contains("assessment") || kind.contains("quiz") { return "checklist" }
         if kind.contains("discussion") { return "text.bubble" }

@@ -1,3 +1,22 @@
+## [2026.10.0-port.138]
+
+### AI session reset
+- Clear every local ClassWire AI preference, provider/model selection, conversation, page context, Google Cloud connection detail, provider API key, and Google refresh token when signing out.
+- Sign out of Puter where available and invalidate in-flight AI responses so they cannot recreate chat history after sign-out.
+- Start the next login with the AI welcome screen and no saved conversations or blank history entries.
+
+### LAUSD sign-in
+- Detect LAUSD email addresses in “Sign in with my account” and show the same SSO/Remote Authentication confirmation text as the Tauri app.
+- On confirmation, route directly to the Schoology browser sign-in flow at `https://lms.lausd.net`; Cancel leaves the credential form unchanged.
+
+### Resources and assignment symbols
+- Make Resources folders and item labels follow the same native DisclosureGroup structure, row-level insets, alignment, and nested indentation as Course Materials.
+- Use the filled `pencil.circle.fill` SF Symbol for assignments in Upcoming, Course Materials, and Resources for improved visibility.
+
+### Build
+- Increment the app marketing version to `2026.10.138` and build number to `138`.
+
+
 ## [2026.10.0-port.137]
 
 ### Course Materials hierarchy

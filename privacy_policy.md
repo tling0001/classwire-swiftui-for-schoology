@@ -1,6 +1,6 @@
 # ClassWire Privacy Policy
 
-**Last updated: November 10, 2026**
+**Last updated: November 11, 2026**
 
 ClassWire is an independent client for accessing a user's existing Schoology account. This policy explains what information the app handles, where it is sent, how it is stored, and the choices available to users.
 
@@ -76,7 +76,7 @@ This does not prevent Schoology, Apple, GitHub, a school identity provider, or a
 
 - OAuth credentials remain in Keychain until you sign out or the credentials are otherwise replaced or removed. Signing out deletes the locally stored OAuth credentials and asks Schoology to unregister the active push token when possible.
 - App preferences and saved AI conversation text remain on the device until changed, deleted in the app where supported, or the app's local data is removed. AI attachment bytes are not saved with conversation history and are released with the active session, subject to normal operating-system behavior.
-- AI API keys and the Google refresh token remain in Keychain until removed through the relevant AI settings or app data is removed. A Gemini key created in Google Cloud remains subject to Google's Cloud API-key management and deletion controls.
+- Signing out clears locally stored AI conversations, provider/model preferences, captured page context, all AI provider API keys, the Google refresh token, and Google account metadata. The app also attempts to sign out of Puter. A Gemini API key created in Google Cloud remains subject to Google's Cloud API-key management and deletion controls. A Gemini key created in Google Cloud remains subject to Google's Cloud API-key management and deletion controls.
 - Temporary data held in memory is released as the app session ends, subject to normal operating-system behavior.
 - WebKit cookies and website data may remain in WebKit's website data store; signing out of ClassWire does not currently guarantee that every embedded-browser cookie is immediately erased.
 - Files downloaded or exported by you remain wherever you saved them until you delete them.

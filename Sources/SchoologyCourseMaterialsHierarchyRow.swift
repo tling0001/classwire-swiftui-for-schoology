@@ -120,7 +120,7 @@ struct SchoologyInlineCourseMaterialRow: View {
         if isLinkMaterial { return "link" }
         if kind.contains("discussion") { return "text.bubble" }
         if kind.contains("page") { return "doc.text" }
-        if kind.contains("assignment") { return "pencil" }
+        if kind.contains("assignment") { return "pencil.circle.fill" }
         if kind.contains("event") { return "calendar" }
         if ["assessment", "assessment_v2", "managed_assessment", "quiz"].contains(kind) { return "checklist" }
         return "doc"
