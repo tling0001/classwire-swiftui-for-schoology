@@ -800,9 +800,9 @@ actor SchoologyAPI {
         var redirectCount = 0
         var replayRetryCount = 0
 
-        // Allow up to five same-host redirects plus three fresh-signature retries
+        // Allow up to five same-host redirects plus five fresh-signature retries
         // when Schoology explicitly rejects a timestamp/nonce pair as a replay.
-        for _ in 0...8 {
+        for _ in 0...10 {
             var request = URLRequest(url: currentURL)
             request.httpMethod = currentMethod
             request.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
