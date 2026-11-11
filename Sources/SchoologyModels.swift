@@ -358,6 +358,17 @@ struct SchoologySchool: Identifiable, Sendable {
         domain = SchoologyValue.string(json["domain"])
         loginType = SchoologyValue.optionalString(json["login_type"] ?? json["loginType"])
     }
+
+    /// Unknown or missing login metadata retains the established school-browser flow.
+    /// Only explicit password/native values select the non-OAuth credential form.
+    var usesSchoolBrowserSignIn: Bool {
+        let value = loginType?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? ""
+        guard !value.isEmpty else { return true }
+        if value == "oauth" || value == "oath" || value.hasPrefix("oauth") || value.hasPrefix("oath") {
+            return true
+        }
+        return !["password", "native", "non-oauth", "non_oauth", "credentials", "basic", "none"].contains(value)
+    }
 }
 
 enum SchoologyValue {

@@ -155,7 +155,7 @@ struct SignInView: View {
                         Button {
                             selectedSchool = school
                             session.errorMessage = nil
-                            if school.loginType?.caseInsensitiveCompare("oauth") == .orderedSame {
+                            if school.usesSchoolBrowserSignIn {
                                 mode = .schoolBrowser
                                 Task { await signInThroughSchool() }
                             } else {

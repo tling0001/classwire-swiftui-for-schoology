@@ -1,3 +1,18 @@
+## [2026.10.0-port.137]
+
+### Course Materials hierarchy
+- Restore the dedicated port.123 `SchoologyInlineCourseMaterialRow` for Course Materials instead of using the generic Resources row.
+- Match the original folder disclosure structure, row-level list insets, label layout, native nested indentation, and lazy recursive loading; leave Resources and its picker on their independent shared row.
+- Preserve existing file/link handling and course-material navigation, and retain the pencil icon for assignments.
+
+### School sign-in compatibility
+- Preserve browser-based Oath/OAuth sign-in for `oauth` and `oath` login-type values.
+- Keep the native credential form for explicitly password/native login types, while treating missing or unfamiliar school login metadata as browser sign-in so existing SSO schools are not silently redirected to the wrong flow.
+
+### Build
+- Increment the Apple bundle marketing version to `2026.10.137` and build number to `137`.
+
+
 ## [2026.10.0-port.136]
 
 ### Course Materials and Resources hierarchy

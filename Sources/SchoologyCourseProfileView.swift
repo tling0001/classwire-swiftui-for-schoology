@@ -232,7 +232,7 @@ struct SchoologyCourseProfileView: View {
         case .materials:
             List {
                 ForEach(materials) { item in
-                    SchoologyInlineResourceItemRow(item: item, source: .course(courseID: course.id))
+                    SchoologyInlineCourseMaterialRow(courseID: course.id, item: item)
                 }
             }
             .overlay { if materials.isEmpty && loadedTabs.contains(.materials) { ContentUnavailableView("No materials", systemImage: "folder") } }
