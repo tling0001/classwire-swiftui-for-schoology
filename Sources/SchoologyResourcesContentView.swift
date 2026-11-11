@@ -139,6 +139,7 @@ struct SchoologyInlineResourceItemRow: View {
         } label: {
             HStack(spacing: 10) {
                 Label(item.title, systemImage: resourceSymbol)
+                    .font(.body.weight(.semibold))
                     .foregroundStyle(.primary).frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                 if selection.wrappedValue[item.id] != nil {
                     Image(systemName: "checkmark.circle.fill").foregroundStyle(.tint).accessibilityHidden(true)
@@ -159,6 +160,7 @@ struct SchoologyInlineResourceItemRow: View {
                 SchoologyCourseMaterialDestinationView(courseID: courseID, item: item)
             } label: {
                 Label(item.title, systemImage: resourceSymbol)
+                    .font(.body.weight(.semibold))
                     .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                     .contentShape(Rectangle())
             }
@@ -180,6 +182,7 @@ struct SchoologyInlineResourceItemRow: View {
                 SchoologyEmbeddedWebView(url: url, title: item.title)
             } label: {
                 Label(item.title, systemImage: resourceSymbol)
+                    .font(.body.weight(.semibold))
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .contentShape(Rectangle())
             }
@@ -234,7 +237,7 @@ struct SchoologyInlineResourceItemRow: View {
     private var resourceSymbol: String {
         let kind = item.kind.lowercased()
         if isLinkMaterial { return "link" }
-        if kind.contains("assignment") { return "pencil.circle.fill" }
+        if kind.contains("assignment") { return "pencil" }
         if kind.contains("page") { return "doc.text" }
         if kind.contains("assessment") || kind.contains("quiz") { return "checklist" }
         if kind.contains("discussion") { return "text.bubble" }
