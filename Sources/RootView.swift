@@ -271,6 +271,29 @@ private struct SchoologySidebar: View {
             }
         }
 
+        if !session.parentChildren.isEmpty {
+            Section("Family") {
+                DisclosureGroup {
+                    Button { Task { await session.selectLearningStudent(nil) } } label: {
+                        HStack {
+                            Label("Parent account", systemImage: "person.crop.circle")
+                            Spacer()
+                            if session.selectedStudent == nil { Image(systemName: "checkmark").foregroundStyle(.tint) }
+                        }.contentShape(Rectangle())
+                    }.buttonStyle(.plain)
+                    ForEach(session.parentChildren) { student in
+                        Button { Task { await session.selectLearningStudent(student) } } label: {
+                            HStack {
+                                Label(student.nameDisplay, systemImage: "person").lineLimit(1)
+                                Spacer()
+                                if session.selectedStudent?.id == student.id { Image(systemName: "checkmark").foregroundStyle(.tint) }
+                            }.contentShape(Rectangle())
+                        }.buttonStyle(.plain)
+                    }
+                } label: { Label("Switch Student", systemImage: "person.2") }
+            }
+        }
+
         Section("More") {
             destinationRow(.profile)
             ForEach([AppDestination.resources, .grades]) { item in

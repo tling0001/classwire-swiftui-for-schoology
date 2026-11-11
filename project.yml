@@ -8,8 +8,8 @@ options:
 settings:
   base:
     SWIFT_VERSION: "6.0"
-    MARKETING_VERSION: "2026.10.133"
-    CURRENT_PROJECT_VERSION: "133"
+    MARKETING_VERSION: "2026.10.134"
+    CURRENT_PROJECT_VERSION: "134"
     PRODUCT_NAME: ClassWire
     INFOPLIST_KEY_CFBundleDisplayName: ClassWire
     GENERATE_INFOPLIST_FILE: YES
@@ -129,6 +129,8 @@ targets:
         CODE_SIGN_ENTITLEMENTS: Config/Schoology-macOS.entitlements
         MACOSX_DEPLOYMENT_TARGET: "14.0"
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.education
+        INFOPLIST_KEY_NSAppTransportSecurity_NSAllowsArbitraryLoads: NO
+        INFOPLIST_KEY_NSAppTransportSecurity_NSAllowsLocalNetworking: YES
         INFOPLIST_KEY_NSCameraUsageDescription: Scan a ClassWire QR code to sign in.
         ENABLE_APP_SANDBOX: NO
         ENABLE_HARDENED_RUNTIME: YES

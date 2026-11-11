@@ -1,5 +1,22 @@
 # Release notes
 
+## [2026.10.0-port.134]
+
+### Parent accounts
+- Discover linked students from the authenticated Schoology parent's `child_uids` profile field and add a native Switch Student section to the iOS, iPadOS, and macOS navigation sidebar.
+- Scope student-facing course lists, groups, dashboard data, grades, calendar events, assignment enrollment, submission history, and AI Schoology lookups to the selected child while retaining the parent OAuth session and account-level profile, messaging, and settings.
+- Keep Schoology API permissions authoritative; linked students remain visible even when an individual profile lookup is restricted.
+
+### Puter reliability
+- Serve the embedded Puter bridge from a real loopback-only HTTP origin instead of relying on WKWebView's HTML base URL, and report origin mismatches instead of silently dropping bridge messages.
+- Keep App Transport Security enabled while allowing local networking for the macOS localhost bridge; do not enable arbitrary HTTP loads.
+- Match Tauri's Puter authentication order: open the in-page Puter authentication dialog first, with the popup sign-in API as fallback.
+- Launch sign-in directly from Connect Puter; remove the redundant second Connect button from the embedded sign-in view.
+
+### Build
+- Increment iOS and macOS marketing version to `2026.10.134` and build number to `134`.
+
+
 ## [2026.10.0-port.133]
 
 ### Puter reliability and authentication

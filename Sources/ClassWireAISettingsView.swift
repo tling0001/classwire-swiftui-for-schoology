@@ -17,8 +17,11 @@ struct ClassWireAISettingsView: View {
                 privacySection
             }
             .navigationTitle("AI Settings")
-            .navigationDestination(isPresented: $showingPuterConnect) {
-                ClassWirePuterConnectSheet(service: puterService)
+            .sheet(isPresented: $showingPuterConnect) {
+                NavigationStack {
+                    ClassWirePuterConnectSheet(service: puterService)
+                }
+                .presentationDragIndicator(.visible)
             }
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
@@ -88,6 +91,7 @@ struct ClassWireAISettingsView: View {
                     .font(.footnote).foregroundStyle(.secondary)
                 Button("Connect Puter account", systemImage: "person.crop.circle.badge.checkmark") {
                     showingPuterConnect = true
+                    Task { await puterService.signIn(); await store.refreshKeyStatus() }
                 }
                 .buttonStyle(.borderedProminent)
             }
