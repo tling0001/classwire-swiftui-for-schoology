@@ -1,5 +1,6 @@
 import Foundation
 import CryptoKit
+import Security
 
 private final class NoRedirectDelegate: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
     func urlSession(
@@ -41,6 +42,8 @@ actor SchoologyAPI {
     private var lastServerTimeSync: Date?
     private var recentOAuthNonces = Set<String>()
     private var oauthNonceOrder: [String] = []
+    private var recentOAuthPairs = Set<String>()
+    private var oauthPairOrder: [String] = []
     private var oauthNonceCounter: UInt64 = 0
     private var useCanadianServer = false
     private let imageDataCache: NSCache<NSString, NSData> = {
@@ -627,31 +630,55 @@ actor SchoologyAPI {
     }
 
     private func nextOAuthNonce() -> String {
-        // Match Tauri's 128-bit random value plus a monotonically increasing
-        // sequence. Explicitly reject recent collisions before returning a nonce.
+        // Match the Tauri signer exactly: 128 bits from Apple's system CSPRNG
+        // followed by a monotonically increasing 64-bit sequence.
+        var randomBytes = [UInt8](repeating: 0, count: 16)
+        let randomStatus = randomBytes.withUnsafeMutableBytes { buffer -> OSStatus in
+            guard let baseAddress = buffer.baseAddress else { return errSecParam }
+            return SecRandomCopyBytes(kSecRandomDefault, buffer.count, baseAddress)
+        }
+        let randomPart: String
+        if randomStatus == errSecSuccess {
+            randomPart = randomBytes.map { String(format: "%02x", $0) }.joined()
+        } else {
+            // UUID is a system-random fallback if SecRandomCopyBytes is unavailable.
+            randomPart = UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased()
+        }
+
         var nonce = ""
         repeat {
             oauthNonceCounter &+= 1
-            let randomHigh = UInt64.random(in: UInt64.min...UInt64.max)
-            let randomLow = UInt64.random(in: UInt64.min...UInt64.max)
-            nonce = String(format: "%016llx%016llx%016llx",
-                           CUnsignedLongLong(randomHigh),
-                           CUnsignedLongLong(randomLow),
-                           CUnsignedLongLong(oauthNonceCounter))
+            nonce = randomPart + String(format: "%016llx", CUnsignedLongLong(oauthNonceCounter))
         } while recentOAuthNonces.contains(nonce)
 
         recentOAuthNonces.insert(nonce)
         oauthNonceOrder.append(nonce)
-        if oauthNonceOrder.count > 4096 {
+        if oauthNonceOrder.count > 8192 {
             let expired = oauthNonceOrder.removeFirst()
             recentOAuthNonces.remove(expired)
         }
         return nonce
     }
 
-    private func plaintextAuthorization(auth: SchoologyAuth) -> String {
-        let nonce = nextOAuthNonce()
+    private func nextOAuthPair() -> (nonce: String, timestamp: Int64) {
         let timestamp = Int64(Date.now.timeIntervalSince1970) + timeOffset
+        var nonce = nextOAuthNonce()
+        var pair = "\(timestamp):\(nonce)"
+        while recentOAuthPairs.contains(pair) {
+            nonce = nextOAuthNonce()
+            pair = "\(timestamp):\(nonce)"
+        }
+        recentOAuthPairs.insert(pair)
+        oauthPairOrder.append(pair)
+        if oauthPairOrder.count > 8192 {
+            let expired = oauthPairOrder.removeFirst()
+            recentOAuthPairs.remove(expired)
+        }
+        return (nonce, timestamp)
+    }
+
+    private func plaintextAuthorization(auth: SchoologyAuth) -> String {
+        let (nonce, timestamp) = nextOAuthPair()
         let fields = [
             ("oauth_consumer_key", consumerKey),
             ("oauth_nonce", nonce),
@@ -847,12 +874,21 @@ actor SchoologyAPI {
                     // Rebuild the Authorization header on the next pass so both
                     // oauth_nonce and oauth_signature are fresh.
                     replayRetryCount += 1
+                    // Give the replay cache time to settle, then refresh server time
+                    // and build a completely new nonce/signature pair.
+                    try? await Task.sleep(nanoseconds: UInt64(replayRetryCount) * 300_000_000)
                     await syncServerTime(force: true)
                     continue
                 }
             }
 
-            try validate(response, data: data)
+            do {
+                try validate(response, data: data)
+            } catch let SchoologyAPIError.http(code, detail) {
+                // Include only the method and path (never credentials or signed query values)
+                // so failures from multi-step AI tool calls can be identified precisely.
+                throw SchoologyAPIError.http(code, "\(currentMethod) \(currentURL.path): \(detail)")
+            }
             return data
         }
 
@@ -860,8 +896,7 @@ actor SchoologyAPI {
     }
 
     private func authorization(method: String, url: URL, auth: SchoologyAuth?, extra: [(String, String)]) throws -> String {
-        let nonce = nextOAuthNonce()
-        let timestamp = Int64(Date.now.timeIntervalSince1970) + timeOffset
+        let (nonce, timestamp) = nextOAuthPair()
         var pairs = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.map { ($0.name, $0.value ?? "") } ?? []
         pairs += [
             ("oauth_consumer_key", consumerKey),

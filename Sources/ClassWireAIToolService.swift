@@ -65,12 +65,12 @@ enum ClassWireAIToolService {
             "assignment_id": ["type": "integer", "description": "Schoology assignment ID."],
             "section_id": ["type": "integer", "description": "Schoology course section ID."]
         ], required: ["assignment_id", "section_id"]),
-        tool("send_message", "PROPOSE a Schoology message. The user must review and explicitly confirm before it is sent.", [
+        tool("send_message", "PROPOSE a Schoology message. Write the message body in Markdown, including paragraphs, headings, bold, italic, links, and lists where useful. The app converts the reviewed Markdown to safe Schoology rich-text HTML. The user must review and explicitly confirm before it is sent.", [
             "recipient_name": ["type": "string"],
             "subject": ["type": "string"],
             "message": ["type": "string"]
         ], required: ["recipient_name", "subject", "message"]),
-        tool("post_course_update", "PROPOSE a course update. The user must review and explicitly confirm before it is posted.", [
+        tool("post_course_update", "PROPOSE a course update. Write the body in Markdown, including paragraphs, headings, bold, italic, links, and lists where useful. The app converts the reviewed Markdown to safe Schoology rich-text HTML. The user must review and explicitly confirm before it is posted.", [
             "body": ["type": "string"],
             "course_id": ["type": "integer"]
         ], required: ["body"]),
@@ -366,26 +366,28 @@ enum ClassWireAIToolService {
         case "send_message":
             let recipient = text(arguments["recipient_name"]).trimmingCharacters(in: .whitespacesAndNewlines)
             let subject = text(arguments["subject"]).trimmingCharacters(in: .whitespacesAndNewlines)
-            let message = text(arguments["message"]).trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !recipient.isEmpty, !subject.isEmpty, !message.isEmpty else {
+            let messageMarkdown = text(arguments["message"]).trimmingCharacters(in: .whitespacesAndNewlines)
+            let messageHTML = ClassWireAIMarkdownHTML.encode(messageMarkdown)
+            guard !recipient.isEmpty, !subject.isEmpty, !messageMarkdown.isEmpty, !messageHTML.isEmpty else {
                 throw ClassWireAIError.action("Recipient, subject, and message are required.")
             }
             return .action(ClassWireAIPendingAction(
                 type: name,
-                values: ["recipient_name": recipient, "subject": subject, "message": message],
+                values: ["recipient_name": recipient, "subject": subject, "message": messageHTML, "preview_markdown": messageMarkdown],
                 title: "Send Schoology message",
                 summary: "Send “\(subject)” to \(recipient). Review the full message before confirming."
             ))
 
         case "post_course_update":
-            let body = text(arguments["body"]).trimmingCharacters(in: .whitespacesAndNewlines)
+            let bodyMarkdown = text(arguments["body"]).trimmingCharacters(in: .whitespacesAndNewlines)
+            let bodyHTML = ClassWireAIMarkdownHTML.encode(bodyMarkdown)
             let targetCourseID = text(arguments["course_id"], fallback: session.aiCurrentCourseID ?? "")
-            guard !body.isEmpty, !targetCourseID.isEmpty else {
+            guard !bodyMarkdown.isEmpty, !bodyHTML.isEmpty, !targetCourseID.isEmpty else {
                 throw ClassWireAIError.action("Open a course or include course_id before proposing an update.")
             }
             return .action(ClassWireAIPendingAction(
                 type: name,
-                values: ["body": body, "course_id": targetCourseID],
+                values: ["body": bodyHTML, "preview_markdown": bodyMarkdown, "course_id": targetCourseID],
                 title: "Post course update",
                 summary: "Post this update to \(session.aiCurrentCourseTitle ?? "the selected course"). Review the text before confirming."
             ))

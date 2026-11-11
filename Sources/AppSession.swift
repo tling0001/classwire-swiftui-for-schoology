@@ -13,6 +13,10 @@ final class AppSession {
     var pendingAINavigation: ClassWireAINavigationRequest?
     var isAIAssistantPresented = false
     var aiSessionID = UUID()
+    private var completedAIWelcomeSessionID: UUID?
+    var hasCompletedAIWelcomeForCurrentSession: Bool {
+        completedAIWelcomeSessionID == aiSessionID
+    }
     var aiCurrentCourseID: String?
     var aiCurrentCourseTitle: String?
     var aiCurrentAssignmentID: String?
@@ -247,6 +251,10 @@ final class AppSession {
             upcomingEvents = SchoologyUpcomingEvent.decodeList(Self.object(upcomingData))
                 .sorted { ($0.date ?? .distantFuture) < ($1.date ?? .distantFuture) }
         }
+    }
+
+    func completeAIWelcomeForCurrentSession() {
+        completedAIWelcomeSessionID = aiSessionID
     }
 
     func setAICourseContext(courseID: String, title: String) {

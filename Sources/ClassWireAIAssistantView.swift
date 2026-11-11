@@ -11,7 +11,6 @@ struct ClassWireAIAssistantView: View {
     @State private var historySearch = ""
     @State private var showingSettings = false
     @State private var showingHistory = false
-    @State private var hasCompletedFirstRun = false
     @FocusState private var composerFocused: Bool
     @State private var availableModels: [String] = []
     @State private var isRefreshingModels = false
@@ -31,7 +30,7 @@ struct ClassWireAIAssistantView: View {
     var body: some View {
         GeometryReader { geometry in
             Group {
-                if hasCompletedFirstRun {
+                if session.hasCompletedAIWelcomeForCurrentSession {
                     HStack(spacing: 0) {
                         if geometry.size.width >= 760 {
                             conversationSidebar
@@ -46,7 +45,7 @@ struct ClassWireAIAssistantView: View {
                         provider: store.provider,
                         isProviderConfigured: store.hasSavedProviderKey,
                         onConfigureProvider: { showingSettings = true },
-                        onContinue: { hasCompletedFirstRun = true }
+                        onContinue: { session.completeAIWelcomeForCurrentSession() }
                     )
                 }
             }
@@ -90,7 +89,6 @@ struct ClassWireAIAssistantView: View {
             }
         }
         .task(id: session.aiSessionID) {
-            hasCompletedFirstRun = false
             await store.refreshKeyStatus()
         }
         .environment(\.openURL, OpenURLAction { url in
@@ -699,7 +697,7 @@ struct ClassWireAIAssistantView: View {
                     .font(.subheadline)
                 Text("Subject: \(action.values["subject"] ?? "")")
                     .font(.subheadline)
-                Text(action.values["message"] ?? "")
+                Text(attributedMessage(action.values["preview_markdown"] ?? action.values["message"] ?? ""))
                     .font(.body)
                     .textSelection(.enabled)
                     .padding(10)
@@ -721,7 +719,7 @@ struct ClassWireAIAssistantView: View {
                         .lineLimit(2)
                 }
             } else if action.type == "post_course_update" {
-                Text(action.values["body"] ?? "")
+                Text(attributedMessage(action.values["preview_markdown"] ?? action.values["body"] ?? ""))
                     .font(.body)
                     .textSelection(.enabled)
                     .padding(10)

@@ -1,5 +1,24 @@
 # Release notes
 
+## [2026.10.0-port.130]
+
+### ClassWire AI request authentication
+- Generate OAuth nonces with Apple's system cryptographic random generator and the same 128-bit-random-plus-64-bit-sequence format used by the Tauri signer.
+- Track recent timestamp/nonce pairs explicitly and use a short, bounded backoff plus fresh server-time synchronization when Schoology reports a replay rejection.
+- Include the failed Schoology HTTP method and path in request errors without exposing signed query values or credentials, making multi-step AI tool failures diagnosable.
+
+### AI rich text
+- Convert AI-proposed Schoology messages and course updates from Markdown into the same restricted, escaped rich-text HTML format already used for AI text submissions.
+- Preserve Markdown previews in the confirmation card so the user reviews formatted content before confirming.
+- Keep AI chat replies rendered as attributed Markdown, and preserve HTML rich text when the resulting Schoology message or post is displayed.
+
+### AI onboarding
+- Store welcome completion on the shared signed-in app session rather than inside the transient assistant view.
+- Show the welcome/setup screen once per sign-in session, retain completion when the assistant is dismissed and reopened, and reset it after sign-out/sign-in.
+
+### Build
+- Increment the iOS and macOS marketing version to `2026.10.130` and build number to `130`.
+
 ## [2026.10.0-port.129]
 
 ### Build repair
