@@ -192,6 +192,17 @@ final class ClassWireGoogleCloudService: NSObject, ASWebAuthenticationPresentati
             throw ClassWireGoogleCloudError.invalidProject
         }
         let accessToken = try await refreshedAccessToken()
+        // The API Keys API requires the numeric project number in its parent
+        // resource path. Keep the project ID for IAM and Service Usage.
+        let projectDetails = try await googleGET(
+            "https://cloudresourcemanager.googleapis.com/v3/projects/\(projectID)",
+            accessToken: accessToken
+        )
+        let rawProjectNumber = projectDetails["projectNumber"]
+        let projectNumber = (rawProjectNumber as? String) ?? (rawProjectNumber as? NSNumber)?.stringValue ?? ""
+        guard !projectNumber.isEmpty, projectNumber.allSatisfy(\.isNumber) else {
+            throw ClassWireGoogleCloudError.invalidResponse("Google did not return a valid numeric project number for the selected project.")
+        }
         for service in ["iam.googleapis.com", "apikeys.googleapis.com", "generativelanguage.googleapis.com"] {
             try await enableService(projectID: projectID, service: service, accessToken: accessToken)
         }
@@ -233,7 +244,7 @@ final class ClassWireGoogleCloudService: NSObject, ASWebAuthenticationPresentati
         var existingKeyName: String?
         var keyPageToken: String?
         for _ in 0..<10 {
-            var keyListComponents = URLComponents(string: "https://apikeys.googleapis.com/v2/projects/\(projectID)/locations/global/keys")!
+            var keyListComponents = URLComponents(string: "https://apikeys.googleapis.com/v2/projects/\(projectNumber)/locations/global/keys")!
             var keyQuery = [URLQueryItem(name: "pageSize", value: "100")]
             if let keyPageToken { keyQuery.append(URLQueryItem(name: "pageToken", value: keyPageToken)) }
             keyListComponents.queryItems = keyQuery
@@ -256,7 +267,7 @@ final class ClassWireGoogleCloudService: NSObject, ASWebAuthenticationPresentati
         if let name = existingKeyName {
             keyResourceName = name
         } else {
-            let createURL = URL(string: "https://apikeys.googleapis.com/v2/projects/\(projectID)/locations/global/keys")!
+            let createURL = URL(string: "https://apikeys.googleapis.com/v2/projects/\(projectNumber)/locations/global/keys")!
             var operation: [String: Any]?
             var lastBindingError: Error?
 

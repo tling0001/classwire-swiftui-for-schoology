@@ -155,8 +155,14 @@ struct SignInView: View {
                         Button {
                             selectedSchool = school
                             session.errorMessage = nil
-                            mode = .schoolBrowser
-                            Task { await signInThroughSchool() }
+                            if school.loginType?.caseInsensitiveCompare("oauth") == .orderedSame {
+                                mode = .schoolBrowser
+                                Task { await signInThroughSchool() }
+                            } else {
+                                // Non-OAuth schools use the same native account
+                                // credential form as "Sign in with my account".
+                                mode = .credentials
+                            }
                         } label: {
                             HStack(spacing: 12) {
                                 Image(systemName: "building.2")
@@ -403,7 +409,18 @@ struct SignInView: View {
         defer { searching = false }
         do {
             await SchoologyAPI.shared.setCanadianServer(canadian)
-            schools = try await SchoologyAPI.shared.searchSchools(query)
+            var results = try await SchoologyAPI.shared.searchSchools(query)
+            if query.trimmingCharacters(in: .whitespacesAndNewlines).caseInsensitiveCompare("app.classwire.com") == .orderedSame,
+               !results.contains(where: { $0.domain.caseInsensitiveCompare("app.classwire.com") == .orderedSame }),
+               let testSchool = SchoologySchool(json: [
+                   "id": "classwire-test",
+                   "title": "ClassWire Test School",
+                   "domain": "app.classwire.com",
+                   "login_type": "oauth"
+               ]) {
+                results.append(testSchool)
+            }
+            schools = results
         } catch {
             session.errorMessage = error.localizedDescription
         }

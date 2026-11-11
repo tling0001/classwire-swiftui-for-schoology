@@ -136,12 +136,15 @@ actor SchoologyAPI {
         }
 
         // Match LoginOAuthManagementActivity.R0() from the official Tauri port.
-        let callback = "https://\(host)/mobile_login_success?os=android&os_version=34&app_version=600000478"
+        // The ClassWire-owned test search alias deliberately exercises the
+        // normal Schoology OAuth browser flow without redirecting to that alias.
+        let authorizationHost = host.lowercased() == "app.classwire.com" ? "app.schoology.com" : host
+        let callback = "https://\(authorizationHost)/mobile_login_success?os=android&os_version=34&app_version=600000478"
         let oauthPath = "oauth/authorize?oauth_token=\(temporary.token)&oauth_callback=\(androidURIEncode(callback))"
-        let authorizationString = "https://\(host)/\(oauthPath)&login_landing_dest=\(androidURIEncode(oauthPath))"
+        let authorizationString = "https://\(authorizationHost)/\(oauthPath)&login_landing_dest=\(androidURIEncode(oauthPath))"
         guard let authorizationURL = URL(string: authorizationString),
               authorizationURL.scheme == "https",
-              authorizationURL.host == host else {
+              authorizationURL.host?.caseInsensitiveCompare(authorizationHost) == .orderedSame else {
             throw SchoologyAPIError.invalidResponse
         }
         return SchoologyPendingSchoolLogin(credential: temporary, authorizationURL: authorizationURL)

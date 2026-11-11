@@ -349,12 +349,14 @@ struct SchoologySchool: Identifiable, Sendable {
     let id: String
     let title: String
     let domain: String
+    let loginType: String?
 
     init?(json: [String: Any]) {
         guard let rawID = json["id"] else { return nil }
         id = SchoologyValue.string(rawID)
         title = SchoologyValue.string(json["title"] ?? json["name"], fallback: "School")
         domain = SchoologyValue.string(json["domain"])
+        loginType = SchoologyValue.optionalString(json["login_type"] ?? json["loginType"])
     }
 }
 

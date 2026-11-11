@@ -1,5 +1,14 @@
 # Release notes
 
+## [2026.10.0-port.135]
+
+### Gemini and school sign-in parity
+- Use the numeric Google Cloud project number for API Keys API list/create parent resources while retaining the project ID for Cloud Resource Manager, IAM, and Service Usage.
+- Preserve automatic reuse of an existing ClassWire AI project and creation of a new project when none is found; keep project creation parent unset unless the user explicitly selects a valid organization or folder.
+- Route schools whose login type is not OAuth to the native account credential form and include the selected school ID in sign-in.
+- Add the ClassWire test school search alias and map its browser OAuth flow to app.schoology.com.
+
+
 ## [2026.10.0-port.134]
 
 ### Parent accounts
