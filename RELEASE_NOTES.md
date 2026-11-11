@@ -1,3 +1,20 @@
+## [2026.10.0-port.139]
+
+### Gradebook navigation
+- Make every gradebook item row a real navigation link, reusing the Course Materials destination routing for assignments, discussions, assessments/quizzes, events, and pages.
+- Normalize Schoology grade-item type metadata and Android's numeric assignment/discussion type identifiers before routing.
+
+### OAuth recipient-search reliability
+- Detect replay rejection variants without depending on exact punctuation or spacing.
+- Retry rejected signed requests up to five times with a newly generated OAuth nonce/signature and a refreshed Schoology server timestamp.
+
+### Assignment symbol
+- Replace the circled pencil with a standalone pencil SF Symbol and apply a semibold symbol weight for clearer visibility in Upcoming, Course Materials, and Resources.
+
+### Build
+- Increment the app marketing version to `2026.10.139` and build number to `139`.
+
+
 ## [2026.10.0-port.138]
 
 ### AI session reset
