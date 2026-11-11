@@ -696,6 +696,18 @@ final class AppSession {
             let comment = SchoologyValue.plainText(SchoologyValue.string(
                 (rawComment as? [String: Any])?["comment"] ?? (rawComment as? [String: Any])?["body"] ?? rawComment
             ))
+            let rawItemType = SchoologyValue.string(
+                item["template_type"] ?? item["templateType"] ?? item["type_name"] ?? item["typeName"] ??
+                item["item_type"] ?? item["itemType"] ?? item["type"] ?? item["type_id"] ?? item["typeId"],
+                fallback: "assignment"
+            ).lowercased()
+            // Android's GradeItemStrategyFactory uses 0 for assignments and 1 for discussions.
+            let itemType: String
+            switch rawItemType {
+            case "0": itemType = "assignment"
+            case "1": itemType = "discussion"
+            default: itemType = rawItemType
+            }
             let assignment = SchoologyGradeAssignment(
                 id: id,
                 title: SchoologyValue.string(item["title"] ?? item["assignment_title"] ?? item["assignmentTitle"], fallback: "Assignment"),
@@ -703,7 +715,7 @@ final class AppSession {
                 maxPoints: maxPoints,
                 due: SchoologyValue.string(item["due"] ?? item["due_date"] ?? item["dueDate"]),
                 comment: comment,
-                itemType: SchoologyValue.string(item["type"] ?? item["template_type"] ?? item["type_name"] ?? item["typeName"], fallback: "assignment")
+                itemType: itemType
             )
             grouped[periodID, default: [:]][categoryID, default: []].append(assignment)
         }

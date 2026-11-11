@@ -177,8 +177,8 @@ struct SchoologyGradesView: View {
                                             Text(course.courseTitle).font(.subheadline).foregroundStyle(.secondary)
                                         }
                                         if course.isGradeOverridden {
-                                            Label("Grade override", systemImage: "pencil.circle.fill")
-                                                .font(.caption.weight(.medium))
+                                            Label("Grade override", systemImage: "pencil")
+                                                .font(.caption.weight(.semibold))
                                                 .foregroundStyle(.orange)
                                                 .accessibilityLabel("Teacher-entered overall grade override")
                                         }

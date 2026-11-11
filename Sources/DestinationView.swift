@@ -482,7 +482,7 @@ struct UpcomingEventList: View {
                                 } label: {
                                     HStack(spacing: 12) {
                                         Image(systemName: icon(for: event.type))
-                                            .font(.title3)
+                                            .font(.system(size: 20, weight: .semibold))
                                             .foregroundStyle(SchoologyStyle.blue)
                                             .frame(width: 34)
                                         VStack(alignment: .leading, spacing: 4) {
@@ -545,7 +545,7 @@ struct UpcomingEventList: View {
 
     private func icon(for type: String) -> String {
         switch type {
-        case "assignment": "pencil.circle.fill"
+        case "assignment": "pencil"
         case "assessment", "assessment_v2", "managed_assessment", "quiz": "doc.text.magnifyingglass"
         case "discussion": "text.bubble"
         case "external_tool": "app"
