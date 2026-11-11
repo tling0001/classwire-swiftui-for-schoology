@@ -1,3 +1,16 @@
+## [2026.10.0-port.136]
+
+### Course Materials and Resources hierarchy
+- Restore the pre-port.124 Course Materials folder presentation: native inline DisclosureGroup folders, the original folder icon/title/description alignment, original vertical spacing, and native nested indentation.
+- Use the same recursive folder row across Course Materials, group resources, collections, standalone Resources, and the resource picker while preserving each view's loading, selection, preview, and navigation behavior.
+
+### Assignment icons
+- Use the pencil SF Symbol for assignments in Upcoming and Course Materials.
+
+### Build
+- Increment the Apple bundle marketing version to `2026.10.136` and build number to `136`.
+
+
 # Release notes
 
 ## [2026.10.0-port.135]

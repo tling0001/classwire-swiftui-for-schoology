@@ -545,7 +545,7 @@ struct UpcomingEventList: View {
 
     private func icon(for type: String) -> String {
         switch type {
-        case "assignment": "doc.text"
+        case "assignment": "pencil"
         case "assessment", "assessment_v2", "managed_assessment", "quiz": "doc.text.magnifyingglass"
         case "discussion": "text.bubble"
         case "external_tool": "app"

@@ -73,36 +73,51 @@ struct SchoologyInlineResourceItemRow: View {
                 }
                 .padding(.vertical, 6)
                 .accessibilityElement(children: .combine)
+                .transition(.opacity)
             } else if let loadError {
                 Label(loadError, systemImage: "exclamationmark.triangle")
-                    .font(.caption).foregroundStyle(.secondary).padding(.vertical, 6)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.vertical, 6)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
             } else if let children, children.isEmpty {
-                Text("This folder is empty").font(.caption).foregroundStyle(.secondary).padding(.vertical, 6)
+                Text("This folder is empty")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.vertical, 6)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
             } else if let children {
                 ForEach(children) { child in
                     SchoologyInlineResourceItemRow(item: child, source: source, selection: selection)
+                        .transition(.opacity.combined(with: .move(edge: .top)))
                 }
             }
         } label: {
             HStack(alignment: .center, spacing: 9) {
-                Image(systemName: "folder.fill").foregroundStyle(folderTint).frame(width: 20).accessibilityHidden(true)
+                Image(systemName: "folder.fill")
+                    .foregroundStyle(folderTint)
+                    .frame(width: 20)
+                    .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 3) {
                     Text(item.title).font(.body)
                     if !item.body.isEmpty {
-                        Text(item.body).font(.caption).foregroundStyle(.secondary)
-                            .lineLimit(nil).fixedSize(horizontal: false, vertical: true)
+                        Text(item.body)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(nil)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-            .padding(.vertical, 6)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.vertical, 8)
             .contentShape(Rectangle())
         }
         .animation(reduceMotion ? nil : .snappy(duration: 0.24), value: isExpanded)
-        .task(id: isExpanded) {
-            guard isExpanded, children == nil else { return }
-            await loadChildren()
+        .onChange(of: isExpanded) { _, expanded in
+            guard expanded, children == nil, !isLoading else { return }
+            Task { await loadChildren() }
         }
     }
 
@@ -213,6 +228,7 @@ struct SchoologyInlineResourceItemRow: View {
     private var resourceSymbol: String {
         let kind = item.kind.lowercased()
         if isLinkMaterial { return "link" }
+        if kind.contains("assignment") { return "pencil" }
         if kind.contains("page") { return "doc.text" }
         if kind.contains("assessment") || kind.contains("quiz") { return "checklist" }
         if kind.contains("discussion") { return "text.bubble" }
