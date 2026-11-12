@@ -34,7 +34,7 @@ targets:
         INFOPLIST_KEY_NSAppTransportSecurity_NSAllowsLocalNetworking: YES
         INFOPLIST_KEY_NSLocalNetworkUsageDescription: ClassWire can connect to an Ollama AI server on your local network.
         INFOPLIST_KEY_NSCameraUsageDescription: Take photos to attach to ClassWire posts, messages, and submissions, or scan a ClassWire QR code to sign in.
-        INFOPLIST_KEY_NSPhotoLibraryUsageDescription: Attach files and images to ClassWire assignments.
+        INFOPLIST_KEY_NSPhotoLibraryUsageDescription: Choose photos to attach to ClassWire posts, messages, and submissions.
         INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         UIBackgroundModes:
@@ -85,7 +85,7 @@ targets:
         INFOPLIST_KEY_NSAppTransportSecurity_NSAllowsLocalNetworking: YES
         INFOPLIST_KEY_NSLocalNetworkUsageDescription: ClassWire can connect to an Ollama AI server on your local network.
         INFOPLIST_KEY_NSCameraUsageDescription: Take photos to attach to ClassWire posts, messages, and submissions, or scan a ClassWire QR code to sign in.
-        INFOPLIST_KEY_NSPhotoLibraryUsageDescription: Attach files and images to ClassWire assignments.
+        INFOPLIST_KEY_NSPhotoLibraryUsageDescription: Choose photos to attach to ClassWire posts, messages, and submissions.
         INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         SUPPORTS_MACCATALYST: YES
