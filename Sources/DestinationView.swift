@@ -321,18 +321,8 @@ private struct SchoologyActivityCard: View {
                 }
             }
 
-            if !activity.body.isEmpty {
-                SchoologyRichTextText(activity.body, minimumFontSize: postMinimumFontSize)
-                    .font(.body)
-                    .textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-
-            ForEach(activity.imageURLs, id: \.absoluteString) { imageURL in
-                AuthenticatedSchoologyImage(url: imageURL, contentMode: .fit)
-                    .frame(maxWidth: .infinity)
-                    .frame(maxHeight: 420)
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
+            if !activity.body.isEmpty || !activity.imageURLs.isEmpty {
+                SchoologyActivityContentView(activity: activity, minimumFontSize: postMinimumFontSize)
             }
 
             if !activity.attachments.isEmpty {
