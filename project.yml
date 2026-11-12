@@ -8,8 +8,8 @@ options:
 settings:
   base:
     SWIFT_VERSION: "6.0"
-    MARKETING_VERSION: "2026.10.139"
-    CURRENT_PROJECT_VERSION: "139"
+    MARKETING_VERSION: "2026.10.140"
+    CURRENT_PROJECT_VERSION: "140"
     PRODUCT_NAME: ClassWire
     INFOPLIST_KEY_CFBundleDisplayName: ClassWire
     GENERATE_INFOPLIST_FILE: YES
@@ -33,7 +33,7 @@ targets:
         INFOPLIST_KEY_NSAppTransportSecurity_NSAllowsArbitraryLoads: NO
         INFOPLIST_KEY_NSAppTransportSecurity_NSAllowsLocalNetworking: YES
         INFOPLIST_KEY_NSLocalNetworkUsageDescription: ClassWire can connect to an Ollama AI server on your local network.
-        INFOPLIST_KEY_NSCameraUsageDescription: Scan a ClassWire QR code to sign in.
+        INFOPLIST_KEY_NSCameraUsageDescription: Take photos to attach to ClassWire posts, messages, and submissions, or scan a ClassWire QR code to sign in.
         INFOPLIST_KEY_NSPhotoLibraryUsageDescription: Attach files and images to ClassWire assignments.
         INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
@@ -84,7 +84,7 @@ targets:
         INFOPLIST_KEY_NSAppTransportSecurity_NSAllowsArbitraryLoads: NO
         INFOPLIST_KEY_NSAppTransportSecurity_NSAllowsLocalNetworking: YES
         INFOPLIST_KEY_NSLocalNetworkUsageDescription: ClassWire can connect to an Ollama AI server on your local network.
-        INFOPLIST_KEY_NSCameraUsageDescription: Scan a ClassWire QR code to sign in.
+        INFOPLIST_KEY_NSCameraUsageDescription: Take photos to attach to ClassWire posts, messages, and submissions, or scan a ClassWire QR code to sign in.
         INFOPLIST_KEY_NSPhotoLibraryUsageDescription: Attach files and images to ClassWire assignments.
         INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
@@ -131,7 +131,7 @@ targets:
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.education
         INFOPLIST_KEY_NSAppTransportSecurity_NSAllowsArbitraryLoads: NO
         INFOPLIST_KEY_NSAppTransportSecurity_NSAllowsLocalNetworking: YES
-        INFOPLIST_KEY_NSCameraUsageDescription: Scan a ClassWire QR code to sign in.
+        INFOPLIST_KEY_NSCameraUsageDescription: Take photos to attach to ClassWire posts, messages, and submissions, or scan a ClassWire QR code to sign in.
         ENABLE_APP_SANDBOX: NO
         ENABLE_HARDENED_RUNTIME: YES
     info:
