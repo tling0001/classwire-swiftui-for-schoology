@@ -1,3 +1,22 @@
+## [2026.10.0-port.140]
+
+### Composer photo attachments
+- Add a Camera action on iOS/iPadOS devices with a supported camera, using Apple's full-screen system camera interface.
+- Add Photo Library selection using SwiftUI PhotosPicker, with multiple-image selection and user-selected access only.
+- Reuse the photo controls in update, message/reply, discussion/event, and assignment-submission composers.
+- Rename attachment actions to File and Schoology Resources and place them below the photo actions.
+- Upload selected photos through the existing Schoology FileService and include them in the same message, update, discussion/event, or assignment submission payload as other files.
+- Keep photo uploads inside the existing progress/disabled states and show selected photo filenames before submitting.
+
+### Inline post images
+- Render post body text and embedded images in their original HTML order instead of collecting every image below the complete post body.
+- Recognize standard and lazy-loaded image source attributes, de-duplicate image URLs, and continue showing separate image-file attachments after the body.
+
+### Privacy and build
+- Update the camera permission explanation to cover taking photos for attachments as well as QR sign-in.
+- Increment the app marketing version to `2026.10.140` and build number to `140`.
+
+
 ## [2026.10.0-port.139]
 
 ### Gradebook navigation
