@@ -11,8 +11,10 @@ struct SchoologyAssignmentSubmissionComposerView: View {
     let onSubmitted: () -> Void
 
     @State private var selectedFiles: [URL] = []
+    @State private var selectedImages: [SchoologyComposerImage] = []
     @State private var selectedResources: [String: String] = [:]
     @State private var uploadedFileIDs: [String: String] = [:]
+    @State private var uploadedImageIDs: [String: String] = [:]
     @State private var showingFileImporter = false
     @State private var showingResourcePicker = false
     @State private var isSubmitting = false
@@ -22,15 +24,20 @@ struct SchoologyAssignmentSubmissionComposerView: View {
     @State private var comment = ""
     @State private var submissionCreated = false
 
-    private var hasAttachments: Bool { !selectedFiles.isEmpty || !selectedResources.isEmpty }
+    private var hasAttachments: Bool { !selectedFiles.isEmpty || !selectedImages.isEmpty || !selectedResources.isEmpty }
 
     var body: some View {
         NavigationStack {
             Form {
+                SchoologyComposerMediaPicker(
+                    isDisabled: isSubmitting,
+                    onImagesPicked: { selectedImages.append(contentsOf: $0) },
+                    onError: { errorMessage = $0 }
+                )
                 Section("Add to Submission") {
-                    Button("Choose Files", systemImage: "doc.badge.plus") { showingFileImporter = true }
+                    Button("File", systemImage: "paperclip") { showingFileImporter = true }
                         .disabled(isSubmitting)
-                    Button("Choose Resources", systemImage: "folder.badge.plus") { showingResourcePicker = true }
+                    Button("Schoology Resources", systemImage: "folder") { showingResourcePicker = true }
                         .disabled(isSubmitting)
                 }
                 if !selectedFiles.isEmpty {
@@ -58,6 +65,26 @@ struct SchoologyAssignmentSubmissionComposerView: View {
                         }
                     }
                 }
+                if !selectedImages.isEmpty {
+                    Section("Photos") {
+                        ForEach(selectedImages) { image in
+                            HStack(spacing: 9) {
+                                Image(systemName: "photo").foregroundStyle(.secondary)
+                                Text(image.filename)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                if !isSubmitting {
+                                    Button("Remove", systemImage: "xmark.circle") {
+                                        selectedImages.removeAll { $0.id == image.id }
+                                        uploadedImageIDs[image.id.uuidString] = nil
+                                    }
+                                    .labelStyle(.iconOnly)
+                                    .buttonStyle(.borderless)
+                                    .accessibilityLabel("Remove \(image.filename)")
+                                }
+                            }
+                        }
+                    }
+                }
                 if !selectedResources.isEmpty {
                     Section("Resources") {
                         ForEach(selectedResources.keys.sorted(), id: \.self) { resourceID in
@@ -82,10 +109,11 @@ struct SchoologyAssignmentSubmissionComposerView: View {
                         .lineLimit(2...5)
                         .focused($commentFocused)
                 }
-                if isSubmitting && !selectedFiles.isEmpty {
+                if isSubmitting && (!selectedFiles.isEmpty || !selectedImages.isEmpty) {
                     Section("Upload Progress") {
-                        ProgressView(value: Double(completedUploadCount), total: Double(max(selectedFiles.count, 1)))
-                        Text("\(completedUploadCount) of \(selectedFiles.count) files uploaded")
+                        let totalUploads = selectedFiles.count + selectedImages.count
+                        ProgressView(value: Double(completedUploadCount), total: Double(max(totalUploads, 1)))
+                        Text("\(completedUploadCount) of \(totalUploads) files uploaded")
                             .font(.caption).foregroundStyle(.secondary)
                     }
                 }
@@ -153,7 +181,7 @@ struct SchoologyAssignmentSubmissionComposerView: View {
         commentFocused = false
         isSubmitting = true
         errorMessage = nil
-        completedUploadCount = uploadedFileIDs.count
+        completedUploadCount = uploadedFileIDs.count + uploadedImageIDs.count
         defer { isSubmitting = false; uploadingFileID = nil }
         do {
             var fileIDs: [String] = []
@@ -177,6 +205,23 @@ struct SchoologyAssignmentSubmissionComposerView: View {
                 completedUploadCount += 1
                 uploadingFileID = nil
             }
+            for image in selectedImages {
+                if let existingID = uploadedImageIDs[image.id.uuidString] {
+                    fileIDs.append(existingID)
+                    continue
+                }
+                uploadingFileID = image.id.uuidString
+                let fileID = try await session.uploadAssignmentFile(
+                    data: image.data,
+                    filename: image.filename,
+                    mime: image.mimeType
+                )
+                uploadedImageIDs[image.id.uuidString] = fileID
+                fileIDs.append(fileID)
+                completedUploadCount += 1
+                uploadingFileID = nil
+            }
+
             try await session.submitAssignmentFiles(
                 fileIDs: fileIDs,
                 resourceIDs: selectedResources.keys.sorted(),
