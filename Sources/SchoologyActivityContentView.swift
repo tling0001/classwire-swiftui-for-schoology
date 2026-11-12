@@ -44,7 +44,7 @@ struct SchoologyActivityContentView: View {
     }
 
     private static func makeSegments(body: String, imageURLs: [URL]) -> [SchoologyActivityContentSegment] {
-        let tagPattern = #"<img\\b[^>]*>"#
+        let tagPattern = #"<img\b[^>]*>"#
         guard let tagRegex = try? NSRegularExpression(pattern: tagPattern, options: [.caseInsensitive]) else {
             var fallback: [SchoologyActivityContentSegment] = []
             if !body.isEmpty { fallback.append(.text(id: 0, html: body)) }
@@ -102,7 +102,7 @@ struct SchoologyActivityContentView: View {
     }
 
     private static func imageURL(in tag: String) -> URL? {
-        let pattern = #"(?is)\\b(?:src|data-src|data-original|data-lazy-src)\\s*=\\s*["']([^"']+)["']"#
+        let pattern = #"(?is)\b(?:src|data-src|data-original|data-lazy-src)\s*=\s*["']([^"']+)["']"#
         guard let regex = try? NSRegularExpression(pattern: pattern),
               let match = regex.firstMatch(in: tag, range: NSRange(tag.startIndex..<tag.endIndex, in: tag)),
               let range = Range(match.range(at: 1), in: tag) else { return nil }
