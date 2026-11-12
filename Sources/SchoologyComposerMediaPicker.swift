@@ -25,9 +25,9 @@ struct SchoologyComposerImage: Identifiable, Sendable {
 /// on iOS/iPadOS only when the device reports a camera is available.
 struct SchoologyComposerMediaPicker: View {
     let isDisabled: Bool
-    let onImagesPicked: ([SchoologyComposerImage]) async -> Void
-    let onError: (String) -> Void
-    let onActivityChanged: (Bool) -> Void
+    let onImagesPicked: @MainActor ([SchoologyComposerImage]) async -> Void
+    let onError: @MainActor (String) -> Void
+    let onActivityChanged: @MainActor (Bool) -> Void
 
     @State private var selectedPhotos: [PhotosPickerItem] = []
     @State private var isLoadingPhotos = false
