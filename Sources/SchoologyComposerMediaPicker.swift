@@ -63,14 +63,17 @@ struct SchoologyComposerMediaPicker: View {
         }
         #if os(iOS)
         .fullScreenCover(isPresented: $showingCamera) {
-            SchoologyCameraCaptureView { data in
-                let image = SchoologyComposerImage(
-                    data: data,
-                    filename: "Camera-\(UUID().uuidString.prefix(8)).jpg",
-                    mimeType: "image/jpeg"
-                )
-                onImagesPicked([image])
-            }
+            SchoologyCameraCaptureView(
+                onCapture: { data in
+                    let image = SchoologyComposerImage(
+                        data: data,
+                        filename: "Camera-\(UUID().uuidString.prefix(8)).jpg",
+                        mimeType: "image/jpeg"
+                    )
+                    onImagesPicked([image])
+                },
+                onDismiss: { showingCamera = false }
+            )
             .ignoresSafeArea()
         }
         #endif
@@ -116,9 +119,10 @@ struct SchoologyComposerMediaPicker: View {
 /// the native SwiftUI PhotosPicker above.
 private struct SchoologyCameraCaptureView: UIViewControllerRepresentable {
     let onCapture: (Data) -> Void
+    let onDismiss: () -> Void
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(onCapture: onCapture)
+        Coordinator(onCapture: onCapture, onDismiss: onDismiss)
     }
 
     func makeUIViewController(context: Context) -> UIImagePickerController {
@@ -134,9 +138,11 @@ private struct SchoologyCameraCaptureView: UIViewControllerRepresentable {
 
     final class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
         private let onCapture: (Data) -> Void
+        private let onDismiss: () -> Void
 
-        init(onCapture: @escaping (Data) -> Void) {
+        init(onCapture: @escaping (Data) -> Void, onDismiss: @escaping () -> Void) {
             self.onCapture = onCapture
+            self.onDismiss = onDismiss
         }
 
         func imagePickerController(
@@ -147,11 +153,11 @@ private struct SchoologyCameraCaptureView: UIViewControllerRepresentable {
                let data = image.jpegData(compressionQuality: 0.88) {
                 onCapture(data)
             }
-            picker.dismiss(animated: true)
+            picker.dismiss(animated: true, completion: onDismiss)
         }
 
         func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
-            picker.dismiss(animated: true)
+            picker.dismiss(animated: true, completion: onDismiss)
         }
     }
 }
