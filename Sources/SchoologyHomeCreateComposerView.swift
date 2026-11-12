@@ -111,9 +111,14 @@ struct SchoologyHomeCreateComposerView: View {
                         Toggle("Enable comments", isOn: $commentsEnabled)
                     }
                 }
+                SchoologyComposerMediaPicker(
+                    isDisabled: isUploading || isSubmitting,
+                    onImagesPicked: uploadImages,
+                    onError: { errorMessage = $0 }
+                )
                 Section("Attachments") {
-                    Button("Attach File", systemImage: "paperclip") { showingFileImporter = true }.disabled(isUploading || isSubmitting)
-                    Button("Attach Schoology Resource", systemImage: "folder") { showingResourcePicker = true }.disabled(isUploading || isSubmitting)
+                    Button("File", systemImage: "paperclip") { showingFileImporter = true }.disabled(isUploading || isSubmitting)
+                    Button("Schoology Resources", systemImage: "folder") { showingResourcePicker = true }.disabled(isUploading || isSubmitting)
                     ForEach(Array(attachmentNames.enumerated()), id: \.offset) { _, name in Label(name, systemImage: "paperclip").foregroundStyle(.secondary) }
                     if isUploading { ProgressView("Uploading attachment…") }
                 }
@@ -179,6 +184,24 @@ struct SchoologyHomeCreateComposerView: View {
         if action == .discussion && graded { guard let points = maxPointsValue, points > 0, factorValue > 0 else { return false } }
         if action == .event && hasEndDate && endDate < startDate { return false }
         return true
+    }
+
+    private func uploadImages(_ images: [SchoologyComposerImage]) {
+        guard !images.isEmpty else { return }
+        Task {
+            isUploading = true
+            errorMessage = nil
+            defer { isUploading = false }
+            do {
+                for image in images {
+                    let id = try await session.uploadMessageFile(data: image.data, filename: image.filename, mime: image.mimeType)
+                    fileIDs.append(id)
+                    attachmentNames.append(image.filename)
+                }
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+        }
     }
 
     private func importFiles(_ result: Result<[URL], Error>) {
