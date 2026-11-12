@@ -32,7 +32,8 @@ struct SchoologyAssignmentSubmissionComposerView: View {
                 SchoologyComposerMediaPicker(
                     isDisabled: isSubmitting,
                     onImagesPicked: { selectedImages.append(contentsOf: $0) },
-                    onError: { errorMessage = $0 }
+                    onError: { errorMessage = $0 },
+                    onActivityChanged: { isSubmitting = $0 }
                 )
                 Section("Add to Submission") {
                     Button("File", systemImage: "paperclip") { showingFileImporter = true }
