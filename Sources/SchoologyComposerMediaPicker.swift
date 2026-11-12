@@ -110,6 +110,7 @@ struct SchoologyComposerMediaPicker: View {
                     mimeType: type.preferredMIMEType ?? "image/jpeg"
                 ))
             }
+            isLoadingPhotos = false
             if !images.isEmpty {
                 await onImagesPicked(images)
             } else if !items.isEmpty {
@@ -143,6 +144,7 @@ private struct SchoologyCameraCaptureView: UIViewControllerRepresentable {
 
     func updateUIViewController(_ controller: UIImagePickerController, context: Context) {}
 
+    @MainActor
     final class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
         private let onCapture: (Data) -> Void
         private let onDismiss: () -> Void
