@@ -125,9 +125,10 @@ struct SchoologyComposerMediaPicker: View {
 #if os(iOS)
 /// Wraps Apple's full-screen system camera interface; the Photos library uses
 /// the native SwiftUI PhotosPicker above.
+@MainActor
 private struct SchoologyCameraCaptureView: UIViewControllerRepresentable {
-    let onCapture: (Data) -> Void
-    let onDismiss: () -> Void
+    let onCapture: @MainActor (Data) -> Void
+    let onDismiss: @MainActor () -> Void
 
     func makeCoordinator() -> Coordinator {
         Coordinator(onCapture: onCapture, onDismiss: onDismiss)
@@ -146,10 +147,10 @@ private struct SchoologyCameraCaptureView: UIViewControllerRepresentable {
 
     @MainActor
     final class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
-        private let onCapture: (Data) -> Void
-        private let onDismiss: () -> Void
+        private let onCapture: @MainActor (Data) -> Void
+        private let onDismiss: @MainActor () -> Void
 
-        init(onCapture: @escaping (Data) -> Void, onDismiss: @escaping () -> Void) {
+        init(onCapture: @escaping @MainActor (Data) -> Void, onDismiss: @escaping @MainActor () -> Void) {
             self.onCapture = onCapture
             self.onDismiss = onDismiss
         }
