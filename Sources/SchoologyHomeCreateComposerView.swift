@@ -111,13 +111,13 @@ struct SchoologyHomeCreateComposerView: View {
                         Toggle("Enable comments", isOn: $commentsEnabled)
                     }
                 }
-                SchoologyComposerMediaPicker(
-                    isDisabled: isUploading || isSubmitting,
-                    onImagesPicked: uploadImages,
-                    onError: { errorMessage = $0 },
-                    onActivityChanged: { isUploading = $0 }
-                )
                 Section("Attachments") {
+                    SchoologyComposerMediaPicker(
+                        isDisabled: isUploading || isSubmitting,
+                        onImagesPicked: uploadImages,
+                        onError: { errorMessage = $0 },
+                        onActivityChanged: { isUploading = $0 }
+                    )
                     Button("File", systemImage: "paperclip") { showingFileImporter = true }.disabled(isUploading || isSubmitting)
                     Button("Schoology Resources", systemImage: "folder") { showingResourcePicker = true }.disabled(isUploading || isSubmitting)
                     ForEach(Array(attachmentNames.enumerated()), id: \.offset) { _, name in Label(name, systemImage: "paperclip").foregroundStyle(.secondary) }

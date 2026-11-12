@@ -1,3 +1,13 @@
+## [2026.10.0-port.141]
+
+### Composer attachment layout
+- Put Camera, Photo Library, File, and Schoology Resources together in one Attachments section in message/reply, update, discussion/event, and assignment file-submission composers.
+- Keep selected files, photos, resources, upload progress, and submission behavior intact.
+
+### Build fixes
+- Fix image-upload error handling in message and update composers by avoiding shadowing the writable SwiftUI error state with the caught Error value.
+- Increment the app marketing version to `2026.10.141` and build number to `141`.
+
 ## [2026.10.0-port.140]
 
 ### Composer photo attachments

@@ -29,13 +29,13 @@ struct SchoologyAssignmentSubmissionComposerView: View {
     var body: some View {
         NavigationStack {
             Form {
-                SchoologyComposerMediaPicker(
-                    isDisabled: isSubmitting,
-                    onImagesPicked: { selectedImages.append(contentsOf: $0) },
-                    onError: { errorMessage = $0 },
-                    onActivityChanged: { isSubmitting = $0 }
-                )
-                Section("Add to Submission") {
+                Section("Attachments") {
+                    SchoologyComposerMediaPicker(
+                        isDisabled: isSubmitting,
+                        onImagesPicked: { selectedImages.append(contentsOf: $0) },
+                        onError: { errorMessage = $0 },
+                        onActivityChanged: { isSubmitting = $0 }
+                    )
                     Button("File", systemImage: "paperclip") { showingFileImporter = true }
                         .disabled(isSubmitting)
                     Button("Schoology Resources", systemImage: "folder") { showingResourcePicker = true }

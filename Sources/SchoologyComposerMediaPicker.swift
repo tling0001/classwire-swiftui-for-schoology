@@ -34,7 +34,7 @@ struct SchoologyComposerMediaPicker: View {
     @State private var showingCamera = false
 
     var body: some View {
-        Section("Photos") {
+        Group {
             #if os(iOS)
             if UIImagePickerController.isSourceTypeAvailable(.camera) {
                 Button("Camera", systemImage: "camera") {

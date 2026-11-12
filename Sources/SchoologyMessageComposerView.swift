@@ -115,13 +115,13 @@ struct SchoologyMessageComposerView: View {
                         if #available(iOS 26.0, macOS 26.0, *), focusedField != .message { formattingBar }
                     }
                 }
-                SchoologyComposerMediaPicker(
-                    isDisabled: isSending || isUploading,
-                    onImagesPicked: uploadImages,
-                    onError: { error = $0 },
-                    onActivityChanged: { isUploading = $0 }
-                )
                 Section("Attachments") {
+                    SchoologyComposerMediaPicker(
+                        isDisabled: isSending || isUploading,
+                        onImagesPicked: uploadImages,
+                        onError: { error = $0 },
+                        onActivityChanged: { isUploading = $0 }
+                    )
                     Button("File", systemImage: "paperclip") { showingFileImporter = true }
                         .disabled(isSending || isUploading)
                     Button("Schoology Resources", systemImage: "folder") { showingResourcePicker = true }
@@ -202,8 +202,8 @@ struct SchoologyMessageComposerView: View {
                 fileIDs.append(id)
                 attachmentNames.append(image.filename)
             }
-        } catch {
-            error = error.localizedDescription
+        } catch let uploadError {
+            self.error = uploadError.localizedDescription
         }
     }
 

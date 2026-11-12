@@ -80,13 +80,13 @@ struct SchoologyUpdateComposerView: View {
                     }
                 }
 
-                SchoologyComposerMediaPicker(
-                    isDisabled: isUploading || isPosting,
-                    onImagesPicked: uploadImages,
-                    onError: { error = $0 },
-                    onActivityChanged: { isUploading = $0 }
-                )
                 Section("Attachments") {
+                    SchoologyComposerMediaPicker(
+                        isDisabled: isUploading || isPosting,
+                        onImagesPicked: uploadImages,
+                        onError: { error = $0 },
+                        onActivityChanged: { isUploading = $0 }
+                    )
                     Button("File", systemImage: "paperclip") { showingFileImporter = true }
                         .disabled(isUploading || isPosting)
                     Button("Schoology Resources", systemImage: "folder") { showingResourcePicker = true }
@@ -158,8 +158,8 @@ struct SchoologyUpdateComposerView: View {
                 fileIDs.append(id)
                 attachmentNames.append(image.filename)
             }
-        } catch {
-            error = error.localizedDescription
+        } catch let uploadError {
+            self.error = uploadError.localizedDescription
         }
     }
 
