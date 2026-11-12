@@ -25,8 +25,9 @@ struct SchoologyComposerImage: Identifiable, Sendable {
 /// on iOS/iPadOS only when the device reports a camera is available.
 struct SchoologyComposerMediaPicker: View {
     let isDisabled: Bool
-    let onImagesPicked: ([SchoologyComposerImage]) -> Void
+    let onImagesPicked: ([SchoologyComposerImage]) async -> Void
     let onError: (String) -> Void
+    let onActivityChanged: (Bool) -> Void
 
     @State private var selectedPhotos: [PhotosPickerItem] = []
     @State private var isLoadingPhotos = false
@@ -70,7 +71,11 @@ struct SchoologyComposerMediaPicker: View {
                         filename: "Camera-\(UUID().uuidString.prefix(8)).jpg",
                         mimeType: "image/jpeg"
                     )
-                    onImagesPicked([image])
+                    onActivityChanged(true)
+                    Task {
+                        await onImagesPicked([image])
+                        onActivityChanged(false)
+                    }
                 },
                 onDismiss: { showingCamera = false }
             )
@@ -83,9 +88,11 @@ struct SchoologyComposerMediaPicker: View {
     private func loadPhotos(_ items: [PhotosPickerItem]) async {
         guard !isLoadingPhotos else { return }
         isLoadingPhotos = true
+        onActivityChanged(true)
         defer {
             isLoadingPhotos = false
             selectedPhotos = []
+            onActivityChanged(false)
         }
 
         var images: [SchoologyComposerImage] = []
@@ -104,7 +111,7 @@ struct SchoologyComposerMediaPicker: View {
                 ))
             }
             if !images.isEmpty {
-                onImagesPicked(images)
+                await onImagesPicked(images)
             } else if !items.isEmpty {
                 onError("The selected photos could not be read.")
             }
