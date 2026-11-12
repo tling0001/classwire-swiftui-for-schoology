@@ -114,7 +114,8 @@ struct SchoologyHomeCreateComposerView: View {
                 SchoologyComposerMediaPicker(
                     isDisabled: isUploading || isSubmitting,
                     onImagesPicked: uploadImages,
-                    onError: { errorMessage = $0 }
+                    onError: { errorMessage = $0 },
+                    onActivityChanged: { isUploading = $0 }
                 )
                 Section("Attachments") {
                     Button("File", systemImage: "paperclip") { showingFileImporter = true }.disabled(isUploading || isSubmitting)
@@ -186,21 +187,18 @@ struct SchoologyHomeCreateComposerView: View {
         return true
     }
 
-    private func uploadImages(_ images: [SchoologyComposerImage]) {
+    @MainActor
+    private func uploadImages(_ images: [SchoologyComposerImage]) async {
         guard !images.isEmpty else { return }
-        Task {
-            isUploading = true
-            errorMessage = nil
-            defer { isUploading = false }
-            do {
-                for image in images {
-                    let id = try await session.uploadMessageFile(data: image.data, filename: image.filename, mime: image.mimeType)
-                    fileIDs.append(id)
-                    attachmentNames.append(image.filename)
-                }
-            } catch {
-                errorMessage = error.localizedDescription
+        errorMessage = nil
+        do {
+            for image in images {
+                let id = try await session.uploadMessageFile(data: image.data, filename: image.filename, mime: image.mimeType)
+                fileIDs.append(id)
+                attachmentNames.append(image.filename)
             }
+        } catch {
+            errorMessage = error.localizedDescription
         }
     }
 
