@@ -115,10 +115,15 @@ struct SchoologyMessageComposerView: View {
                         if #available(iOS 26.0, macOS 26.0, *), focusedField != .message { formattingBar }
                     }
                 }
+                SchoologyComposerMediaPicker(
+                    isDisabled: isSending || isUploading,
+                    onImagesPicked: uploadImages,
+                    onError: { error = $0 }
+                )
                 Section("Attachments") {
-                    Button("Attach File", systemImage: "paperclip") { showingFileImporter = true }
+                    Button("File", systemImage: "paperclip") { showingFileImporter = true }
                         .disabled(isSending || isUploading)
-                    Button("Attach Schoology Resource", systemImage: "folder") { showingResourcePicker = true }
+                    Button("Schoology Resources", systemImage: "folder") { showingResourcePicker = true }
                         .disabled(isSending || isUploading)
                     ForEach(Array(attachmentNames.enumerated()), id: \.offset) { _, name in
                         Label(name, systemImage: "paperclip").foregroundStyle(.secondary)
@@ -184,6 +189,24 @@ struct SchoologyMessageComposerView: View {
     @available(iOS 26.0, macOS 26.0, *)
     private var formattingBar: some View {
         SchoologySubmissionFormattingBar(text: $formattedMessage, selection: $formattedSelection) { isShowingLinkPrompt = true }
+    }
+
+    private func uploadImages(_ images: [SchoologyComposerImage]) {
+        guard !images.isEmpty else { return }
+        Task {
+            isUploading = true
+            error = nil
+            defer { isUploading = false }
+            do {
+                for image in images {
+                    let id = try await session.uploadMessageFile(data: image.data, filename: image.filename, mime: image.mimeType)
+                    fileIDs.append(id)
+                    attachmentNames.append(image.filename)
+                }
+            } catch {
+                self.error = error.localizedDescription
+            }
+        }
     }
 
     private func importFiles(_ result: Result<[URL], Error>) {
