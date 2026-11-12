@@ -223,7 +223,7 @@ struct SchoologyActivity: Identifiable, Sendable {
 
     private static func imageURLs(in html: String, attachments: Any?) -> [URL] {
         var urls: [URL] = []
-        let pattern = #"(?is)<img\b[^>]*?\bsrc\s*=\s*["']([^"']+)["']"#
+        let pattern = #"(?is)<img\b[^>]*?\b(?:src|data-src|data-original|data-lazy-src)\s*=\s*["']([^"']+)["']"#
         if let regex = try? NSRegularExpression(pattern: pattern) {
             let range = NSRange(html.startIndex..<html.endIndex, in: html)
             for match in regex.matches(in: html, range: range) {
