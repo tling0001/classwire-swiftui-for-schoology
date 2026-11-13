@@ -1,3 +1,13 @@
+## [2026.10.0-port.145]
+
+### iPad group composer presentation
+- Remove the unused, competing profile-detail sheet presentation from `GroupProfileView`, leaving one sheet presenter for the group Create actions.
+- Keep group update, discussion, event, album, and resource creation flows and their existing permission checks, submission handlers, and refresh behavior.
+- Group resource and discussion details continue to use their existing navigation destinations.
+
+### Build
+- Increment the app marketing version to `2026.10.145` and build number to `145`.
+
 ## [2026.10.0-port.144]
 
 ### iPad composer presentation

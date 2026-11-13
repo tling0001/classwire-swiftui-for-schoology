@@ -31,7 +31,6 @@ struct GroupProfileView: View {
     @State private var loadingTabs: Set<ProfileTab> = []
     @State private var tabErrors: [ProfileTab: String] = [:]
     @State private var presentedAction: GroupProfileAction?
-    @State private var selectedDetail: SchoologyProfileItem?
 
     var body: some View {
         Group {
@@ -64,9 +63,6 @@ struct GroupProfileView: View {
             GroupProfileActionSheet(groupID: group.id, action: action) {
                 Task { await loadTab(tab, force: true) }
             }
-        }
-        .sheet(item: $selectedDetail) { item in
-            SchoologyProfileItemDetailSheet(item: item)
         }
     }
 
