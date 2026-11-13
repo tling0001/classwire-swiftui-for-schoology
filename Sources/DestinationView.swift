@@ -73,8 +73,15 @@ struct HomeView: View {
     @Environment(AppSession.self) private var session
     @State private var postableDestinations: [SchoologyUpdateDestination] = []
     @State private var createDestinations: [SchoologyHomeCreateDestination] = []
-    @State private var showingUpdateComposer = false
-    @State private var selectedCreateAction: SchoologyHomeCreateAction?
+    private enum ComposerPresentation: String, Identifiable {
+        case update
+        case discussion
+        case event
+
+        var id: String { rawValue }
+    }
+
+    @State private var presentedComposer: ComposerPresentation?
     @AppStorage("schoology.notifications.promptDismissed") private var didDismissNotificationPrompt = false
     @State private var shouldShowNotificationPrompt = false
     @State private var notificationPromptError: String?
@@ -129,27 +136,37 @@ struct HomeView: View {
             if !postableDestinations.isEmpty || !createDestinations.isEmpty {
                 ToolbarItem(placement: .primaryAction) {
                     Menu("Create", systemImage: "plus") {
-                        if !postableDestinations.isEmpty { Button("Post Update", systemImage: "square.and.pencil") { showingUpdateComposer = true } }
-                        if createDestinations.contains(where: \.canCreateDiscussion) { Button("Discussion", systemImage: "text.bubble") { selectedCreateAction = .discussion } }
-                        if createDestinations.contains(where: \.canCreateEvent) { Button("Event", systemImage: "calendar.badge.plus") { selectedCreateAction = .event } }
+                        if !postableDestinations.isEmpty { Button("Post Update", systemImage: "square.and.pencil") { presentedComposer = .update } }
+                        if createDestinations.contains(where: \.canCreateDiscussion) { Button("Discussion", systemImage: "text.bubble") { presentedComposer = .discussion } }
+                        if createDestinations.contains(where: \.canCreateEvent) { Button("Event", systemImage: "calendar.badge.plus") { presentedComposer = .event } }
                     }
                 }
             }
         }
-        .sheet(isPresented: $showingUpdateComposer) {
-            SchoologyUpdateComposerView(destinations: postableDestinations) {
-                Task {
-                    await session.refresh()
-                    postableDestinations = await session.loadPostableUpdateDestinations()
+        .sheet(item: $presentedComposer) { composer in
+            switch composer {
+            case .update:
+                SchoologyUpdateComposerView(destinations: postableDestinations) {
+                    Task {
+                        await session.refresh()
+                        postableDestinations = await session.loadPostableUpdateDestinations()
+                    }
                 }
-            }
-        }
-        .sheet(item: $selectedCreateAction) { action in
-            SchoologyHomeCreateComposerView(destinations: createDestinations, action: action) {
-                Task {
-                    await session.refresh()
-                    postableDestinations = await session.loadPostableUpdateDestinations()
-                    createDestinations = await session.loadHomeCreateDestinations()
+            case .discussion:
+                SchoologyHomeCreateComposerView(destinations: createDestinations, action: .discussion) {
+                    Task {
+                        await session.refresh()
+                        postableDestinations = await session.loadPostableUpdateDestinations()
+                        createDestinations = await session.loadHomeCreateDestinations()
+                    }
+                }
+            case .event:
+                SchoologyHomeCreateComposerView(destinations: createDestinations, action: .event) {
+                    Task {
+                        await session.refresh()
+                        postableDestinations = await session.loadPostableUpdateDestinations()
+                        createDestinations = await session.loadHomeCreateDestinations()
+                    }
                 }
             }
         }

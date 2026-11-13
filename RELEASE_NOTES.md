@@ -1,3 +1,13 @@
+## [2026.10.0-port.144]
+
+### iPad composer presentation
+- Consolidate Home's Post Update, Discussion, and Event composers behind one item-driven sheet presenter instead of attaching two competing sheet modifiers to the same view.
+- Keep each composer’s existing content, permissions, refresh behavior, and dismissal flow intact.
+- Use one active modal presentation at a time, following Apple's Human Interface Guidelines for sheets.
+
+### Build
+- Increment the app marketing version to `2026.10.144` and build number to `144`.
+
 ## [2026.10.0-port.143]
 
 ### iPad composer presentation
