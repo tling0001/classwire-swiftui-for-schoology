@@ -1,3 +1,17 @@
+## [2026.10.0-port.143]
+
+### iPad composer presentation
+- Move the camera's full-screen presentation from the shared attachment row to each composer's root navigation container, avoiding a presentation host nested inside a Form row.
+- Keep Camera, Photo Library, File, and Schoology Resources actions and their existing upload/staging behavior.
+
+### macOS ClassWire AI
+- Add ClassWire AI to the native macOS primary toolbar/title bar.
+- Anchor the existing 520 × 680 assistant popover to the toolbar button, retaining the current assistant view and Close action instead of converting it to a dialog.
+- Keep the floating assistant button on iOS/iPadOS and remove the duplicate floating control from macOS.
+
+### Build
+- Increment the app marketing version to `2026.10.143` and build number to `143`.
+
 ## [2026.10.0-port.142]
 
 ### Recent activity posts

@@ -49,12 +49,14 @@ struct RootView: View {
             rootNavigationContent
             #endif
         }
+        #if os(iOS)
         .overlay {
             if session.isSignedIn {
                 ClassWireAIFloatingAssistantOverlay()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
+        #endif
         .onOpenURL(perform: handleIncomingURL)
         .animation(reduceMotion ? nil : .snappy(duration: 0.24), value: session.isSignedIn)
         #if os(macOS)
@@ -73,6 +75,34 @@ struct RootView: View {
         #endif
         .toolbar {
             #if os(macOS)
+            if session.isSignedIn {
+                ToolbarItem(placement: .primaryAction) {
+                    Button("ClassWire AI", systemImage: "sparkles") {
+                        session.isAIAssistantPresented = true
+                    }
+                    .labelStyle(.iconOnly)
+                    .help("Open ClassWire AI")
+                    .popover(
+                        isPresented: Binding(
+                            get: { session.isAIAssistantPresented },
+                            set: { session.isAIAssistantPresented = $0 }
+                        ),
+                        arrowEdge: .top
+                    ) {
+                        NavigationStack {
+                            ClassWireAIAssistantView()
+                                .toolbar {
+                                    ToolbarItem(placement: .cancellationAction) {
+                                        Button("Close", systemImage: "xmark") {
+                                            session.isAIAssistantPresented = false
+                                        }
+                                    }
+                                }
+                        }
+                        .frame(width: 520, height: 680)
+                    }
+                }
+            }
             if session.isDemoMode {
                 ToolbarItem(placement: .status) { Label("Demo data", systemImage: "checkmark.seal.fill").foregroundStyle(.secondary) }
                 ToolbarItem(placement: .automatic) { Button("Exit Demo", systemImage: "rectangle.portrait.and.arrow.right", action: session.exitDemoMode) }

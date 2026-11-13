@@ -18,6 +18,7 @@ struct SchoologyUpdateComposerView: View {
     @State private var fileIDs: [String] = []
     @State private var resourceIDs: [String] = []
     @State private var attachmentNames: [String] = []
+    @State private var showingCameraCapture = false
     @State private var showingFileImporter = false
     @State private var showingResourcePicker = false
     @State private var isUploading = false
@@ -83,6 +84,7 @@ struct SchoologyUpdateComposerView: View {
                 Section("Attachments") {
                     SchoologyComposerMediaPicker(
                         isDisabled: isUploading || isPosting,
+                        onCameraRequested: { showingCameraCapture = true },
                         onImagesPicked: uploadImages,
                         onError: { error = $0 },
                         onActivityChanged: { isUploading = $0 }
@@ -131,6 +133,11 @@ struct SchoologyUpdateComposerView: View {
                 if selectedDestinationID.isEmpty { selectedDestinationID = destinations.first?.id ?? "" }
             }
         }
+        .schoologyComposerCameraCapture(
+            isPresented: $showingCameraCapture,
+            onImagesPicked: uploadImages,
+            onActivityChanged: { isUploading = $0 }
+        )
         .sheet(isPresented: $isShowingLinkPrompt) {
             if #available(iOS 26.0, macOS 26.0, *) {
                 SchoologyInsertLinkSheet(text: $formattedBody, selection: $formattedSelection) { message in error = message }

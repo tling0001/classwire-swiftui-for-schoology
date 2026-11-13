@@ -25,20 +25,20 @@ struct SchoologyComposerImage: Identifiable, Sendable {
 /// on iOS/iPadOS only when the device reports a camera is available.
 struct SchoologyComposerMediaPicker: View {
     let isDisabled: Bool
+    let onCameraRequested: @MainActor () -> Void
     let onImagesPicked: @MainActor ([SchoologyComposerImage]) async -> Void
     let onError: @MainActor (String) -> Void
     let onActivityChanged: @MainActor (Bool) -> Void
 
     @State private var selectedPhotos: [PhotosPickerItem] = []
     @State private var isLoadingPhotos = false
-    @State private var showingCamera = false
 
     var body: some View {
         Group {
             #if os(iOS)
             if UIImagePickerController.isSourceTypeAvailable(.camera) {
                 Button("Camera", systemImage: "camera") {
-                    showingCamera = true
+                    onCameraRequested()
                 }
                 .disabled(isDisabled || isLoadingPhotos)
                 .accessibilityHint("Take a new photo to attach")
@@ -62,26 +62,6 @@ struct SchoologyComposerMediaPicker: View {
             guard !items.isEmpty else { return }
             Task { await loadPhotos(items) }
         }
-        #if os(iOS)
-        .fullScreenCover(isPresented: $showingCamera) {
-            SchoologyCameraCaptureView(
-                onCapture: { data in
-                    let image = SchoologyComposerImage(
-                        data: data,
-                        filename: "Camera-\(UUID().uuidString.prefix(8)).jpg",
-                        mimeType: "image/jpeg"
-                    )
-                    onActivityChanged(true)
-                    Task {
-                        await onImagesPicked([image])
-                        onActivityChanged(false)
-                    }
-                },
-                onDismiss: { showingCamera = false }
-            )
-            .ignoresSafeArea()
-        }
-        #endif
     }
 
     @MainActor
@@ -119,6 +99,54 @@ struct SchoologyComposerMediaPicker: View {
         } catch {
             onError("Could not load the selected photos: \(error.localizedDescription)")
         }
+    }
+}
+
+/// Hosts the camera presentation at the composer's root navigation container,
+/// rather than inside a Form row. This gives UIKit a stable presentation anchor
+/// on iPad while preserving the system camera interface.
+struct SchoologyComposerCameraCaptureModifier: ViewModifier {
+    @Binding var isPresented: Bool
+    let onImagesPicked: @MainActor ([SchoologyComposerImage]) async -> Void
+    let onActivityChanged: @MainActor (Bool) -> Void
+
+    func body(content: Content) -> some View {
+        #if os(iOS)
+        content.fullScreenCover(isPresented: $isPresented) {
+            SchoologyCameraCaptureView(
+                onCapture: { data in
+                    let image = SchoologyComposerImage(
+                        data: data,
+                        filename: "Camera-\(UUID().uuidString.prefix(8)).jpg",
+                        mimeType: "image/jpeg"
+                    )
+                    onActivityChanged(true)
+                    Task { @MainActor in
+                        await onImagesPicked([image])
+                        onActivityChanged(false)
+                    }
+                },
+                onDismiss: { isPresented = false }
+            )
+            .ignoresSafeArea()
+        }
+        #else
+        content
+        #endif
+    }
+}
+
+extension View {
+    func schoologyComposerCameraCapture(
+        isPresented: Binding<Bool>,
+        onImagesPicked: @escaping @MainActor ([SchoologyComposerImage]) async -> Void,
+        onActivityChanged: @escaping @MainActor (Bool) -> Void
+    ) -> some View {
+        modifier(SchoologyComposerCameraCaptureModifier(
+            isPresented: isPresented,
+            onImagesPicked: onImagesPicked,
+            onActivityChanged: onActivityChanged
+        ))
     }
 }
 

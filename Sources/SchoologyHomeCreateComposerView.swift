@@ -32,6 +32,7 @@ struct SchoologyHomeCreateComposerView: View {
     @State private var fileIDs: [String] = []
     @State private var resourceIDs: [String] = []
     @State private var attachmentNames: [String] = []
+    @State private var showingCameraCapture = false
     @State private var showingFileImporter = false
     @State private var showingResourcePicker = false
     @State private var isUploading = false
@@ -114,6 +115,7 @@ struct SchoologyHomeCreateComposerView: View {
                 Section("Attachments") {
                     SchoologyComposerMediaPicker(
                         isDisabled: isUploading || isSubmitting,
+                        onCameraRequested: { showingCameraCapture = true },
                         onImagesPicked: uploadImages,
                         onError: { errorMessage = $0 },
                         onActivityChanged: { isUploading = $0 }
@@ -154,6 +156,11 @@ struct SchoologyHomeCreateComposerView: View {
             .task { if selectedDestinationID.isEmpty { selectedDestinationID = eligible.first?.id ?? "" } }
             .interactiveDismissDisabled(isSubmitting || isUploading)
         }
+        .schoologyComposerCameraCapture(
+            isPresented: $showingCameraCapture,
+            onImagesPicked: uploadImages,
+            onActivityChanged: { isUploading = $0 }
+        )
         .sheet(isPresented: $isShowingLinkPrompt) {
             if #available(iOS 26.0, macOS 26.0, *) {
                 SchoologyInsertLinkSheet(text: $formattedBody, selection: $formattedSelection) { message in

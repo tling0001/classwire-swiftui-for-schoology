@@ -15,6 +15,7 @@ struct SchoologyAssignmentSubmissionComposerView: View {
     @State private var selectedResources: [String: String] = [:]
     @State private var uploadedFileIDs: [String: String] = [:]
     @State private var uploadedImageIDs: [String: String] = [:]
+    @State private var showingCameraCapture = false
     @State private var showingFileImporter = false
     @State private var showingResourcePicker = false
     @State private var isSubmitting = false
@@ -32,6 +33,7 @@ struct SchoologyAssignmentSubmissionComposerView: View {
                 Section("Attachments") {
                     SchoologyComposerMediaPicker(
                         isDisabled: isSubmitting,
+                        onCameraRequested: { showingCameraCapture = true },
                         onImagesPicked: { selectedImages.append(contentsOf: $0) },
                         onError: { errorMessage = $0 },
                         onActivityChanged: { isSubmitting = $0 }
@@ -148,6 +150,11 @@ struct SchoologyAssignmentSubmissionComposerView: View {
                 }
             }
         }
+        .schoologyComposerCameraCapture(
+            isPresented: $showingCameraCapture,
+            onImagesPicked: { selectedImages.append(contentsOf: $0) },
+            onActivityChanged: { isSubmitting = $0 }
+        )
         .fileImporter(isPresented: $showingFileImporter, allowedContentTypes: [.item], allowsMultipleSelection: true) { result in
             switch result {
             case .success(let urls):
