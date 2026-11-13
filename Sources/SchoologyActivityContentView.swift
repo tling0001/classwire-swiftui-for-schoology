@@ -96,9 +96,24 @@ struct SchoologyActivityContentView: View {
         identity: inout Int,
         to output: inout [SchoologyActivityContentSegment]
     ) {
-        guard !html.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
-        output.append(.text(id: identity, html: html))
+        // Schoology sometimes serializes an empty paragraph before the first
+        // authored paragraph. Rich-text HTML importers preserve that block's
+        // vertical paragraph spacing, which looks like excess card padding.
+        let content = output.isEmpty ? removingLeadingEmptyBlocks(from: html) : html
+        guard !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        output.append(.text(id: identity, html: content))
         identity += 1
+    }
+
+    private static func removingLeadingEmptyBlocks(from html: String) -> String {
+        var content = html.trimmingCharacters(in: .whitespacesAndNewlines)
+        let emptyBlockPattern = #"(?is)^(?:(?:<p\b[^>]*>\s*(?:(?:<br\b[^>]*\s*/?>)|&nbsp;|&#(?:0*160|x0*a0);|\s)*</p>)|(?:<div\b[^>]*>\s*(?:(?:<br\b[^>]*\s*/?>)|&nbsp;|&#(?:0*160|x0*a0);|\s)*</div>)|<br\b[^>]*\s*/?>)\s*"#
+        while let range = content.range(of: emptyBlockPattern, options: .regularExpression),
+              range.lowerBound == content.startIndex {
+            content.removeSubrange(range)
+            content = content.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        return content
     }
 
     private static func imageURL(in tag: String) -> URL? {

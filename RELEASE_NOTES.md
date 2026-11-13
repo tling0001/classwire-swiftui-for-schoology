@@ -1,3 +1,12 @@
+## [2026.10.0-port.142]
+
+### Recent activity posts
+- Remove leading empty HTML paragraphs and line breaks from the first text segment of a post before rendering it.
+- Prevent empty rich-text blocks at the start of a post from creating a large blank gap above the authored content, while preserving meaningful paragraphs, inline images, and spacing elsewhere.
+
+### Build
+- Increment the app marketing version to `2026.10.142` and build number to `142`.
+
 ## [2026.10.0-port.141]
 
 ### Composer attachment layout
