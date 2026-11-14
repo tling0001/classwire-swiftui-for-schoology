@@ -555,7 +555,7 @@ struct UpcomingEventList: View {
         case "assignment": "pencil"
         case "assessment", "assessment_v2", "managed_assessment", "quiz": "doc.text.magnifyingglass"
         case "discussion": "text.bubble"
-        case "external_tool": "app"
+        case "external_tool", "lti", "lti_assignment": "app"
         case "event": "calendar"
         default: "calendar"
         }
@@ -629,6 +629,8 @@ struct UpcomingEventDetailView: View {
             if let sectionID = event.sectionID ?? (eventRealmTarget?.realm == "sections" ? eventRealmTarget?.realmID : nil),
                let assignmentID = event.assignmentID {
                 SchoologyAssignmentDetailView(sectionID: sectionID, assignmentID: assignmentID, title: event.title)
+            } else if let url = event.webURL {
+                SchoologyEmbeddedWebView(url: url, title: event.title)
             } else {
                 unavailableTarget("This assignment is missing its section or assignment identifier.")
             }

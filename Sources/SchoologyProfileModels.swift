@@ -22,6 +22,9 @@ struct SchoologyProfileItem: Identifiable, Sendable {
     var fileMIME: String = ""
     var documentType: String = ""
     var folderColor: String = "blue"
+    var isAvailable: Bool = true
+    var hasCompletionRules: Bool = false
+    var isCompleted: Bool? = nil
 
     var isFolder: Bool { kind.lowercased() == "folder" || documentType.lowercased() == "folder" }
 
@@ -44,6 +47,12 @@ struct SchoologyProfileItem: Identifiable, Sendable {
                 templateFields["color"] ?? templateFields["folder_color"] ?? templateFields["folderColor"],
                 fallback: "blue"
             ).lowercased()
+            let availabilityValue = item["available"] ?? item["is_available"] ?? item["isAvailable"]
+            let isAvailable = availabilityValue == nil ? true : SchoologyValue.bool(availabilityValue)
+            let completionRulesValue = item["has_rules"] ?? item["hasRules"] ?? item["has_completion_rules"] ?? item["hasCompletionRules"]
+            let completionValue = item["completed"] ?? item["is_completed"] ?? item["isCompleted"]
+            let hasCompletionRules = SchoologyValue.bool(completionRulesValue)
+            let isCompleted = completionValue == nil ? nil : SchoologyValue.bool(completionValue)
             let rawID: Any?
             if nestedPerson != nil {
                 rawID = person["id"] ?? person["uid"] ?? person["user_id"] ?? item["user_id"] ?? item["userId"] ?? item["uid"] ?? item["id"]
@@ -89,7 +98,7 @@ struct SchoologyProfileItem: Identifiable, Sendable {
                 title: rawTitle.isEmpty ? (displayName.isEmpty ? "ClassWire" : displayName) : rawTitle,
                 body: SchoologyValue.plainText(SchoologyValue.string(item["body"] ?? item["description"] ?? item["folder_description"] ?? item["folderDescription"] ?? item["message"] ?? person["bio"] ?? person["about"])),
                 subtitle: subtitle,
-                url: SchoologyValue.url(person["profile_url"] ?? person["profileUrl"] ?? item["link"] ?? item["url"] ?? item["web_url"] ?? item["webUrl"] ?? file["file_download_url"] ?? file["fileDownloadURL"] ?? file["download_path"] ?? file["downloadPath"] ?? item["file_download_url"] ?? item["download_path"] ?? item["photo_url"] ?? item["photoUrl"] ?? item["original_url"] ?? item["originalUrl"]),
+                url: SchoologyValue.url(person["profile_url"] ?? person["profileUrl"] ?? item["link"] ?? item["url"] ?? item["web_url"] ?? item["webUrl"] ?? item["location"] ?? file["file_download_url"] ?? file["fileDownloadURL"] ?? file["download_path"] ?? file["downloadPath"] ?? item["file_download_url"] ?? item["download_path"] ?? item["photo_url"] ?? item["photoUrl"] ?? item["original_url"] ?? item["originalUrl"]),
                 isAdmin: isAdmin,
                 kind: normalizedKind,
                 collectionID: SchoologyValue.optionalString(item["collection_id"] ?? item["collectionID"] ?? item["collectionId"]),
@@ -103,7 +112,10 @@ struct SchoologyProfileItem: Identifiable, Sendable {
                 fileName: fileName,
                 fileMIME: fileMIME,
                 documentType: documentType,
-                folderColor: folderColor
+                folderColor: folderColor,
+                isAvailable: isAvailable,
+                hasCompletionRules: hasCompletionRules,
+                isCompleted: isCompleted
             )
         }
     }

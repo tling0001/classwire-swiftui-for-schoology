@@ -10,6 +10,12 @@ private enum SchoologyCourseTab: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
+private enum SchoologyCourseComposerPresentation: String, Identifiable {
+    case update
+    case event
+    var id: String { rawValue }
+}
+
 struct SchoologyCourseProfileView: View {
     @Environment(AppSession.self) private var session
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
@@ -27,7 +33,8 @@ struct SchoologyCourseProfileView: View {
     @State private var schoolName = ""
     @State private var schoolID: String?
     @State private var permissions: SchoologyCoursePermissions?
-    @State private var showingUpdateComposer = false
+    @State private var composerPresentation: SchoologyCourseComposerPresentation?
+    @State private var eventDestinations: [SchoologyHomeCreateDestination] = []
     @State private var showingResourceCreator = false
 
     private var profileNavigationTitle: String {
@@ -54,14 +61,17 @@ struct SchoologyCourseProfileView: View {
         .navigationTitle(profileNavigationTitle)
         .onAppear { session.setAICourseContext(courseID: course.id, title: course.title) }
         .toolbar {
-            if permissions?.canPostUpdates == true || permissions?.canAddResources == true {
+            if permissions?.canPostUpdates == true || permissions?.canAddResources == true || !eventDestinations.isEmpty {
                 ToolbarItem(placement: .primaryAction) {
                     Menu("Course Actions", systemImage: "plus") {
                         if permissions?.canPostUpdates == true {
-                            Button("Post Update", systemImage: "square.and.pencil") { showingUpdateComposer = true }
+                            Button("Post Update", systemImage: "square.and.pencil") { composerPresentation = .update }
                         }
                         if permissions?.canAddResources == true {
                             Button("Add Resources", systemImage: "folder.badge.plus") { showingResourceCreator = true }
+                        }
+                        if !eventDestinations.isEmpty {
+                            Button("Create Event", systemImage: "calendar.badge.plus") { composerPresentation = .event }
                         }
                     }
                 }
@@ -80,10 +90,17 @@ struct SchoologyCourseProfileView: View {
                 .disabled(loadingTabs.contains(tab))
             }
         }
-        .sheet(isPresented: $showingUpdateComposer) {
-            SchoologyUpdateComposerView(destinations: [
-                SchoologyUpdateDestination(realm: "sections", resourceID: course.id, title: course.title)
-            ]) { Task { await loadTab(.updates, force: true) } }
+        .sheet(item: $composerPresentation) { presentation in
+            switch presentation {
+            case .update:
+                SchoologyUpdateComposerView(destinations: [
+                    SchoologyUpdateDestination(realm: "sections", resourceID: course.id, title: course.title)
+                ]) { Task { await loadTab(.updates, force: true) } }
+            case .event:
+                SchoologyHomeCreateComposerView(destinations: eventDestinations, action: .event) {
+                    Task { await loadTab(.upcoming, force: true) }
+                }
+            }
         }
         .navigationDestination(isPresented: $showingResourceCreator) {
             if let url = resourceCreatorURL {
@@ -97,9 +114,14 @@ struct SchoologyCourseProfileView: View {
             async let loadedName = session.loadSchoolName(for: course)
             async let loadedSchoolID = session.loadSchoolID(for: course)
             async let loadedPermissions = session.loadCoursePermissions(courseID: course.id)
+            async let loadedDestinations = session.loadHomeCreateDestinations()
             schoolName = await loadedName
             schoolID = await loadedSchoolID
             permissions = await loadedPermissions
+            let destinations = await loadedDestinations
+            eventDestinations = destinations.filter {
+                $0.canCreateEvent && $0.realm == "sections" && $0.resourceID == course.id
+            }
         }
         .refreshable { await loadTab(tab, force: true) }
     }
@@ -351,7 +373,9 @@ struct SchoologyCourseMaterialDestinationView: View {
     var body: some View {
         if item.isFolder {
             SchoologyCourseResourceFolderView(courseID: courseID, item: item)
-        } else if item.kind.lowercased() == "document" {
+        } else if item.kind.lowercased() == "media-album" {
+            SchoologyCourseAlbumDetailView(courseID: courseID, albumID: item.id, title: item.title)
+        } else if requiresDocumentResolution {
             Group {
                 if isResolvingAttachment {
                     ProgressView("Loading material…")
@@ -399,6 +423,13 @@ struct SchoologyCourseMaterialDestinationView: View {
         }
     }
 
+    private var requiresDocumentResolution: Bool {
+        let kind = item.kind.lowercased()
+        let documentType = item.documentType.lowercased()
+        return ["document", "package", "web_package", "scorm"].contains(kind) ||
+            ["external_tool", "video", "embed"].contains(documentType)
+    }
+
     private var isFileAttachment: Bool {
         let kind = item.kind.lowercased()
         if ["file", "document", "attachment", "file_attachment"].contains(kind) { return true }
@@ -420,5 +451,92 @@ struct SchoologyCourseMaterialDestinationView: View {
         } catch {
             attachmentError = error.localizedDescription
         }
+    }
+}
+
+
+struct SchoologyCourseAlbumDetailView: View {
+    @Environment(AppSession.self) private var session
+    let courseID: String
+    let albumID: String
+    let title: String
+    @State private var media: [SchoologyProfileItem] = []
+    @State private var isLoading = true
+    @State private var error: String?
+
+    var body: some View {
+        ScrollView {
+            if isLoading {
+                ProgressView("Loading album…").padding()
+            } else if let error {
+                ContentUnavailableView("Unable to load album", systemImage: "exclamationmark.triangle", description: Text(error))
+            } else if media.isEmpty {
+                ContentUnavailableView("No album photos", systemImage: "photo.on.rectangle")
+            } else {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 180), spacing: 12)], spacing: 12) {
+                    ForEach(media) { item in
+                        VStack(alignment: .leading, spacing: 6) {
+                            albumMediaPreview(item)
+                            Text(item.title).font(.subheadline).lineLimit(2)
+                        }
+                        .padding(8)
+                        .background(.background, in: RoundedRectangle(cornerRadius: 12))
+                    }
+                }
+                .padding()
+            }
+        }
+        .navigationTitle(title)
+        .task(id: albumID) {
+            isLoading = true
+            error = nil
+            do { media = try await session.loadCourseAlbum(courseID: courseID, albumID: albumID) }
+            catch { self.error = error.localizedDescription }
+            isLoading = false
+        }
+        .refreshable {
+            isLoading = true
+            error = nil
+            do { media = try await session.loadCourseAlbum(courseID: courseID, albumID: albumID) }
+            catch { self.error = error.localizedDescription }
+            isLoading = false
+        }
+    }
+
+    @ViewBuilder
+    private func albumMediaPreview(_ item: SchoologyProfileItem) -> some View {
+        if let attachment = mediaAttachment(item) {
+            SchoologyAttachmentPreviewButton(attachment: attachment, automaticallyPresent: true)
+                .frame(maxWidth: .infinity)
+                .frame(height: 180)
+        } else if let url = item.url {
+            AuthenticatedSchoologyImage(url: url, contentMode: .fit)
+                .frame(maxWidth: .infinity)
+                .frame(height: 180)
+                .clipped()
+        } else {
+            Image(systemName: "photo")
+                .font(.largeTitle)
+                .frame(maxWidth: .infinity)
+                .frame(height: 180)
+                .background(.quaternary)
+        }
+    }
+
+    private func mediaAttachment(_ item: SchoologyProfileItem) -> SchoologyAttachment? {
+        guard let url = item.url else { return nil }
+        let filename = item.fileName.isEmpty ? url.lastPathComponent : item.fileName
+        let ext = URL(fileURLWithPath: filename).pathExtension.lowercased()
+        let mime = item.fileMIME.lowercased()
+        let previewExtensions: Set<String> = [
+            "mp4", "m4v", "mov", "webm", "avi", "mkv", "3gp", "wmv", "mpeg", "mpg",
+            "mp3", "m4a", "aac", "wav", "aiff", "aif", "flac", "ogg", "oga", "opus", "wma", "caf",
+            "pdf", "doc", "docx", "ppt", "pptx", "xls", "xlsx", "csv", "txt", "rtf"
+        ]
+        guard mime.hasPrefix("video/") || mime.hasPrefix("audio/") ||
+                (!mime.isEmpty && !mime.hasPrefix("image/")) || previewExtensions.contains(ext) else {
+            return nil
+        }
+        return SchoologyAttachment(title: filename.isEmpty ? item.title : filename, url: url)
     }
 }

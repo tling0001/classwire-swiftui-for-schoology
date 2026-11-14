@@ -33,7 +33,7 @@ struct SchoologyRichTextText: View {
                         .textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 } else {
-                    Text(value)
+                    Text(SchoologyValue.plainText(value))
                 }
 
                 ForEach(embeddedURLs, id: \.absoluteString) { url in
@@ -55,10 +55,17 @@ struct SchoologyRichTextText: View {
     }
 
     private static func containsHTML(_ value: String) -> Bool {
-        value.range(of: #"<[a-zA-Z][^>]*>"#, options: .regularExpression) != nil
+        value.range(of: #"</?[a-zA-Z][^>]*>"#, options: .regularExpression) != nil
+    }
+
+    private static func normalizedHTMLFragment(_ html: String) -> String {
+        var fragment = html.replacingOccurrences(of: #"\\(?=</?[a-zA-Z][^>]*>)"#, with: "", options: .regularExpression)
+        fragment = fragment.replacingOccurrences(of: #"(?is)</?(?:html|body)\b[^>]*>"#, with: "", options: .regularExpression)
+        return fragment.replacingOccurrences(of: #"(?is)<!doctype[^>]*>"#, with: "", options: .regularExpression)
     }
 
     private static func attributedHTML(_ html: String, colorScheme: ColorScheme, minimumFontSize: CGFloat?) -> AttributedString? {
+        let html = normalizedHTMLFragment(html)
         let cacheKey = "\(colorScheme == .dark ? "dark" : "light")|\(minimumFontSize.map { String(describing: $0) } ?? "default")|\(html)" as NSString
         if let cached = attributedHTMLCache.object(forKey: cacheKey) {
             return AttributedString(cached)

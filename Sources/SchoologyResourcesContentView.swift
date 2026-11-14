@@ -112,6 +112,7 @@ struct SchoologyInlineResourceItemRow: View {
                             .lineLimit(nil)
                             .fixedSize(horizontal: false, vertical: true)
                     }
+                    SchoologyCourseMaterialStatusLabel(item: item)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
@@ -120,6 +121,7 @@ struct SchoologyInlineResourceItemRow: View {
             .contentShape(Rectangle())
         }
         .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
+        .disabled(!item.isAvailable)
         .animation(reduceMotion ? nil : .snappy(duration: 0.24), value: isExpanded)
         .onChange(of: isExpanded) { _, expanded in
             guard expanded, children == nil, !isLoading else { return }
@@ -138,9 +140,13 @@ struct SchoologyInlineResourceItemRow: View {
             selection.wrappedValue = selected
         } label: {
             HStack(spacing: 10) {
-                Label(item.title, systemImage: resourceSymbol)
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(.primary).frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                VStack(alignment: .leading, spacing: 3) {
+                    Label(item.title, systemImage: resourceSymbol)
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(.primary)
+                    SchoologyCourseMaterialStatusLabel(item: item)
+                }
+                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                 if selection.wrappedValue[item.id] != nil {
                     Image(systemName: "checkmark.circle.fill").foregroundStyle(.tint).accessibilityHidden(true)
                 }
@@ -148,6 +154,7 @@ struct SchoologyInlineResourceItemRow: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .disabled(!item.isAvailable)
         .accessibilityValue(selection.wrappedValue[item.id] == nil ? "Not selected" : "Selected")
     }
 
@@ -159,42 +166,63 @@ struct SchoologyInlineResourceItemRow: View {
             NavigationLink {
                 SchoologyCourseMaterialDestinationView(courseID: courseID, item: item)
             } label: {
-                Label(item.title, systemImage: resourceSymbol)
-                    .font(.body.weight(.semibold))
-                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                    .contentShape(Rectangle())
+                HStack(spacing: 10) {
+                    Label(item.title, systemImage: resourceSymbol)
+                        .font(.body.weight(.semibold))
+                        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                    SchoologyCourseMaterialStatusLabel(item: item)
+                }
+                .contentShape(Rectangle())
             }
+            .disabled(!item.isAvailable)
         }
     }
 
     @ViewBuilder
     private var resourceItemRow: some View {
-        if isLinkMaterial, let url = item.url ?? item.fileViewURL {
-            Link(destination: url) {
-                Label(item.title, systemImage: "link")
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .contentShape(Rectangle())
+        if item.documentType.lowercased() == "external_tool", let url = item.url ?? item.fileViewURL {
+            NavigationLink {
+                SchoologyEmbeddedWebView(url: url, title: item.title)
+            } label: {
+                resourceRowLabel
             }
+            .disabled(!item.isAvailable)
+        } else if isLinkMaterial, let url = item.url ?? item.fileViewURL {
+            NavigationLink {
+                SchoologyEmbeddedWebView(url: url, title: item.title)
+            } label: {
+                resourceRowLabel
+            }
+            .disabled(!item.isAvailable)
         } else if let attachment {
-            SchoologyAttachmentPreviewButton(attachment: attachment).frame(maxWidth: .infinity, alignment: .leading)
+            SchoologyAttachmentPreviewButton(attachment: attachment)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .disabled(!item.isAvailable)
         } else if let url = item.url {
             NavigationLink {
                 SchoologyEmbeddedWebView(url: url, title: item.title)
             } label: {
-                Label(item.title, systemImage: resourceSymbol)
-                    .font(.body.weight(.semibold))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .contentShape(Rectangle())
+                resourceRowLabel
             }
+            .disabled(!item.isAvailable)
         } else {
             NavigationLink {
                 SchoologyProfileItemDetailSheet(item: item)
             } label: {
-                Label(item.title, systemImage: resourceSymbol)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .contentShape(Rectangle())
+                resourceRowLabel
             }
+            .disabled(!item.isAvailable)
         }
+    }
+
+    private var resourceRowLabel: some View {
+        HStack(spacing: 10) {
+            Label(item.title, systemImage: resourceSymbol)
+                .font(.body.weight(.semibold))
+                .frame(maxWidth: .infinity, alignment: .leading)
+            SchoologyCourseMaterialStatusLabel(item: item)
+        }
+        .contentShape(Rectangle())
     }
 
     private var folderTint: Color {
@@ -211,11 +239,16 @@ struct SchoologyInlineResourceItemRow: View {
         }
     }
 
-    private var isLinkMaterial: Bool { item.documentType == "link" || item.kind.lowercased().contains("link") }
+    private var isLinkMaterial: Bool {
+        let kind = item.kind.lowercased()
+        let documentType = item.documentType.lowercased()
+        return documentType == "link" || documentType == "external_tool" || kind.contains("link")
+    }
 
     private var isFileMaterial: Bool {
         let kind = item.kind.lowercased()
-        if ["document", "file", "attachment", "file_attachment"].contains(kind) { return true }
+        let documentType = item.documentType.lowercased()
+        if ["file", "attachment", "file_attachment"].contains(kind) || documentType == "file" { return true }
         let ext = (item.url ?? item.fileViewURL)?.pathExtension.lowercased() ?? ""
         return ["pdf", "doc", "docx", "ppt", "pptx", "xls", "xlsx", "csv", "txt", "rtf",
                 "jpg", "jpeg", "png", "gif", "heic", "webp"].contains(ext)
@@ -225,7 +258,7 @@ struct SchoologyInlineResourceItemRow: View {
         guard let url = item.url ?? item.fileViewURL else { return nil }
         let kind = item.kind.lowercased()
         let isFile = item.fileViewURL != nil || !item.fileMIME.isEmpty ||
-            kind.contains("file") || kind.contains("document") || !url.pathExtension.isEmpty
+            kind.contains("file") || item.documentType.lowercased() == "file" || !url.pathExtension.isEmpty
         guard isFile else { return nil }
         return SchoologyAttachment(
             title: item.fileName.isEmpty ? item.title : item.fileName,
@@ -236,13 +269,23 @@ struct SchoologyInlineResourceItemRow: View {
 
     private var resourceSymbol: String {
         let kind = item.kind.lowercased()
+        if item.documentType.lowercased() == "external_tool" { return "app" }
         if isLinkMaterial { return "link" }
         if kind.contains("assignment") { return "pencil" }
         if kind.contains("page") { return "doc.text" }
         if kind.contains("assessment") || kind.contains("quiz") { return "checklist" }
         if kind.contains("discussion") { return "text.bubble" }
         if kind.contains("event") { return "calendar" }
-        return "doc"
+        if ["package", "scorm"].contains(kind) { return "shippingbox" }
+        if ["web_package", "webpackage"].contains(kind) { return "globe" }
+        if ["media-album", "album"].contains(kind) { return "photo.on.rectangle" }
+        switch item.documentType.lowercased() {
+        case "external_tool": return "app"
+        case "video": return "play.rectangle"
+        case "embed": return "rectangle.inset.filled"
+        case "file": return "doc"
+        default: return "doc"
+        }
     }
 
     @MainActor

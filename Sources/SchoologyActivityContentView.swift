@@ -99,10 +99,18 @@ struct SchoologyActivityContentView: View {
         // Schoology sometimes serializes an empty paragraph before the first
         // authored paragraph. Rich-text HTML importers preserve that block's
         // vertical paragraph spacing, which looks like excess card padding.
-        let content = output.isEmpty ? removingLeadingEmptyBlocks(from: html) : html
-        guard !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        let normalized = normalizedHTMLFragment(html)
+        let content = output.isEmpty ? removingLeadingEmptyBlocks(from: normalized) : normalized
+        let visibleText = content.replacingOccurrences(of: #"(?is)</?[a-z][^>]*>"#, with: "", options: .regularExpression).trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !visibleText.isEmpty else { return }
         output.append(.text(id: identity, html: content))
         identity += 1
+    }
+
+    private static func normalizedHTMLFragment(_ html: String) -> String {
+        var fragment = html.replacingOccurrences(of: #"\\(?=</?[a-z][^>]*>)"#, with: "", options: .regularExpression)
+        fragment = fragment.replacingOccurrences(of: #"(?is)</?(?:html|body)\b[^>]*>"#, with: "", options: .regularExpression)
+        return fragment.replacingOccurrences(of: #"(?is)<!doctype[^>]*>"#, with: "", options: .regularExpression)
     }
 
     private static func removingLeadingEmptyBlocks(from html: String) -> String {

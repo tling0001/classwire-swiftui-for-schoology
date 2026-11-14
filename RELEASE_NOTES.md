@@ -1,3 +1,28 @@
+## [2026.10.0-port.146]
+
+### Recent activity post HTML
+- Normalize escaped HTML closing tags in post fragments, strip redundant document-level HTML/body wrappers, and discard tag-only fragments after inline images so closing markup can’t appear as visible post text.
+- Use the existing HTML-to-text conversion as the safe fallback when attributed HTML import fails, rather than displaying raw markup.
+
+### Course Materials parity
+- Add explicit support and native routing for Android course material types: assignments, discussions, events, pages, assessments, assessment v2, managed assessments, folders, document subtypes (links, files, external tools, video, and embed), SCORM packages, web packages, and media albums.
+- Open course media albums with their section-scoped Schoology materials endpoint and support photo, audio, video, and document previews.
+- Show availability and completion state on course material rows, and prevent unavailable items from being opened.
+- Keep external tools and links inside the authenticated Schoology web view.
+
+### Upcoming and Calendar parity
+- Paginate calendar-wide and course-specific upcoming events instead of stopping at the first page; retain ID de-duplication and chronological ordering.
+- Add permission-checked event creation to Calendar and course Upcoming using the existing event composer.
+- Keep the Calendar month/day split responsive with bounded pane widths for resizable iPad and Mac windows.
+
+### Resources parity
+- Paginate resource collections and collection contents.
+- Support Android collection types (downloads, ePortfolio, resource apps) with matching native symbols.
+- Apply availability/completion state to resource items and route links/external tools through the authenticated Schoology web view.
+
+### Build
+- Increment the app marketing version to `2026.10.146` and build number to `146`.
+
 ## [2026.10.0-port.145]
 
 ### iPad group composer presentation

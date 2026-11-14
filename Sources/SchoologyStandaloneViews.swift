@@ -33,7 +33,7 @@ struct SchoologyResourcesView: View {
                                                         .frame(width: 32, height: 32)
                                                         .clipShape(RoundedRectangle(cornerRadius: 7))
                                                 } else {
-                                                    Image(systemName: item.category == .apps ? "app.fill" : item.typeID == "3" ? "book.closed" : "folder")
+                                                    Image(systemName: collectionSymbol(item))
                                                         .font(.title3).foregroundStyle(SchoologyStyle.blue).frame(width: 32)
                                                 }
                                                 VStack(alignment: .leading, spacing: 3) {
@@ -72,6 +72,16 @@ struct SchoologyResourcesView: View {
         }
         .task { await session.loadResources() }
         .refreshable { await session.loadResources(force: true) }
+    }
+
+    private func collectionSymbol(_ item: SchoologyResourceCollection) -> String {
+        if item.category == .apps { return "app.fill" }
+        switch item.typeID {
+        case "2": return "arrow.down.to.line"
+        case "3": return "book.closed"
+        case "4": return "app"
+        default: return "folder"
+        }
     }
 }
 
@@ -259,6 +269,8 @@ struct SchoologyCalendarView: View {
     @State private var mode = "calendar"
     @State private var displayedMonth = Calendar.current.dateInterval(of: .month, for: Date())?.start ?? Date()
     @State private var selectedDate = Calendar.current.startOfDay(for: Date())
+    @State private var eventDestinations: [SchoologyHomeCreateDestination] = []
+    @State private var showingEventComposer = false
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 4), count: 7)
     private let weekdays = Calendar.current.veryShortWeekdaySymbols
@@ -294,13 +306,32 @@ struct SchoologyCalendarView: View {
             if mode == "calendar" { calendarContent } else { upcomingContent }
         }
         .navigationTitle("Calendar")
+        .toolbar {
+            if !eventDestinations.isEmpty {
+                ToolbarItem(placement: .primaryAction) {
+                    Button("New Event", systemImage: "plus") { showingEventComposer = true }
+                }
+            }
+        }
+        .sheet(isPresented: $showingEventComposer) {
+            SchoologyHomeCreateComposerView(destinations: eventDestinations, action: .event) {
+                Task {
+                    await session.loadCalendarMonth(displayedMonth, force: true)
+                    await session.loadCalendarUpcoming(force: true)
+                }
+            }
+        }
         .task {
             await session.loadCalendarUpcoming()
             await session.loadCalendarMonth(displayedMonth)
+            let destinations = await session.loadHomeCreateDestinations()
+            eventDestinations = destinations.filter { $0.canCreateEvent }
         }
         .refreshable {
             if mode == "calendar" { await session.loadCalendarMonth(displayedMonth, force: true) }
             else { await session.loadCalendarUpcoming(force: true) }
+            let destinations = await session.loadHomeCreateDestinations()
+            eventDestinations = destinations.filter { $0.canCreateEvent }
         }
     }
 
@@ -308,13 +339,14 @@ struct SchoologyCalendarView: View {
         GeometryReader { proxy in
             if proxy.size.width >= 801 {
                 let splitWidth = max(0, proxy.size.width - 1)
+                let monthPaneWidth = min(max(splitWidth * 0.4, 300), min(480, splitWidth - 320))
                 HStack(spacing: 0) {
                     ScrollView {
                         monthCalendarContent
                             .padding(16)
                             .frame(maxWidth: .infinity, alignment: .topLeading)
                     }
-                    .frame(width: splitWidth * 0.4).frame(maxHeight: .infinity)
+                    .frame(width: monthPaneWidth).frame(maxHeight: .infinity)
 
                     Divider()
 
@@ -323,7 +355,7 @@ struct SchoologyCalendarView: View {
                             .padding(16)
                             .frame(maxWidth: .infinity, alignment: .topLeading)
                     }
-                    .frame(width: splitWidth * 0.6).frame(maxHeight: .infinity)
+                    .frame(maxWidth: .infinity).frame(maxHeight: .infinity)
                 }
             } else {
                 ScrollView {

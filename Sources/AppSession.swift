@@ -343,6 +343,15 @@ final class AppSession {
         return SchoologyProfileItem.decodeList(Self.object(data), keys: ["folder-item", "folder_item", "folderItems", "items", "documents"])
     }
 
+    func loadCourseAlbum(courseID: String, albumID: String) async throws -> [SchoologyProfileItem] {
+        if isDemoMode { return demoMaterials.filter { $0.kind == "image" } }
+        guard let auth else { throw SchoologyAPIError.notSignedIn }
+        let data = try await api.get("sections/\(courseID)/materials/albums/\(albumID)", auth: auth, params: ["with_content": "TRUE"])
+        let json = Self.object(data)
+        let album = (json["album"] as? [String: Any]) ?? json
+        return SchoologyProfileItem.decodeList(album["content"] ?? album["contents"] ?? album["media"], keys: ["content", "contents", "media", "photo", "photos", "items"])
+    }
+
     func loadCourseMaterialDetail(courseID: String, item: SchoologyProfileItem) async throws -> (attachment: SchoologyAttachment?, linkURL: URL?) {
         if isDemoMode {
             let url = try demoHTMLURL(title: item.title, body: item.body.isEmpty ? "Sample course material preview." : item.body)
@@ -820,11 +829,14 @@ final class AppSession {
         resourcesError = nil
         defer { isLoadingResources = false }
         do {
-            async let collectionsRequest = api.get("collections", auth: auth, params: ["limit": "200"])
-            async let appsRequest = try? await api.get("resource_apps", auth: auth, params: ["limit": "200"])
-            let (collectionsData, appsData) = try await (collectionsRequest, appsRequest)
-            let all = SchoologyResourceCollection.decodeList(Self.object(collectionsData), keys: ["collection", "collections", "collection_list", "items"])
-            let apps = SchoologyResourceCollection.decodeList(Self.object(appsData ?? Data()), keys: ["resource_apps", "resourceApps", "collection", "collections", "items"])
+            let all = try await loadResourceCollections(
+                path: "collections", auth: auth,
+                keys: ["collection", "collections", "collection_list", "items"]
+            )
+            let apps = (try? await loadResourceCollections(
+                path: "resource_apps", auth: auth,
+                keys: ["resource_apps", "resourceApps", "collection", "collections", "items"]
+            )) ?? []
             var mine: [SchoologyResourceCollection] = []
             var shared: [SchoologyResourceCollection] = []
             var groups: [SchoologyResourceCollection] = []
@@ -846,16 +858,51 @@ final class AppSession {
         }
     }
 
+    private func loadResourceCollections(
+        path: String,
+        auth: SchoologyAuth,
+        keys: [String]
+    ) async throws -> [SchoologyResourceCollection] {
+        var offset = 0
+        let pageSize = 200
+        var seenIDs = Set<String>()
+        var collections: [SchoologyResourceCollection] = []
+        while true {
+            let data = try await api.get(path, auth: auth, params: [
+                "start": String(offset), "limit": String(pageSize)
+            ])
+            let page = SchoologyResourceCollection.decodeList(Self.object(data), keys: keys)
+            guard !page.isEmpty else { break }
+            let newItems = page.filter { seenIDs.insert($0.id).inserted }
+            collections.append(contentsOf: newItems)
+            if page.count < pageSize || newItems.isEmpty { break }
+            offset += pageSize
+        }
+        return collections
+    }
+
     func loadResourceItems(collectionID: String, folderID: String? = nil) async throws -> [SchoologyProfileItem] {
         if isDemoMode {
             if folderID == "demo-folder" { return demoMaterials.filter { $0.id != "demo-folder" } }
             return demoMaterials
         }
         guard let auth else { throw SchoologyAPIError.notSignedIn }
-        var params = ["start": "0", "limit": "200", "with_attachments": "TRUE"]
-        if let folderID, !folderID.isEmpty, folderID != "0" { params["f"] = folderID }
-        let data = try await api.get("collections/\(collectionID)/resources", auth: auth, params: params)
-        return SchoologyProfileItem.decodeList(Self.object(data), keys: ["resource", "resources", "resource_list", "items"])
+        var offset = 0
+        let pageSize = 200
+        var seenIDs = Set<String>()
+        var items: [SchoologyProfileItem] = []
+        while true {
+            var params = ["start": String(offset), "limit": String(pageSize), "with_attachments": "TRUE"]
+            if let folderID, !folderID.isEmpty, folderID != "0" { params["f"] = folderID }
+            let data = try await api.get("collections/\(collectionID)/resources", auth: auth, params: params)
+            let page = SchoologyProfileItem.decodeList(Self.object(data), keys: ["resource", "resources", "resource_list", "items"])
+            guard !page.isEmpty else { break }
+            let newItems = page.filter { seenIDs.insert($0.id).inserted }
+            items.append(contentsOf: newItems)
+            if page.count < pageSize || newItems.isEmpty { break }
+            offset += pageSize
+        }
+        return items
     }
 
 
@@ -1145,10 +1192,22 @@ final class AppSession {
         calendarError = nil
         defer { isLoadingCalendar = false }
         do {
-            let data = try await api.get("users/\(learningUserID)/events", auth: auth, params: [
-                "start_date": Self.apiDate(Date()), "start": "0", "limit": "100"
-            ])
-            calendarUpcomingEvents = SchoologyUpcomingEvent.decodeList(Self.object(data))
+            var offset = 0
+            let pageSize = 20
+            var seenIDs = Set<String>()
+            var allEvents: [SchoologyUpcomingEvent] = []
+            while true {
+                let data = try await api.get("users/\(learningUserID)/events", auth: auth, params: [
+                    "start_date": Self.apiDate(Date()), "start": String(offset), "limit": String(pageSize)
+                ])
+                let page = SchoologyUpcomingEvent.decodeList(Self.object(data))
+                guard !page.isEmpty else { break }
+                let newEvents = page.filter { seenIDs.insert($0.id).inserted }
+                allEvents.append(contentsOf: newEvents)
+                if page.count < pageSize || newEvents.isEmpty { break }
+                offset += pageSize
+            }
+            calendarUpcomingEvents = allEvents
                 .filter { ($0.date ?? .distantPast) >= Calendar.current.startOfDay(for: Date()) }
                 .sorted { ($0.date ?? .distantFuture) < ($1.date ?? .distantFuture) }
             hasLoadedCalendarUpcoming = true
@@ -1193,12 +1252,27 @@ final class AppSession {
 
     func loadUpcomingEvents(for course: SchoologyCourse) async -> [SchoologyUpcomingEvent] {
         if isDemoMode { return upcomingEvents.filter { $0.sectionID == course.id } }
-        guard let auth,
-              let data = try? await api.get("sections/\(course.id)/events", auth: auth, params: [
-                "start_date": Self.apiDate(Date()), "start": "0", "limit": "50"
-              ]) else { return [] }
-        return SchoologyUpcomingEvent.decodeList(Self.object(data))
-            .sorted { ($0.date ?? .distantFuture) < ($1.date ?? .distantFuture) }
+        guard let auth else { return [] }
+        do {
+            var offset = 0
+            let pageSize = 20
+            var seenIDs = Set<String>()
+            var allEvents: [SchoologyUpcomingEvent] = []
+            while true {
+                let data = try await api.get("sections/\(course.id)/events", auth: auth, params: [
+                    "start_date": Self.apiDate(Date()), "start": String(offset), "limit": String(pageSize)
+                ])
+                let page = SchoologyUpcomingEvent.decodeList(Self.object(data))
+                guard !page.isEmpty else { break }
+                let newEvents = page.filter { seenIDs.insert($0.id).inserted }
+                allEvents.append(contentsOf: newEvents)
+                if page.count < pageSize || newEvents.isEmpty { break }
+                offset += pageSize
+            }
+            return allEvents.sorted { ($0.date ?? .distantFuture) < ($1.date ?? .distantFuture) }
+        } catch {
+            return []
+        }
     }
 
     private func hydrateActivityAuthors(auth: SchoologyAuth) async {

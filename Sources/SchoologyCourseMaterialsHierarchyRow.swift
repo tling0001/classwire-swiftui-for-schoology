@@ -58,6 +58,7 @@ struct SchoologyInlineCourseMaterialRow: View {
                                 .lineLimit(nil)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
+                        SchoologyCourseMaterialStatusLabel(item: item)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
@@ -66,6 +67,7 @@ struct SchoologyInlineCourseMaterialRow: View {
                 .contentShape(Rectangle())
             }
             .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
+            .disabled(!item.isAvailable)
             .animation(reduceMotion ? nil : .snappy(duration: 0.24), value: isExpanded)
             .onChange(of: isExpanded) { _, expanded in
                 guard expanded, children == nil, !isLoading else { return }
@@ -81,12 +83,16 @@ struct SchoologyInlineCourseMaterialRow: View {
             NavigationLink {
                 SchoologyCourseMaterialDestinationView(courseID: courseID, item: item)
             } label: {
-                Label(item.title, systemImage: symbol)
-                    .font(.body.weight(.semibold))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .contentShape(Rectangle())
+                HStack(spacing: 10) {
+                    Label(item.title, systemImage: symbol)
+                        .font(.body.weight(.semibold))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    SchoologyCourseMaterialStatusLabel(item: item)
+                }
+                .contentShape(Rectangle())
             }
             .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
+            .disabled(!item.isAvailable)
         }
     }
 
@@ -105,12 +111,15 @@ struct SchoologyInlineCourseMaterialRow: View {
     }
 
     private var isLinkMaterial: Bool {
-        item.documentType == "link" || item.kind.lowercased().contains("link")
+        let kind = item.kind.lowercased()
+        let documentType = item.documentType.lowercased()
+        return documentType == "link" || documentType == "external_tool" || kind.contains("link")
     }
 
     private var isFileMaterial: Bool {
         let kind = item.kind.lowercased()
-        if ["document", "file", "attachment", "file_attachment"].contains(kind) { return true }
+        let documentType = item.documentType.lowercased()
+        if ["file", "attachment", "file_attachment"].contains(kind) || documentType == "file" { return true }
         let ext = (item.url ?? item.fileViewURL)?.pathExtension.lowercased() ?? ""
         return ["pdf", "doc", "docx", "ppt", "pptx", "xls", "xlsx", "csv", "txt", "rtf",
                 "jpg", "jpeg", "png", "gif", "heic", "webp"].contains(ext)
@@ -118,13 +127,23 @@ struct SchoologyInlineCourseMaterialRow: View {
 
     private var symbol: String {
         let kind = item.kind.lowercased()
+        if item.documentType.lowercased() == "external_tool" { return "app" }
         if isLinkMaterial { return "link" }
         if kind.contains("discussion") { return "text.bubble" }
         if kind.contains("page") { return "doc.text" }
         if kind.contains("assignment") { return "pencil" }
         if kind.contains("event") { return "calendar" }
         if ["assessment", "assessment_v2", "managed_assessment", "quiz"].contains(kind) { return "checklist" }
-        return "doc"
+        if ["package", "scorm"].contains(kind) { return "shippingbox" }
+        if ["web_package", "webpackage"].contains(kind) { return "globe" }
+        if ["media-album", "album"].contains(kind) { return "photo.on.rectangle" }
+        switch item.documentType.lowercased() {
+        case "external_tool": return "app"
+        case "video": return "play.rectangle"
+        case "embed": return "rectangle.inset.filled"
+        case "file": return "doc"
+        default: return "doc"
+        }
     }
 
     @MainActor
@@ -144,5 +163,24 @@ struct SchoologyInlineCourseMaterialRow: View {
                 isLoading = false
             }
         }
+    }
+}
+
+
+struct SchoologyCourseMaterialStatusLabel: View {
+    let item: SchoologyProfileItem
+
+    var body: some View {
+        Group {
+            if !item.isAvailable {
+                Label("Unavailable", systemImage: "lock.fill").foregroundStyle(.secondary)
+            } else if item.hasCompletionRules, let isCompleted = item.isCompleted {
+                Label(isCompleted ? "Completed" : "Not completed",
+                      systemImage: isCompleted ? "checkmark.circle.fill" : "circle")
+                    .foregroundStyle(isCompleted ? Color.green : Color.gray)
+            }
+        }
+        .font(.caption)
+        .fixedSize()
     }
 }

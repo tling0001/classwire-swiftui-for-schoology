@@ -4,10 +4,11 @@ import SwiftUI
 /// pushing a placeholder destination page into the navigation stack.
 struct SchoologyCourseMaterialLinkRow: View {
     @Environment(AppSession.self) private var session
-    @Environment(\.openURL) private var openURL
     let courseID: String
     let item: SchoologyProfileItem
     @State private var selectedAttachment: SchoologyAttachment?
+    @State private var linkedURL: URL?
+    @State private var isShowingLinkedMaterial = false
     @State private var isResolving = false
     @State private var errorMessage: String?
     @State private var showingError = false
@@ -22,16 +23,27 @@ struct SchoologyCourseMaterialLinkRow: View {
                 } else {
                     Image(systemName: "link").foregroundStyle(.secondary).frame(width: 20).accessibilityHidden(true)
                 }
-                Text(item.title).lineLimit(2).frame(maxWidth: .infinity, alignment: .leading)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(item.title).lineLimit(2)
+                    SchoologyCourseMaterialStatusLabel(item: item)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
                 Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.tertiary).accessibilityHidden(true)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .disabled(isResolving)
+        .disabled(isResolving || !item.isAvailable)
         .sheet(item: $selectedAttachment) { attachment in
             SchoologyAttachmentsView(attachments: [attachment])
+        }
+        .navigationDestination(isPresented: $isShowingLinkedMaterial) {
+            if let linkedURL {
+                SchoologyEmbeddedWebView(url: linkedURL, title: item.title)
+            } else {
+                ContentUnavailableView("Unable to open link", systemImage: "exclamationmark.triangle")
+            }
         }
         .alert("Unable to open link", isPresented: $showingError) {
             Button("OK", role: .cancel) { }
@@ -51,14 +63,16 @@ struct SchoologyCourseMaterialLinkRow: View {
             if let attachment = detail.attachment {
                 selectedAttachment = attachment
             } else if let url = detail.linkURL ?? item.url ?? item.fileViewURL {
-                openURL(url)
+                linkedURL = url
+                isShowingLinkedMaterial = true
             } else {
                 errorMessage = "Schoology did not provide a destination for this link."
                 showingError = true
             }
         } catch {
             if let url = item.url ?? item.fileViewURL {
-                openURL(url)
+                linkedURL = url
+                isShowingLinkedMaterial = true
             } else {
                 errorMessage = error.localizedDescription
                 showingError = true
@@ -89,14 +103,18 @@ struct SchoologyCourseMaterialFileRow: View {
                 } else {
                     Image(systemName: "doc").foregroundStyle(.secondary).frame(width: 20).accessibilityHidden(true)
                 }
-                Text(item.title).lineLimit(2).frame(maxWidth: .infinity, alignment: .leading)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(item.title).lineLimit(2)
+                    SchoologyCourseMaterialStatusLabel(item: item)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
                 Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.tertiary).accessibilityHidden(true)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .disabled(isResolving)
+        .disabled(isResolving || !item.isAvailable)
         .sheet(item: $selectedAttachment) { attachment in
             SchoologyAttachmentsView(attachments: [attachment])
         }
