@@ -1,3 +1,14 @@
+## [2026.10.0-port.153]
+
+### iPhone toolbar and refresh reliability
+- Keep the Home Create action mounted while permissions refresh, so the plus button remains visible after a reload.
+- Move Home refresh into the Home view's toolbar action and refresh both update and discussion/event creation permissions after content reload.
+- Keep Resources refresh directly in the navigation toolbar on both the Resources root and collection screens, alongside creation.
+- Retain the last confirmed resource-creation toolbar capabilities during transient permission refreshes; every create operation still performs a live permission check before writing.
+
+### Build
+- Increment the app marketing version to `2026.10.153` and build number to `153`.
+
 ## [2026.10.0-port.152]
 
 ### Resource creation consistency

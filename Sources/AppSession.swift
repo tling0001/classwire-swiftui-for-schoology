@@ -869,8 +869,8 @@ final class AppSession {
     }
 
     private func refreshResourceCreationPermissions(auth: SchoologyAuth, collections: [SchoologyResourceCollection]) async {
-        canCreateResourceCollection = false
-        creatableResourceCollectionIDs = []
+        // Keep the last confirmed toolbar capabilities while a refresh is in flight.
+        // Mutations still re-check live POST permission immediately before writing.
         let paths = ["/v1/collections"] + collections.map { "/v1/collections/\($0.id)/resources" }
         do {
             let data = try await api.postMultiOptions(paths, auth: auth)
@@ -889,9 +889,8 @@ final class AppSession {
                 postable.contains("/v1/collections/\(collection.id)/resources") ? collection.id : nil
             })
         } catch {
-            // Unknown permission state is treated as denied; creation is never inferred from role names.
-            canCreateResourceCollection = false
-            creatableResourceCollectionIDs = []
+            // Keep the last confirmed UI capabilities during transient permission failures.
+            // Every mutation performs its own live POST permission check before writing.
         }
     }
 

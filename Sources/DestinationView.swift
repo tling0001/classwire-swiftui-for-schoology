@@ -41,8 +41,8 @@ struct DestinationView: View {
             }
         }
         .toolbar {
-            if destination != .aiAssistant && destination != .messages && destination != .notifications && destination != .profile {
-                ToolbarItem(placement: destination == .resources ? .secondaryAction : .primaryAction) {
+            if destination != .aiAssistant && destination != .messages && destination != .notifications && destination != .profile && destination != .resources && destination != .home {
+                ToolbarItem(placement: .primaryAction) {
                     Button {
                         Task {
                             switch destination {
@@ -73,6 +73,8 @@ struct HomeView: View {
     @Environment(AppSession.self) private var session
     @State private var postableDestinations: [SchoologyUpdateDestination] = []
     @State private var createDestinations: [SchoologyHomeCreateDestination] = []
+    @State private var hasLoadedCreatePermissions = false
+    @State private var isRefreshingHome = false
     private enum ComposerPresentation: String, Identifiable {
         case update
         case discussion
@@ -127,20 +129,30 @@ struct HomeView: View {
                 compactHome
             }
         }
-        .refreshable {
-            await session.refresh()
-            postableDestinations = await session.loadPostableUpdateDestinations()
-            createDestinations = await session.loadHomeCreateDestinations()
-        }
+        .refreshable { await refreshHome() }
         .toolbar {
-            if !postableDestinations.isEmpty || !createDestinations.isEmpty {
-                ToolbarItem(placement: .primaryAction) {
-                    Menu("Create", systemImage: "plus") {
-                        if !postableDestinations.isEmpty { Button("Post Update", systemImage: "square.and.pencil") { presentedComposer = .update } }
-                        if createDestinations.contains(where: \.canCreateDiscussion) { Button("Discussion", systemImage: "text.bubble") { presentedComposer = .discussion } }
-                        if createDestinations.contains(where: \.canCreateEvent) { Button("Event", systemImage: "calendar.badge.plus") { presentedComposer = .event } }
+            ToolbarItemGroup(placement: .topBarTrailing) {
+                Menu {
+                    if !postableDestinations.isEmpty { Button("Post Update", systemImage: "square.and.pencil") { presentedComposer = .update } }
+                    if createDestinations.contains(where: \.canCreateDiscussion) { Button("Discussion", systemImage: "text.bubble") { presentedComposer = .discussion } }
+                    if createDestinations.contains(where: \.canCreateEvent) { Button("Event", systemImage: "calendar.badge.plus") { presentedComposer = .event } }
+                    if !hasLoadedCreatePermissions {
+                        Button("Checking available actions…", systemImage: "hourglass", action: {}).disabled(true)
+                    } else if postableDestinations.isEmpty && createDestinations.isEmpty {
+                        Button("No creation actions available", systemImage: "minus.circle", action: {}).disabled(true)
                     }
+                } label: {
+                    Image(systemName: "plus")
                 }
+                .accessibilityLabel("Create")
+                Button {
+                    Task { await refreshHome() }
+                } label: {
+                    if isRefreshingHome { ProgressView().controlSize(.small) }
+                    else { Image(systemName: "arrow.clockwise") }
+                }
+                .accessibilityLabel("Refresh")
+                .disabled(isRefreshingHome)
             }
         }
         .sheet(item: $presentedComposer) { composer in
@@ -176,10 +188,24 @@ struct HomeView: View {
             async let createAccess = session.loadHomeCreateDestinations()
             postableDestinations = await updateAccess
             createDestinations = await createAccess
+            hasLoadedCreatePermissions = true
             #if os(iOS)
             await refreshNotificationPrompt()
             #endif
         }
+    }
+
+    @MainActor
+    private func refreshHome() async {
+        guard !isRefreshingHome else { return }
+        isRefreshingHome = true
+        defer { isRefreshingHome = false }
+        await session.refresh()
+        async let updateAccess = session.loadPostableUpdateDestinations()
+        async let createAccess = session.loadHomeCreateDestinations()
+        postableDestinations = await updateAccess
+        createDestinations = await createAccess
+        hasLoadedCreatePermissions = true
     }
 
     @ViewBuilder

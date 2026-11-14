@@ -74,9 +74,12 @@ struct SchoologyResourcesView: View {
         .task { await session.loadResources() }
         .refreshable { await session.loadResources(force: true) }
         .toolbar {
-            if session.canCreateResourceCollection || !session.creatableResourceCollections.isEmpty {
-                ToolbarItem(placement: .primaryAction) {
-                    Menu {
+            ToolbarItemGroup(placement: .topBarTrailing) {
+                Button("Refresh", systemImage: "arrow.clockwise") {
+                    Task { await session.loadResources(force: true) }
+                }
+                .disabled(session.isLoadingResources)
+                Menu {
                         if session.canCreateResourceCollection {
                             Button("New Collection", systemImage: "folder.badge.plus") { creationMode = .collection }
                         }
@@ -88,7 +91,7 @@ struct SchoologyResourcesView: View {
                         Image(systemName: "plus")
                     }
                     .accessibilityLabel("Create")
-                }
+                    .disabled(!session.canCreateResourceCollection && session.creatableResourceCollections.isEmpty)
             }
         }
         .sheet(item: $creationMode) { mode in
@@ -161,16 +164,19 @@ private struct SchoologyResourceCollectionView: View {
         .navigationTitle(collection.title)
         .task { await load() }
         .toolbar {
-            if session.canCreateResource(in: collection.id) {
-                ToolbarItem(placement: .primaryAction) {
-                    Menu {
-                        Button("New Resource Item", systemImage: "doc.badge.plus") { creationMode = .resource }
-                        Button("New Folder", systemImage: "folder.badge.plus") { creationMode = .folder }
-                    } label: {
-                        Image(systemName: "plus")
-                    }
-                    .accessibilityLabel("Create a resource item or folder in \(collection.title)")
+            ToolbarItemGroup(placement: .topBarTrailing) {
+                Button("Refresh", systemImage: "arrow.clockwise") {
+                    Task { await load() }
                 }
+                .disabled(loading)
+                Menu {
+                    Button("New Resource Item", systemImage: "doc.badge.plus") { creationMode = .resource }
+                    Button("New Folder", systemImage: "folder.badge.plus") { creationMode = .folder }
+                } label: {
+                    Image(systemName: "plus")
+                }
+                .accessibilityLabel("Create a resource item or folder in \(collection.title)")
+                .disabled(!session.canCreateResource(in: collection.id))
             }
         }
         .sheet(item: $creationMode) { mode in
