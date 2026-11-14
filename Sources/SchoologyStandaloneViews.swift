@@ -81,13 +81,13 @@ struct SchoologyResourcesView: View {
                             Button("New Collection", systemImage: "folder.badge.plus") { creationMode = .collection }
                         }
                         if !session.creatableResourceCollections.isEmpty {
-                            Button("New Resource", systemImage: "doc.badge.plus") { creationMode = .resource }
+                            Button("New File/Link", systemImage: "doc.badge.plus") { creationMode = .resource }
                             Button("New Folder", systemImage: "folder.badge.plus") { creationMode = .folder }
                         }
                     } label: {
-                        Label("Create", systemImage: "plus")
+                        Image(systemName: "plus")
                     }
-                    .accessibilityLabel("Create resource or collection")
+                    .accessibilityLabel("Create")
                 }
             }
         }
@@ -164,10 +164,10 @@ private struct SchoologyResourceCollectionView: View {
             if session.canCreateResource(in: collection.id) {
                 ToolbarItem(placement: .primaryAction) {
                     Menu {
-                        Button("New Resource", systemImage: "doc.badge.plus") { creationMode = .resource }
+                        Button("New File/Link", systemImage: "doc.badge.plus") { creationMode = .resource }
                         Button("New Folder", systemImage: "folder.badge.plus") { creationMode = .folder }
                     } label: {
-                        Label("Create", systemImage: "plus")
+                        Image(systemName: "plus")
                     }
                     .accessibilityLabel("Create a resource or folder in \(collection.title)")
                 }

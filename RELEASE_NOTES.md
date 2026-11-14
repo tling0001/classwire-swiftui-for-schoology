@@ -1,3 +1,13 @@
+## [2026.10.0-port.151]
+
+### Resource creation actions
+- Rename the permission-gated New Resource actions to New File/Link, keeping New Folder as a separate action in both the Resources list and collection toolbar.
+- Keep the resource type picker and its type-specific fields together in the same native creation sheet; retain existing Page, Discussion, Assignment, document-link, file, video, and embed capabilities.
+- Use a clear plus-symbol primary action in the Resources and collection navigation bars, with an explicit accessibility label for VoiceOver.
+
+### Build
+- Increment the app marketing version to `2026.10.151` and build number to `151`.
+
 ## [2026.10.0-port.150]
 
 ### Resource documents, attachments, and folders
