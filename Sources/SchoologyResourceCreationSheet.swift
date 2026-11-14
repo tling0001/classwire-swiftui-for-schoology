@@ -61,8 +61,8 @@ struct SchoologyResourceCreationSheet: View {
                                 .lineLimit(4...9)
                         } else {
                             TextField("Web address", text: $linkURL)
-                                .textInputAutocapitalization(.never)
                                 #if os(iOS)
+                                .textInputAutocapitalization(.never)
                                 .keyboardType(.URL)
                                 #endif
                         }

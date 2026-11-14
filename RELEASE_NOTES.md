@@ -1,3 +1,12 @@
+## [2026.10.0-port.149]
+
+### macOS build fix
+- Keep the URL text-input capitalization and keyboard modifiers inside the iOS-only conditional so the shared resource-creation sheet compiles for macOS.
+- Preserve the URL keyboard behavior on iPhone and iPad.
+
+### Build
+- Increment the app marketing version to `2026.10.149` and build number to `149`.
+
 ## [2026.10.0-port.148]
 
 ### Standalone Resources creation
