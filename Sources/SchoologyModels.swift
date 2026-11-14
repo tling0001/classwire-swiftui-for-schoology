@@ -35,55 +35,199 @@ enum HomeSection: String, CaseIterable, Identifiable {
 
 struct SchoologyAttachment: Identifiable, Hashable, Sendable {
     let title: String
+    /// Compatibility URL: original file URL for files, or the destination for non-file attachments.
     let url: URL
     var viewURL: URL? = nil
     var isLink: Bool = false
-    var id: String { url.absoluteString }
+    var kind: String = "file"
+    var attachmentID: String? = nil
+    var fileMetadataID: String? = nil
+    var fileName: String = ""
+    var mimeType: String = ""
+    var fileSize: Int64? = nil
+    var originalDownloadURL: URL? = nil
+    var convertedDownloadURL: URL? = nil
+    var convertedFileName: String = ""
+    var convertedMimeType: String = ""
+    var conversionStatus: String = ""
+    var thumbnailURL: URL? = nil
+    var linkURL: URL? = nil
+    var embedCode: String = ""
+    var launchURL: URL? = nil
+    var checksum: String? = nil
+    var rawJSON: Data = Data()
 
-    init(title: String, url: URL, viewURL: URL? = nil, isLink: Bool = false) {
+    var id: String { attachmentID ?? fileMetadataID ?? url.absoluteString }
+
+    init(
+        title: String, url: URL, viewURL: URL? = nil, isLink: Bool = false,
+        kind: String = "file", attachmentID: String? = nil, fileMetadataID: String? = nil,
+        fileName: String = "", mimeType: String = "", fileSize: Int64? = nil,
+        originalDownloadURL: URL? = nil, convertedDownloadURL: URL? = nil,
+        convertedFileName: String = "", convertedMimeType: String = "",
+        conversionStatus: String = "", thumbnailURL: URL? = nil, linkURL: URL? = nil,
+        embedCode: String = "", launchURL: URL? = nil, checksum: String? = nil,
+        rawJSON: Data = Data()
+    ) {
         self.title = title
         self.url = url
-        self.isLink = isLink
-        let titleExtension = URL(fileURLWithPath: title).pathExtension.lowercased()
-        let fileExtension = titleExtension.isEmpty ? url.pathExtension.lowercased() : titleExtension
+        self.kind = kind
+        self.attachmentID = attachmentID
+        self.fileMetadataID = fileMetadataID
+        self.fileName = fileName.isEmpty ? title : fileName
+        self.mimeType = mimeType
+        self.fileSize = fileSize
+        self.originalDownloadURL = originalDownloadURL ?? (isLink ? nil : url)
+        self.convertedDownloadURL = convertedDownloadURL
+        self.convertedFileName = convertedFileName
+        self.convertedMimeType = convertedMimeType
+        self.conversionStatus = conversionStatus
+        self.thumbnailURL = thumbnailURL
+        self.linkURL = linkURL ?? (isLink ? url : nil)
+        self.embedCode = embedCode
+        self.launchURL = launchURL
+        self.checksum = checksum
+        self.rawJSON = rawJSON
+        self.isLink = isLink || kind == "link"
+        let ext = URL(fileURLWithPath: self.fileName).pathExtension.lowercased()
         let mediaExtensions: Set<String> = [
             "mp4", "m4v", "mov", "webm", "avi", "mkv", "3gp", "wmv", "mpeg", "mpg",
             "mp3", "m4a", "aac", "wav", "aiff", "aif", "flac", "ogg", "oga", "opus", "wma", "caf"
         ]
-        self.viewURL = mediaExtensions.contains(fileExtension) ? nil : viewURL
+        self.viewURL = mediaExtensions.contains(ext) ? nil : (viewURL ?? (Self.conversionIsReady(conversionStatus) ? convertedDownloadURL : nil))
     }
 
     var fileExtension: String {
-        let titleExtension = URL(fileURLWithPath: title).pathExtension.lowercased()
-        return titleExtension.isEmpty ? url.pathExtension.lowercased() : titleExtension
+        let nameExtension = URL(fileURLWithPath: fileName.isEmpty ? title : fileName).pathExtension.lowercased()
+        return nameExtension.isEmpty ? url.pathExtension.lowercased() : nameExtension
     }
 
     var isVideo: Bool {
+        mimeType.lowercased().hasPrefix("video/") ||
         ["mp4", "m4v", "mov", "webm", "avi", "mkv", "3gp", "wmv", "mpeg", "mpg"].contains(fileExtension)
     }
 
     var isAudio: Bool {
+        mimeType.lowercased().hasPrefix("audio/") ||
         ["mp3", "m4a", "aac", "wav", "aiff", "aif", "flac", "ogg", "oga", "opus", "wma", "caf"].contains(fileExtension)
     }
 
     var isPlayableMedia: Bool { isVideo || isAudio }
+    var originalURL: URL { originalDownloadURL ?? url }
+    var previewDownloadURL: URL {
+        if Self.conversionIsReady(conversionStatus), let convertedDownloadURL { return convertedDownloadURL }
+        return viewURL ?? originalURL
+    }
+    var linkDestinationURL: URL? { linkURL ?? (isLink ? url : nil) }
 
-    static func isLinkRecord(_ item: [String: Any]) -> Bool {
-        let linkFields = ["link_url", "linkURL", "linkUrl", "link_title", "linkTitle",
-                          "href", "web_url", "webUrl", "launch_url", "launchUrl"]
-        if linkFields.contains(where: { item[$0] != nil }) { return true }
+    private static func conversionIsReady(_ status: String) -> Bool {
+        ["success", "converted", "complete", "completed", "ready", "1", "true"].contains(status.trimmingCharacters(in: .whitespacesAndNewlines).lowercased())
+    }
 
-        let fileFields = [
+    static func decodeList(_ value: Any?) -> [SchoologyAttachment] {
+        var decoded: [SchoologyAttachment] = []
+        let groups: [(String, String)] = [
+            ("files", "file"), ("file", "file"), ("file-attachment", "file"),
+            ("links", "link"), ("link", "link"), ("videos", "video"), ("video", "video"),
+            ("embeds", "embed"), ("embed", "embed"), ("external_tools", "external_tool"),
+            ("external_tool", "external_tool"), ("tools", "external_tool"),
+            ("attachments", ""), ("attachment", ""), ("items", ""), ("data", ""), ("response", "")
+        ]
+        func collect(_ candidate: Any?, hint: String, depth: Int) {
+            guard depth < 8, let candidate, !(candidate is NSNull) else { return }
+            if let rows = candidate as? [Any] {
+                for row in rows { collect(row, hint: hint, depth: depth + 1) }
+                return
+            }
+            guard let item = candidate as? [String: Any] else { return }
+            let payloadKeys = [
+                "file_download_url", "fileDownloadURL", "download_path", "downloadPath",
+                "download_url", "downloadUrl", "resolveDownloadUrl", "resolve_download_url",
+                "link_url", "linkURL", "linkUrl", "href", "web_url", "webUrl",
+                "video_url", "videoUrl", "embed_code", "embedCode", "launch_url", "launchUrl",
+                "url", "original_url", "originalUrl"
+            ]
+            if payloadKeys.contains(where: { item[$0] != nil }) {
+                if let attachment = make(item, hint: hint) { decoded.append(attachment) }
+                return
+            }
+            for (key, groupHint) in groups {
+                if let nested = item[key] {
+                    collect(nested, hint: groupHint.isEmpty ? hint : groupHint, depth: depth + 1)
+                }
+            }
+        }
+        collect(value, hint: "", depth: 0)
+        var seen = Set<String>()
+        return decoded.filter { seen.insert($0.id).inserted }
+    }
+
+    private static func make(_ item: [String: Any], hint: String) -> SchoologyAttachment? {
+        func first(_ keys: [String]) -> Any? { keys.compactMap { item[$0] }.first }
+        let explicitKind = SchoologyValue.string(first(["attachment_type", "attachmentType", "kind", "type", "document_type", "documentType"])).lowercased()
+        let candidateKind = hint.isEmpty ? explicitKind : hint
+        let kind: String
+        if candidateKind.contains("external") || candidateKind == "tool" || candidateKind == "lti" { kind = "external_tool" }
+        else if candidateKind.contains("embed") { kind = "embed" }
+        else if candidateKind.contains("video") { kind = "video" }
+        else if candidateKind.contains("link") { kind = "link" }
+        else { kind = "file" }
+
+        let original = SchoologyValue.url(first([
             "file_download_url", "fileDownloadURL", "download_path", "downloadPath",
             "download_url", "downloadUrl", "resolveDownloadUrl", "resolve_download_url",
+            "original_download_url", "originalDownloadURL", "original_url", "originalUrl"
+        ]))
+        let converted = SchoologyValue.url(first([
             "file_converted_download_url", "fileConvertedDownloadURL",
-            "converted_download_path", "convertedDownloadPath",
-            "download_url", "downloadUrl", "resolveDownloadUrl", "resolve_download_url",
-            "filename", "fileName"
-        ]
+            "converted_download_path", "convertedDownloadPath", "converted_download_url", "convertedDownloadURL"
+        ]))
+        let link = SchoologyValue.url(first(["link_url", "linkURL", "linkUrl", "href", "web_url", "webUrl"]) ?? (kind == "link" ? item["url"] : nil))
+        let video = SchoologyValue.url(first(["video_url", "videoUrl"]) ?? (kind == "video" ? item["url"] : nil))
+        let launch = SchoologyValue.url(first(["launch_url", "launchUrl", "launch_uri", "launchURI"]) ?? (kind == "external_tool" ? item["url"] : nil))
+        let embedCode = SchoologyValue.string(first(["embed_code", "embedCode", "html", "code"]))
+        let embedURL: URL? = {
+            guard kind == "embed", !embedCode.isEmpty,
+                  let regex = try? NSRegularExpression(pattern: #"(?is)\bsrc\s*=\s*["']([^"']+)["']"#),
+                  let match = regex.firstMatch(in: embedCode, range: NSRange(embedCode.startIndex..., in: embedCode)),
+                  let range = Range(match.range(at: 1), in: embedCode) else { return nil }
+            return SchoologyValue.url(String(embedCode[range]))
+        }()
+        let primaryURL = kind == "link" ? link : kind == "video" ? video : kind == "external_tool" ? launch : original ?? converted
+        guard let url = primaryURL ?? embedURL ?? SchoologyValue.url(item["url"]) else { return nil }
+        let fileName = SchoologyValue.string(first(["filename", "fileName", "file_name", "fileNameOriginal", "name"]))
+        let title = SchoologyValue.string(first(["title", "file_title", "fileTitle", "link_title", "linkTitle", "name"]), fallback: fileName.isEmpty ? (url.lastPathComponent.isEmpty ? "Attachment" : url.lastPathComponent) : fileName)
+        let mime = SchoologyValue.string(first(["filemime", "fileMIME", "mime_type", "mimeType", "mime", "content_type", "contentType"]))
+        let sizeText = SchoologyValue.string(first(["filesize", "file_size", "fileSize", "size", "content_length", "contentLength"]))
+        let conversion = SchoologyValue.string(first(["converted_status", "convertedStatus", "file_converted_status", "fileConvertedStatus", "conversion_status", "conversionStatus"]))
+        let attachmentID = SchoologyValue.optionalString(first(["attachment_id", "attachmentId", "id"]))
+        let metadataID = SchoologyValue.optionalString(first(["file_metadata_id", "fileMetadataId", "metadata_id", "metadataId"]))
+        let thumbnail = SchoologyValue.url(first(["thumbnail", "thumbnail_url", "thumbnailURL", "fileThumbnailURL", "file_thumbnail_url", "image_url", "imageUrl"]))
+        let checksum = SchoologyValue.optionalString(first(["checksum", "md5", "file_md5", "fileMD5", "hash"]))
+        let convertedName = SchoologyValue.string(first(["converted_filename", "convertedFilename", "file_converted_filename", "fileConvertedFilename"]))
+        let convertedMime = SchoologyValue.string(first(["converted_filemime", "convertedFileMime", "file_converted_mime", "fileConvertedMime"]))
+        let size = Int64(sizeText)
+        let isLink = kind == "link"
+        let raw = (try? JSONSerialization.data(withJSONObject: item, options: [.sortedKeys])) ?? Data()
+        return SchoologyAttachment(
+            title: title, url: url, viewURL: converted, isLink: isLink, kind: kind,
+            attachmentID: attachmentID, fileMetadataID: metadataID, fileName: fileName,
+            mimeType: mime, fileSize: size, originalDownloadURL: original,
+            convertedDownloadURL: converted, convertedFileName: convertedName,
+            convertedMimeType: convertedMime, conversionStatus: conversion,
+            thumbnailURL: thumbnail, linkURL: link, embedCode: embedCode,
+            launchURL: launch, checksum: checksum, rawJSON: raw
+        )
+    }
+
+    static func isLinkRecord(_ item: [String: Any]) -> Bool {
+        let linkFields = ["link_url", "linkURL", "linkUrl", "link_title", "linkTitle", "href", "web_url", "webUrl"]
+        if linkFields.contains(where: { item[$0] != nil }) { return true }
+        let fileFields = ["file_download_url", "fileDownloadURL", "download_path", "downloadPath",
+                          "download_url", "downloadUrl", "resolveDownloadUrl", "resolve_download_url",
+                          "file_converted_download_url", "fileConvertedDownloadURL", "filename", "fileName"]
         guard !fileFields.contains(where: { item[$0] != nil }),
-              let rawURL = item["url"] as? String,
-              let url = URL(string: rawURL) else { return false }
+              let rawURL = item["url"] as? String, let url = URL(string: rawURL) else { return false }
         return url.pathExtension.isEmpty
     }
 }
@@ -183,25 +327,7 @@ struct SchoologyActivity: Identifiable, Sendable {
             let avatar = item["user_photo"] ?? item["photo_url"] ?? item["picture_url"] ?? item["pictureUrl"]
             let rawBody = SchoologyValue.string(item["body"] ?? item["message"] ?? item["description"] ?? item["title"])
             let rawAttachments = item["attachments"] ?? item["attachment"] ?? item["files"]
-            let attachments = SchoologyValue.list(
-                rawAttachments,
-                keys: ["files", "file", "links", "link", "attachment", "attachments", "items", "data"]
-            ).compactMap { attachment -> SchoologyAttachment? in
-                let rawURL = attachment["linkURL"] ?? attachment["linkUrl"] ?? attachment["href"] ??
-                    attachment["url"] ?? attachment["web_url"] ?? attachment["webUrl"] ??
-                    attachment["file_download_url"] ?? attachment["fileDownloadURL"] ??
-                    attachment["download_path"] ?? attachment["downloadPath"]
-                guard let url = SchoologyValue.url(rawURL) else { return nil }
-                let title = SchoologyValue.string(
-                    attachment["title"] ?? attachment["filename"] ?? attachment["fileName"] ?? attachment["linkTitle"],
-                    fallback: url.host ?? "Attachment"
-                )
-                let conversion = SchoologyValue.string(attachment["converted_status"] ?? attachment["convertedStatus"] ?? attachment["file_converted_status"] ?? attachment["fileConvertedStatus"]).lowercased()
-                let converted = SchoologyValue.url(attachment["file_converted_download_url"] ?? attachment["fileConvertedDownloadURL"] ?? attachment["converted_download_path"] ?? attachment["convertedDownloadPath"])
-                let viewURL = ["success", "converted", "1"].contains(conversion) ? converted : nil
-                return SchoologyAttachment(title: title, url: url, viewURL: viewURL,
-                    isLink: SchoologyAttachment.isLinkRecord(attachment))
-            }
+            let attachments = SchoologyAttachment.decodeList(rawAttachments)
             return SchoologyActivity(
                 id: SchoologyValue.string(item["id"] ?? item["update_id"] ?? item["updateId"], fallback: String(index)),
                 authorName: SchoologyValue.string(item["display_name"] ?? item["author_name"] ?? item["user_name"]),
@@ -558,34 +684,7 @@ struct SchoologyMessage: Identifiable, Hashable, Sendable {
             // across every message in a thread.
             let rawID = item["id"] ?? item["message_id"] ?? item["messageId"] else { return nil }
             let attachmentRoot = item["attachments"] ?? item["attachment"] ?? [:]
-            let attachmentItems = SchoologyValue.list(
-                attachmentRoot,
-                keys: ["files", "file", "file-attachment", "links", "link", "embeds", "embed",
-                       "attachments", "attachment", "items", "list", "data", "response"]
-            )
-            let attachments = attachmentItems.compactMap { attachment -> SchoologyAttachment? in
-                guard let url = SchoologyValue.url(
-                    attachment["linkURL"] ?? attachment["linkUrl"] ?? attachment["href"] ??
-                    attachment["file_download_url"] ?? attachment["fileDownloadURL"] ??
-                    attachment["download_path"] ?? attachment["downloadPath"] ??
-                    attachment["download_url"] ?? attachment["downloadUrl"] ??
-                    attachment["resolveDownloadUrl"] ?? attachment["resolve_download_url"] ??
-                    attachment["url"]
-                ) else { return nil }
-                let conversion = SchoologyValue.string(attachment["converted_status"] ?? attachment["convertedStatus"] ?? attachment["file_converted_status"] ?? attachment["fileConvertedStatus"]).lowercased()
-                let converted = SchoologyValue.url(attachment["file_converted_download_url"] ?? attachment["fileConvertedDownloadURL"] ?? attachment["converted_download_path"] ?? attachment["convertedDownloadPath"])
-                let viewURL = ["success", "converted", "1"].contains(conversion) ? converted : nil
-                return SchoologyAttachment(
-                    title: SchoologyValue.string(
-                        attachment["filename"] ?? attachment["fileName"] ??
-                        attachment["file_title"] ?? attachment["fileTitle"] ??
-                        attachment["title"] ?? attachment["linkTitle"],
-                        fallback: url.lastPathComponent
-                    ),
-                    url: url, viewURL: viewURL,
-                    isLink: SchoologyAttachment.isLinkRecord(attachment)
-                )
-            }
+            let attachments = SchoologyAttachment.decodeList(attachmentRoot)
             let status = SchoologyValue.string(item["message_status"] ?? item["messageStatus"])
             let recipientList = SchoologyValue.string(item["recipient_ids"] ?? item["recipientIds"] ?? item["recipient_id"])
             let author = (item["author"] as? [String: Any]) ?? (item["sender"] as? [String: Any]) ?? [:]

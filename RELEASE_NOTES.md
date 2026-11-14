@@ -1,3 +1,15 @@
+## [2026.10.0-port.158] - 2026-11-14
+
+### Attachment metadata and decoding
+- Extend the shared attachment model with attachment/file metadata IDs, kind, original and converted download URLs, conversion state, converted filename/MIME, thumbnail, link/video/embed/external-tool destinations, size, checksum, and preserved source JSON.
+- Decode grouped and nested file, link, video, embed, and external-tool payloads through one normalizer for activity and message threads.
+- Preserve normalized attachments on resource items while retaining existing resource fields and compatibility URLs.
+- Keep authenticated Schoology session-cookie forwarding and OAuth signing for downloads; choose a converted URL only for a ready preview and retain the original URL for downloads.
+- Preserve server-provided original and converted filenames and avoid forcing every converted preview to a PDF extension.
+
+### Build
+- Increment the SwiftUI port version to `2026.10.0-port.158`.
+
 ## [2026.10.0-port.157] - 2026-11-14
 
 ### Resource navigation and editing
