@@ -918,13 +918,21 @@ final class AppSession {
         body: String,
         notes: String,
         linkURL: String,
-        maxPoints: Int
+        maxPoints: Int,
+        fileData: Data? = nil,
+        fileName: String = "",
+        fileMIME: String = "",
+        embedCode: String = "",
+        folderID: String = "0",
+        folderColor: String = "blue"
     ) async throws {
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         let cleanTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
         let cleanBody = body.trimmingCharacters(in: .whitespacesAndNewlines)
         let cleanNotes = notes.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !cleanTitle.isEmpty, ["page", "discussion", "assignment", "document"].contains(type) else {
+        let supportedTypes = ["page", "discussion", "assignment", "documentLink", "documentFile",
+                              "documentVideo", "documentEmbed", "folder"]
+        guard !cleanTitle.isEmpty, supportedTypes.contains(type) else {
             throw SchoologyAPIError.invalidResponse
         }
         let path = "/v1/collections/\(collectionID)/resources"
@@ -933,15 +941,19 @@ final class AppSession {
             throw NSError(domain: "ClassWire.ResourceCreation", code: 403,
                 userInfo: [NSLocalizedDescriptionKey: "Schoology does not allow this account to add resources to the selected collection."])
         }
+
         var templateFields: [String: Any] = [:]
-        var payload: [String: Any] = ["title": cleanTitle, "type": type, "resource_notes": cleanNotes]
+        var attachments: [String: Any] = [:]
+        let resourceType = type.hasPrefix("document") ? "document" : type
+        var payload: [String: Any] = ["title": cleanTitle, "type": resourceType, "resource_notes": cleanNotes]
+
         switch type {
         case "page", "discussion":
             templateFields["body"] = cleanBody
         case "assignment":
             templateFields["body"] = cleanBody
             templateFields["max_points"] = max(0, maxPoints)
-        case "document":
+        case "documentLink":
             guard let url = URL(string: linkURL.trimmingCharacters(in: .whitespacesAndNewlines)),
                   ["http", "https"].contains(url.scheme?.lowercased() ?? "") else {
                 throw NSError(domain: "ClassWire.ResourceCreation", code: 400,
@@ -949,10 +961,51 @@ final class AppSession {
             }
             templateFields["document_type"] = "link"
             payload["attachments"] = [["url": url.absoluteString]]
-        default: throw SchoologyAPIError.invalidResponse
+        case "documentFile":
+            guard let fileData, !fileData.isEmpty, !fileName.isEmpty else {
+                throw NSError(domain: "ClassWire.ResourceCreation", code: 400,
+                    userInfo: [NSLocalizedDescriptionKey: "Choose a file before creating this resource."])
+            }
+            let fileID = try await uploadResourceFile(
+                data: fileData,
+                filename: fileName,
+                mime: fileMIME.isEmpty ? "application/octet-stream" : fileMIME
+            )
+            templateFields["document_type"] = "file"
+            attachments["files"] = ["file": [["id": fileID]]]
+        case "documentVideo":
+            guard let url = URL(string: linkURL.trimmingCharacters(in: .whitespacesAndNewlines)),
+                  ["http", "https"].contains(url.scheme?.lowercased() ?? "") else {
+                throw NSError(domain: "ClassWire.ResourceCreation", code: 400,
+                    userInfo: [NSLocalizedDescriptionKey: "Enter a valid HTTP or HTTPS video URL."])
+            }
+            templateFields["document_type"] = "video"
+            attachments["videos"] = ["video": [["url": url.absoluteString, "title": cleanTitle, "type": "video"]]]
+        case "documentEmbed":
+            let cleanEmbed = embedCode.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !cleanEmbed.isEmpty else {
+                throw NSError(domain: "ClassWire.ResourceCreation", code: 400,
+                    userInfo: [NSLocalizedDescriptionKey: "Enter embed code from a trusted provider."])
+            }
+            templateFields["document_type"] = "embed"
+            attachments["embeds"] = ["embed": [["embed_code": cleanEmbed, "type": "embed"]]]
+        case "folder":
+            let validColors = ["black", "blue", "gray", "green", "orange", "pink", "purple", "red", "yellow"]
+            payload["folder_id"] = Int64(folderID) ?? 0
+            payload["color"] = validColors.contains(folderColor) ? folderColor : "blue"
+        default:
+            throw SchoologyAPIError.invalidResponse
         }
-        payload["template_fields"] = templateFields
+
+        if !attachments.isEmpty { payload["attachments"] = attachments }
+        if !templateFields.isEmpty { payload["template_fields"] = templateFields }
         _ = try await api.postJSON("collections/\(collectionID)/resources", auth: auth, body: payload)
+    }
+
+    func uploadResourceFile(data: Data, filename: String, mime: String) async throws -> String {
+        if isDemoMode { return storeDemoUpload(data, filename: filename, mime: mime) }
+        guard let auth else { throw SchoologyAPIError.notSignedIn }
+        return try await api.uploadResourceFile(data: data, filename: filename, mime: mime, auth: auth)
     }
 
     private static func postableLocations(_ data: Data) -> Set<String> {

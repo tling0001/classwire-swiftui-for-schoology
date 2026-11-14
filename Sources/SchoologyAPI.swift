@@ -681,6 +681,11 @@ actor SchoologyAPI {
         return "OAuth " + fields.map { "\($0.0)=\"\($0.1)\"" }.joined(separator: ", ")
     }
 
+    /// Resource documents use the same Schoology FileService multipart contract as message attachments.
+    func uploadResourceFile(data: Data, filename: String, mime: String, auth: SchoologyAuth) async throws -> String {
+        try await uploadMessageFile(data: data, filename: filename, mime: mime, auth: auth)
+    }
+
     func uploadMessageFile(data: Data, filename: String, mime: String, auth: SchoologyAuth) async throws -> String {
         await syncServerTime()
         let boundary = UUID().uuidString

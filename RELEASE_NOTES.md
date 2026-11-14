@@ -1,3 +1,15 @@
+## [2026.10.0-port.150]
+
+### Resource documents, attachments, and folders
+- Add resource document uploads using the native file importer and Schoology FileService multipart upload; preserve security-scoped file access and derive the MIME type from the selected file.
+- Add video URL and iframe embed attachment options using the Schoology attachment model fields.
+- Add permission-checked resource folder creation, including folder color and parent-folder metadata.
+- Re-check the collection resources POST permission before uploading or creating; unknown permissions continue to deny the operation.
+- Keep the existing Page, Discussion, Assignment, and Document Link flows.
+
+### Build
+- Increment the app marketing version to `2026.10.150` and build number to `150`.
+
 ## [2026.10.0-port.149]
 
 ### macOS build fix
