@@ -880,7 +880,7 @@ final class AppSession {
             for row in rows {
                 guard let location = row["location"] as? String else { continue }
                 let body = String(describing: row["body"] ?? "").lowercased()
-                if body.range(of: #"\\bpost\\b"#, options: .regularExpression) != nil {
+                if body.range(of: #"\bpost\b"#, options: .regularExpression) != nil {
                     postable.insert(location)
                 }
             }
@@ -1013,7 +1013,7 @@ final class AppSession {
         return Set(rows.compactMap { row in
             guard let location = row["location"] as? String else { return nil }
             let body = String(describing: row["body"] ?? "").lowercased()
-            return body.range(of: #"\\bpost\\b"#, options: .regularExpression) != nil ? location : nil
+            return body.range(of: #"\bpost\b"#, options: .regularExpression) != nil ? location : nil
         })
     }
 

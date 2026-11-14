@@ -1,3 +1,12 @@
+## [2026.10.0-port.154]
+
+### Resource creation permission detection
+- Fix the word-boundary expression used to parse Schoology multioptions POST permissions. The previous double-escaped expression searched for a literal `\\bpost\\b` string, causing writable collections to appear read-only and disabling the Resources plus button.
+- Apply the corrected parser to toolbar capability discovery and both live creation permission checks; keep the live server-side permission checks intact.
+
+### Build
+- Increment the app marketing version to `2026.10.154` and build number to `154`.
+
 ## [2026.10.0-port.153]
 
 ### iPhone toolbar and refresh reliability
