@@ -944,7 +944,14 @@ final class AppSession {
         var templateFields: [String: Any] = [:]
         var attachments: [String: Any] = [:]
         let resourceType = type.hasPrefix("document") ? "document" : type
-        var payload: [String: Any] = ["title": cleanTitle, "type": resourceType, "resource_notes": cleanNotes]
+        var payload: [String: Any] = [
+            "title": cleanTitle,
+            "type": resourceType,
+            "resource_notes": cleanNotes
+        ]
+        if let parentFolderID = Int64(folderID), parentFolderID > 0 {
+            payload["folder_id"] = parentFolderID
+        }
 
         switch type {
         case "page", "discussion":

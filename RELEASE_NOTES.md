@@ -1,3 +1,24 @@
+## [2026.10.0-port.156] - 2026-11-14
+
+### Nested resource folders
+- Open collection folders as native SwiftUI navigation destinations instead of requiring inline disclosure expansion in the standalone collection browser.
+- Keep the parent collection context across nested folder levels, with refresh and permission-aware creation actions at each level.
+- Create resources and child folders in the active folder by forwarding its folder ID through the composer and API payload.
+- Preserve disclosure-based folder browsing in resource-picker and other contexts that depend on inline selection.
+
+### Build
+- Increment the SwiftUI port version to `2026.10.0-port.156`.
+
+## [2026.10.0-port.155] - 2026-11-14
+
+### Resource creation permissions
+- Hide the Resources plus toolbar action when the account has no resource-creation permission, matching the homepage's permission-aware action visibility.
+- Apply the same visibility rule inside a collection instead of leaving a disabled plus button visible.
+- Keep New Collection, New Resource Item, and New Folder individually permission-gated.
+
+### Build
+- Increment the SwiftUI port version to `2026.10.0-port.155`.
+
 ## [2026.10.0-port.154]
 
 ### Resource creation permission detection

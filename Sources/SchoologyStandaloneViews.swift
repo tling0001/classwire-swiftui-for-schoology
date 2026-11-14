@@ -79,7 +79,8 @@ struct SchoologyResourcesView: View {
                     Task { await session.loadResources(force: true) }
                 }
                 .disabled(session.isLoadingResources)
-                Menu {
+                if session.canCreateResourceCollection || !session.creatableResourceCollections.isEmpty {
+                    Menu {
                         if session.canCreateResourceCollection {
                             Button("New Collection", systemImage: "folder.badge.plus") { creationMode = .collection }
                         }
@@ -91,7 +92,7 @@ struct SchoologyResourcesView: View {
                         Image(systemName: "plus")
                     }
                     .accessibilityLabel("Create")
-                    .disabled(!session.canCreateResourceCollection && session.creatableResourceCollections.isEmpty)
+                }
             }
         }
         .sheet(item: $creationMode) { mode in
@@ -154,6 +155,7 @@ private struct SchoologyResourceCollectionView: View {
         SchoologyResourcesContentView(
             items: items,
             source: .collection(collectionID: collection.id),
+            collection: collection,
             isLoading: loading,
             error: error,
             emptyTitle: "No resources",
@@ -169,14 +171,15 @@ private struct SchoologyResourceCollectionView: View {
                     Task { await load() }
                 }
                 .disabled(loading)
-                Menu {
-                    Button("New Resource Item", systemImage: "doc.badge.plus") { creationMode = .resource }
-                    Button("New Folder", systemImage: "folder.badge.plus") { creationMode = .folder }
-                } label: {
-                    Image(systemName: "plus")
+                if session.canCreateResource(in: collection.id) {
+                    Menu {
+                        Button("New Resource Item", systemImage: "doc.badge.plus") { creationMode = .resource }
+                        Button("New Folder", systemImage: "folder.badge.plus") { creationMode = .folder }
+                    } label: {
+                        Image(systemName: "plus")
+                    }
+                    .accessibilityLabel("Create a resource item or folder in \(collection.title)")
                 }
-                .accessibilityLabel("Create a resource item or folder in \(collection.title)")
-                .disabled(!session.canCreateResource(in: collection.id))
             }
         }
         .sheet(item: $creationMode) { mode in

@@ -10,6 +10,7 @@ enum SchoologyResourceBrowserSource: Sendable {
 struct SchoologyResourcesContentView: View {
     let items: [SchoologyProfileItem]
     let source: SchoologyResourceBrowserSource
+    var collection: SchoologyResourceCollection? = nil
     let isLoading: Bool
     let error: String?
     let emptyTitle: String
@@ -28,7 +29,7 @@ struct SchoologyResourcesContentView: View {
             } else {
                 List {
                     ForEach(items) { item in
-                        SchoologyInlineResourceItemRow(item: item, source: source, selection: selection)
+                        SchoologyInlineResourceItemRow(item: item, source: source, collection: collection, selection: selection)
                     }
                 }
                 .schoologyInsetGroupedListStyle()
@@ -42,12 +43,13 @@ struct SchoologyResourcesContentView: View {
 }
 
 /// Shared recursive row for group resources, collections, the standalone Resources
-/// page, and the resource picker. Its native folder disclosure rows mirror Course Materials.
+/// page, and the resource picker. Collection folders navigate; picker folders remain expandable.
 struct SchoologyInlineResourceItemRow: View {
     @Environment(AppSession.self) private var session
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let item: SchoologyProfileItem
     let source: SchoologyResourceBrowserSource
+    var collection: SchoologyResourceCollection? = nil
     var selection: Binding<[String: SchoologyPickedResource]>? = nil
     @State private var isExpanded = false
     @State private var children: [SchoologyProfileItem]?
@@ -56,7 +58,17 @@ struct SchoologyInlineResourceItemRow: View {
 
     var body: some View {
         if item.isFolder {
-            folderRow
+            if selection == nil, let collection {
+                NavigationLink {
+                    SchoologyResourceFolderView(collection: collection, folder: item)
+                } label: {
+                    folderNavigationLabel
+                }
+                .disabled(!item.isAvailable)
+                .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
+            } else {
+                folderRow
+            }
         } else if let selection {
             selectableItemRow(selection)
                 .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
@@ -67,6 +79,29 @@ struct SchoologyInlineResourceItemRow: View {
             resourceItemRow
                 .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
         }
+    }
+
+    private var folderNavigationLabel: some View {
+        HStack(alignment: .center, spacing: 9) {
+            Image(systemName: "folder.fill")
+                .foregroundStyle(folderTint)
+                .frame(width: 20)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(item.title).font(.body)
+                if !item.body.isEmpty {
+                    Text(item.body)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(nil)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                SchoologyCourseMaterialStatusLabel(item: item)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+        .contentShape(Rectangle())
     }
 
     private var folderRow: some View {
@@ -93,7 +128,7 @@ struct SchoologyInlineResourceItemRow: View {
                     .transition(.opacity.combined(with: .move(edge: .top)))
             } else if let children {
                 ForEach(children) { child in
-                    SchoologyInlineResourceItemRow(item: child, source: source, selection: selection)
+                    SchoologyInlineResourceItemRow(item: child, source: source, collection: collection, selection: selection)
                         .transition(.opacity.combined(with: .move(edge: .top)))
                 }
             }

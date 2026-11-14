@@ -223,7 +223,8 @@ struct SchoologyResourceCreationSheet: View {
                     fileData: filePayload?.0,
                     fileName: filePayload?.1 ?? "",
                     fileMIME: filePayload?.2 ?? "",
-                    embedCode: embedCode
+                    embedCode: embedCode,
+                    folderID: preferredFolderID ?? "0"
                 )
             }
             await onCreated()
