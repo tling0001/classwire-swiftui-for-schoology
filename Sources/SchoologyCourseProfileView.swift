@@ -373,7 +373,7 @@ struct SchoologyCourseMaterialDestinationView: View {
     var body: some View {
         if item.isFolder {
             SchoologyCourseResourceFolderView(courseID: courseID, item: item)
-        } else if item.kind.lowercased() == "media-album" {
+        } else if ["media-album", "media_album"].contains(item.kind.lowercased()) {
             SchoologyCourseAlbumDetailView(courseID: courseID, albumID: item.id, title: item.title)
         } else if requiresDocumentResolution {
             Group {
@@ -401,7 +401,7 @@ struct SchoologyCourseMaterialDestinationView: View {
             SchoologyDiscussionDetailView(realm: "sections", realmID: courseID, itemID: item.id, title: item.title)
         } else if item.kind.contains("event") {
             SchoologyEventDetailView(realm: "sections", realmID: courseID, eventID: item.id, title: item.title)
-        } else if ["assessment", "assessment_v2", "managed_assessment", "quiz"].contains(item.kind) {
+        } else if ["assessment", "assessment_v2", "managed_assessment", "quiz", "test_quiz"].contains(item.kind) {
             let host = session.canadianServer ? "app.schoologyca.com" : "app.schoology.com"
             if let url = URL(string: "https://\(host)/assignment/\(item.id)") {
                 SchoologyEmbeddedWebView(url: url, title: item.title)
@@ -426,7 +426,7 @@ struct SchoologyCourseMaterialDestinationView: View {
     private var requiresDocumentResolution: Bool {
         let kind = item.kind.lowercased()
         let documentType = item.documentType.lowercased()
-        return ["document", "package", "web_package", "scorm"].contains(kind) ||
+        return ["document", "package", "web_package", "webpackage", "scorm", "scorm_package"].contains(kind) ||
             ["external_tool", "video", "embed"].contains(documentType)
     }
 

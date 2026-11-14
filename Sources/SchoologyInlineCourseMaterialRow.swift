@@ -1,14 +1,21 @@
 import SwiftUI
 
+@MainActor
+private func openSchoologyResourceURL(_ url: URL, using openURL: OpenURLAction) {
+    let destination = url.scheme == nil
+        ? (URL(string: "https://\(url.absoluteString)") ?? url)
+        : url
+    openURL(destination)
+}
+
 /// File materials open their action sheet directly from the Materials list instead of
 /// pushing a placeholder destination page into the navigation stack.
 struct SchoologyCourseMaterialLinkRow: View {
     @Environment(AppSession.self) private var session
+    @Environment(\.openURL) private var openURL
     let courseID: String
     let item: SchoologyProfileItem
     @State private var selectedAttachment: SchoologyAttachment?
-    @State private var linkedURL: URL?
-    @State private var isShowingLinkedMaterial = false
     @State private var isResolving = false
     @State private var errorMessage: String?
     @State private var showingError = false
@@ -38,13 +45,6 @@ struct SchoologyCourseMaterialLinkRow: View {
         .sheet(item: $selectedAttachment) { attachment in
             SchoologyAttachmentsView(attachments: [attachment])
         }
-        .navigationDestination(isPresented: $isShowingLinkedMaterial) {
-            if let linkedURL {
-                SchoologyEmbeddedWebView(url: linkedURL, title: item.title)
-            } else {
-                ContentUnavailableView("Unable to open link", systemImage: "exclamationmark.triangle")
-            }
-        }
         .alert("Unable to open link", isPresented: $showingError) {
             Button("OK", role: .cancel) { }
         } message: {
@@ -63,16 +63,14 @@ struct SchoologyCourseMaterialLinkRow: View {
             if let attachment = detail.attachment {
                 selectedAttachment = attachment
             } else if let url = detail.linkURL ?? item.url ?? item.fileViewURL {
-                linkedURL = url
-                isShowingLinkedMaterial = true
+                openSchoologyResourceURL(url, using: openURL)
             } else {
                 errorMessage = "Schoology did not provide a destination for this link."
                 showingError = true
             }
         } catch {
             if let url = item.url ?? item.fileViewURL {
-                linkedURL = url
-                isShowingLinkedMaterial = true
+                openSchoologyResourceURL(url, using: openURL)
             } else {
                 errorMessage = error.localizedDescription
                 showingError = true
@@ -83,13 +81,12 @@ struct SchoologyCourseMaterialLinkRow: View {
 
 struct SchoologyCourseMaterialFileRow: View {
     @Environment(AppSession.self) private var session
+    @Environment(\.openURL) private var openURL
     let courseID: String
     let item: SchoologyProfileItem
 
 
     @State private var selectedAttachment: SchoologyAttachment?
-    @State private var linkedURL: URL?
-    @State private var isShowingLinkedMaterial = false
     @State private var isResolving = false
     @State private var errorMessage: String?
 
@@ -118,13 +115,6 @@ struct SchoologyCourseMaterialFileRow: View {
         .sheet(item: $selectedAttachment) { attachment in
             SchoologyAttachmentsView(attachments: [attachment])
         }
-        .navigationDestination(isPresented: $isShowingLinkedMaterial) {
-            if let linkedURL {
-                SchoologyEmbeddedWebView(url: linkedURL, title: item.title)
-            } else {
-                ContentUnavailableView("Unable to open material", systemImage: "exclamationmark.triangle")
-            }
-        }
         .alert("Unable to open material", item: $errorMessage) { _ in
             Button("OK", role: .cancel) { }
         } message: { message in
@@ -146,8 +136,7 @@ struct SchoologyCourseMaterialFileRow: View {
                 if isSupportedFileURL(url) {
                     selectedAttachment = SchoologyAttachment(title: item.fileName.isEmpty ? item.title : item.fileName, url: url, viewURL: item.fileViewURL == url ? nil : item.fileViewURL)
                 } else {
-                    linkedURL = url
-                    isShowingLinkedMaterial = true
+                    openSchoologyResourceURL(url, using: openURL)
                 }
             } else {
                 errorMessage = "Schoology did not return a file or link for this material."
@@ -157,8 +146,7 @@ struct SchoologyCourseMaterialFileRow: View {
                 if isSupportedFileURL(url) {
                     selectedAttachment = SchoologyAttachment(title: item.fileName.isEmpty ? item.title : item.fileName, url: url, viewURL: item.fileViewURL == url ? nil : item.fileViewURL)
                 } else {
-                    linkedURL = url
-                    isShowingLinkedMaterial = true
+                    openSchoologyResourceURL(url, using: openURL)
                 }
             } else {
                 errorMessage = error.localizedDescription

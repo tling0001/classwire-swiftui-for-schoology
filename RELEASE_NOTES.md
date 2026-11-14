@@ -1,3 +1,19 @@
+## [2026.10.0-port.147]
+
+### Resources and external links
+- Open ordinary resource links with SwiftUI's system URL handler so links leave the iPhone navigation stack and open through the system's default browser behavior.
+- Keep external tools and embedded resources in the authenticated Schoology web view.
+- Decode Schoology's nested collection attachment payloads for links, files, external tools, videos, and embeds, including nested link URLs, download paths, converted file URLs, filenames, MIME types, and embed iframe sources.
+- Normalize scheme-less external resource links to HTTPS and preserve resource notes and template body text.
+
+### Course Materials and Resources presentation
+- Use regular body text for material and resource item titles instead of semibold titles.
+- Use the native SF Symbols puzzle-piece glyph for legacy assessments, assessment v2, managed assessments, and quiz/test-quiz items across Course Materials, Resources, Upcoming, and notifications.
+- Recognize Android material identifiers for `test_quiz`, `scorm_package`, and `media_album` in icon selection and course-material routing.
+
+### Build
+- Increment the app marketing version to `2026.10.147` and build number to `147`.
+
 ## [2026.10.0-port.146]
 
 ### Recent activity post HTML

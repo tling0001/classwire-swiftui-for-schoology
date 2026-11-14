@@ -46,7 +46,7 @@ struct SchoologyNotificationTargetView: View {
         let host = session.canadianServer ? "app.schoologyca.com" : "app.schoology.com"
         let path: String
         switch type {
-        case "assignment", "assessment", "assessment_v2", "managed_assessment": path = "/assignment/\(targetID)"
+        case "assignment", "assessment", "assessment_v2", "managed_assessment", "test_quiz": path = "/assignment/\(targetID)"
         case "discussion": path = "/discussion/\(targetID)"
         case "event": path = "/event/\(targetID)"
         case "document": path = "/\(realm)/\(realmID)/documents/\(targetID)"

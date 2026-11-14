@@ -553,7 +553,7 @@ struct UpcomingEventList: View {
     private func icon(for type: String) -> String {
         switch type {
         case "assignment": "pencil"
-        case "assessment", "assessment_v2", "managed_assessment", "quiz": "doc.text.magnifyingglass"
+        case "assessment", "assessment_v2", "managed_assessment", "quiz", "test_quiz": "puzzlepiece"
         case "discussion": "text.bubble"
         case "external_tool", "lti", "lti_assignment": "app"
         case "event": "calendar"
@@ -661,7 +661,7 @@ struct UpcomingEventDetailView: View {
             } else {
                 unavailableTarget("Schoology did not provide an external-tool destination.")
             }
-        case "assessment", "assessment_v2", "managed_assessment", "quiz":
+        case "assessment", "assessment_v2", "managed_assessment", "quiz", "test_quiz":
             if let url = event.webURL {
                 SchoologyEmbeddedWebView(url: url, title: event.title)
             } else {

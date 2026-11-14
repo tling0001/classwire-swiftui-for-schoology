@@ -12,7 +12,7 @@ struct SchoologyNotificationArgument: Identifiable, Hashable, Sendable {
     var symbol: String {
         switch type {
         case "assignment": "doc.text"
-        case "assessment", "assessment_v2", "managed_assessment": "doc.text.magnifyingglass"
+        case "assessment", "assessment_v2", "managed_assessment", "quiz", "test_quiz": "puzzlepiece"
         case "discussion": "text.bubble"
         case "event": "calendar"
         case "document":

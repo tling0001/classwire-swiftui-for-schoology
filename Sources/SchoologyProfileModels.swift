@@ -76,16 +76,66 @@ struct SchoologyProfileItem: Identifiable, Sendable {
             let adminFlags: [Any?] = [item["admin"], item["is_admin"], item["isAdmin"], item["group_admin"], item["groupAdmin"], item["is_group_admin"], item["isGroupAdmin"], item["owner"], item["is_owner"], item["isOwner"], person["admin"], person["is_admin"], person["isAdmin"], person["group_admin"], person["groupAdmin"], person["is_group_admin"], person["isGroupAdmin"], person["owner"], person["is_owner"], person["isOwner"]]
             let normalizedRole = roleText.lowercased().replacingOccurrences(of: "_", with: " ").replacingOccurrences(of: "-", with: " ")
             let isAdmin = adminFlags.contains(where: { SchoologyValue.bool($0) }) || ["admin", "administrator", "owner"].contains { normalizedRole.contains($0) }
-            let rawTitle = SchoologyValue.string(item["title"] ?? item["subject"] ?? item["template_title"] ?? item["templateTitle"] ?? person["name_display"] ?? person["display_name"] ?? person["name"])
-            let file = SchoologyValue.list(item["attachments"] ?? item["attachment"], keys: ["files", "file", "items"]).first ?? item
+            let attachmentValue = item["attachments"] ?? item["attachment"]
+            let file = SchoologyValue.list(attachmentValue, keys: ["files", "file", "items"]).first ?? item
+            let link = SchoologyValue.list(attachmentValue, keys: ["links", "link", "items"]).first ?? [:]
+            let embed = SchoologyValue.list(attachmentValue, keys: ["embeds", "embed", "items"]).first ?? [:]
+            let externalTool = SchoologyValue.list(attachmentValue, keys: ["external_tools", "external_tool", "tool", "items"]).first ?? [:]
+            let video = SchoologyValue.list(attachmentValue, keys: ["videos", "video", "items"]).first ?? [:]
+            let rawTitle = SchoologyValue.string(
+                item["title"] ?? item["subject"] ?? item["template_title"] ?? item["templateTitle"] ??
+                link["title"] ?? externalTool["title"] ?? video["title"] ??
+                person["name_display"] ?? person["display_name"] ?? person["name"]
+            )
             let fileViewURL = SchoologyValue.url(
                 file["file_converted_download_url"] ?? file["fileConvertedDownloadURL"] ??
                 file["converted_download_path"] ?? file["convertedDownloadPath"] ??
                 item["file_converted_download_url"] ?? item["fileConvertedDownloadURL"] ??
                 item["converted_download_path"] ?? item["convertedDownloadPath"]
             )
-            let fileName = SchoologyValue.string(file["filename"] ?? file["fileName"] ?? item["filename"] ?? item["fileName"], fallback: rawTitle)
-            let fileMIME = SchoologyValue.string(file["filemime"] ?? file["fileMIME"] ?? file["mime"] ?? item["filemime"] ?? item["fileMIME"])
+            let fileName = SchoologyValue.string(
+                file["filename"] ?? file["fileName"] ?? file["title"] ??
+                item["filename"] ?? item["fileName"], fallback: rawTitle
+            )
+            let fileMIME = SchoologyValue.string(
+                file["filemime"] ?? file["fileMIME"] ?? file["mime"] ??
+                item["filemime"] ?? item["fileMIME"]
+            )
+            let embedCode = SchoologyValue.string(embed["embed_code"] ?? embed["embedCode"])
+            let embedSourceURL: URL? = {
+                let pattern = #"(?is)\bsrc\s*=\s*["']([^"']+)["']"#
+                guard let regex = try? NSRegularExpression(pattern: pattern),
+                      let match = regex.firstMatch(in: embedCode, range: NSRange(embedCode.startIndex..., in: embedCode)),
+                      let range = Range(match.range(at: 1), in: embedCode) else { return nil }
+                return SchoologyValue.url(String(embedCode[range]))
+            }()
+            let directResourceURLCandidate = SchoologyValue.url(
+                person["profile_url"] ?? person["profileUrl"] ??
+                item["url"] ?? item["web_url"] ?? item["webUrl"] ?? item["location"] ??
+                (item["link"] as? String) ?? item["photo_url"] ?? item["photoUrl"] ?? item["original_url"] ?? item["originalUrl"]
+            )
+            let isResourceLink = documentType == "link" || normalizedKind.contains("link")
+            let directResourceURL: URL? = {
+                guard let candidate = directResourceURLCandidate else { return nil }
+                guard isResourceLink, candidate.scheme == nil else { return candidate }
+                return SchoologyValue.url("https://\(candidate.absoluteString)")
+            }()
+            let rawAttachmentLink = SchoologyValue.string(link["url"]).trimmingCharacters(in: .whitespacesAndNewlines)
+            let attachmentLinkURL: URL? = {
+                guard !rawAttachmentLink.isEmpty else { return nil }
+                let lowercased = rawAttachmentLink.lowercased()
+                let normalized = lowercased.hasPrefix("http://") || lowercased.hasPrefix("https://") ||
+                    rawAttachmentLink.hasPrefix("/") || rawAttachmentLink.hasPrefix("//")
+                    ? rawAttachmentLink : "https://\(rawAttachmentLink)"
+                return SchoologyValue.url(normalized)
+            }()
+            let attachmentResourceURL = attachmentLinkURL ?? SchoologyValue.url(
+                externalTool["url"] ?? video["url"] ??
+                file["file_download_url"] ?? file["fileDownloadURL"] ??
+                file["download_path"] ?? file["downloadPath"] ??
+                item["file_download_url"] ?? item["download_path"]
+            )
+            let resourceURL = directResourceURL ?? attachmentResourceURL ?? embedSourceURL
             let school = (person["school"] as? [String: Any]) ?? [:]
             let rawDueDate = SchoologyValue.string(item["due"] ?? item["due_date"] ?? item["dueDate"])
             let subtitle = !roleText.isEmpty
@@ -96,9 +146,13 @@ struct SchoologyProfileItem: Identifiable, Sendable {
             return Self(
                 id: SchoologyValue.string(rawID, fallback: String(index)),
                 title: rawTitle.isEmpty ? (displayName.isEmpty ? "ClassWire" : displayName) : rawTitle,
-                body: SchoologyValue.plainText(SchoologyValue.string(item["body"] ?? item["description"] ?? item["folder_description"] ?? item["folderDescription"] ?? item["message"] ?? person["bio"] ?? person["about"])),
+                body: SchoologyValue.plainText(SchoologyValue.string(
+                    item["body"] ?? item["description"] ?? item["folder_description"] ?? item["folderDescription"] ??
+                    item["resource_notes"] ?? item["resourceNotes"] ?? item["message"] ??
+                    templateFields["body"] ?? link["summary"] ?? person["bio"] ?? person["about"]
+                )),
                 subtitle: subtitle,
-                url: SchoologyValue.url(person["profile_url"] ?? person["profileUrl"] ?? item["link"] ?? item["url"] ?? item["web_url"] ?? item["webUrl"] ?? item["location"] ?? file["file_download_url"] ?? file["fileDownloadURL"] ?? file["download_path"] ?? file["downloadPath"] ?? item["file_download_url"] ?? item["download_path"] ?? item["photo_url"] ?? item["photoUrl"] ?? item["original_url"] ?? item["originalUrl"]),
+                url: resourceURL,
                 isAdmin: isAdmin,
                 kind: normalizedKind,
                 collectionID: SchoologyValue.optionalString(item["collection_id"] ?? item["collectionID"] ?? item["collectionId"]),

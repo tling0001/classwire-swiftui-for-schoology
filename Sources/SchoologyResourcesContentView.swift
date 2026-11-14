@@ -142,7 +142,7 @@ struct SchoologyInlineResourceItemRow: View {
             HStack(spacing: 10) {
                 VStack(alignment: .leading, spacing: 3) {
                     Label(item.title, systemImage: resourceSymbol)
-                        .font(.body.weight(.semibold))
+                        .font(.body)
                         .foregroundStyle(.primary)
                     SchoologyCourseMaterialStatusLabel(item: item)
                 }
@@ -168,7 +168,7 @@ struct SchoologyInlineResourceItemRow: View {
             } label: {
                 HStack(spacing: 10) {
                     Label(item.title, systemImage: resourceSymbol)
-                        .font(.body.weight(.semibold))
+                        .font(.body)
                         .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                     SchoologyCourseMaterialStatusLabel(item: item)
                 }
@@ -187,10 +187,15 @@ struct SchoologyInlineResourceItemRow: View {
                 resourceRowLabel
             }
             .disabled(!item.isAvailable)
-        } else if isLinkMaterial, let url = item.url ?? item.fileViewURL {
+        } else if item.documentType.lowercased() == "embed", let url = item.url ?? item.fileViewURL {
             NavigationLink {
                 SchoologyEmbeddedWebView(url: url, title: item.title)
             } label: {
+                resourceRowLabel
+            }
+            .disabled(!item.isAvailable)
+        } else if isLinkMaterial, let url = item.url ?? item.fileViewURL {
+            Link(destination: url) {
                 resourceRowLabel
             }
             .disabled(!item.isAvailable)
@@ -199,9 +204,7 @@ struct SchoologyInlineResourceItemRow: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .disabled(!item.isAvailable)
         } else if let url = item.url {
-            NavigationLink {
-                SchoologyEmbeddedWebView(url: url, title: item.title)
-            } label: {
+            Link(destination: url) {
                 resourceRowLabel
             }
             .disabled(!item.isAvailable)
@@ -218,7 +221,7 @@ struct SchoologyInlineResourceItemRow: View {
     private var resourceRowLabel: some View {
         HStack(spacing: 10) {
             Label(item.title, systemImage: resourceSymbol)
-                .font(.body.weight(.semibold))
+                .font(.body)
                 .frame(maxWidth: .infinity, alignment: .leading)
             SchoologyCourseMaterialStatusLabel(item: item)
         }
@@ -273,12 +276,12 @@ struct SchoologyInlineResourceItemRow: View {
         if isLinkMaterial { return "link" }
         if kind.contains("assignment") { return "pencil" }
         if kind.contains("page") { return "doc.text" }
-        if kind.contains("assessment") || kind.contains("quiz") { return "checklist" }
+        if kind.contains("assessment") || kind.contains("quiz") { return "puzzlepiece" }
         if kind.contains("discussion") { return "text.bubble" }
         if kind.contains("event") { return "calendar" }
-        if ["package", "scorm"].contains(kind) { return "shippingbox" }
+        if ["package", "scorm", "scorm_package"].contains(kind) { return "shippingbox" }
         if ["web_package", "webpackage"].contains(kind) { return "globe" }
-        if ["media-album", "album"].contains(kind) { return "photo.on.rectangle" }
+        if ["media-album", "media_album", "album"].contains(kind) { return "photo.on.rectangle" }
         switch item.documentType.lowercased() {
         case "external_tool": return "app"
         case "video": return "play.rectangle"

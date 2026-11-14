@@ -85,7 +85,7 @@ struct SchoologyInlineCourseMaterialRow: View {
             } label: {
                 HStack(spacing: 10) {
                     Label(item.title, systemImage: symbol)
-                        .font(.body.weight(.semibold))
+                        .font(.body)
                         .frame(maxWidth: .infinity, alignment: .leading)
                     SchoologyCourseMaterialStatusLabel(item: item)
                 }
@@ -133,10 +133,10 @@ struct SchoologyInlineCourseMaterialRow: View {
         if kind.contains("page") { return "doc.text" }
         if kind.contains("assignment") { return "pencil" }
         if kind.contains("event") { return "calendar" }
-        if ["assessment", "assessment_v2", "managed_assessment", "quiz"].contains(kind) { return "checklist" }
-        if ["package", "scorm"].contains(kind) { return "shippingbox" }
+        if ["assessment", "assessment_v2", "managed_assessment", "quiz", "test_quiz"].contains(kind) { return "puzzlepiece" }
+        if ["package", "scorm", "scorm_package"].contains(kind) { return "shippingbox" }
         if ["web_package", "webpackage"].contains(kind) { return "globe" }
-        if ["media-album", "album"].contains(kind) { return "photo.on.rectangle" }
+        if ["media-album", "media_album", "album"].contains(kind) { return "photo.on.rectangle" }
         switch item.documentType.lowercased() {
         case "external_tool": return "app"
         case "video": return "play.rectangle"
