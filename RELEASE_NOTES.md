@@ -1,3 +1,15 @@
+## [2026.10.0-port.148]
+
+### Standalone Resources creation
+- Add a permission-gated Create action to the standalone Resources toolbar, with separate New Collection and New Resource choices.
+- Add a Create Resource toolbar action inside collections when Schoology's multioptions response permits POST to that collection's resources endpoint.
+- Re-check Schoology permissions immediately before each create request; unknown permission states are treated as denied.
+- Support creating resource collections and the documented resource template types Page, Discussion, Assignment, and Document Link.
+- Use the official collection and resource-template JSON shapes, including template fields, resource notes, assignment points, and link attachments.
+
+### Build
+- Increment the app marketing version to `2026.10.148` and build number to `148`.
+
 ## [2026.10.0-port.147]
 
 ### Resources and external links

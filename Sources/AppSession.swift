@@ -35,6 +35,11 @@ final class AppSession {
     var hasLoadedResources = false
     var isLoadingResources = false
     var resourcesError: String?
+    var canCreateResourceCollection = false
+    var creatableResourceCollectionIDs: Set<String> = []
+    var creatableResourceCollections: [SchoologyResourceCollection] {
+        resourceCollections.filter { creatableResourceCollectionIDs.contains($0.id) }
+    }
     var userGradeCourses: [SchoologyUserGradeCourse] = []
     var hasLoadedUserGrades = false
     var isLoadingUserGrades = false
@@ -820,6 +825,8 @@ final class AppSession {
             resourceCollections = demoCollections
             resourceApps = [SchoologyResourceCollection(id: "demo-resource-app", title: "Class Library App", ownerID: "demo-teacher",
                 realm: "apps", sharedCount: 0, typeID: "app", folderID: "0", category: .apps, imageURL: nil)]
+            canCreateResourceCollection = false
+            creatableResourceCollectionIDs = []
             hasLoadedResources = true
             return
         }
@@ -851,11 +858,111 @@ final class AppSession {
             }
             resourceCollections = mine + shared + groups
             resourceApps = apps.map { $0.withCategory(.apps) }
+            await refreshResourceCreationPermissions(auth: auth, collections: all)
             hasLoadedResources = true
         } catch {
+            canCreateResourceCollection = false
+            creatableResourceCollectionIDs = []
             resourcesError = error.localizedDescription
             hasLoadedResources = true
         }
+    }
+
+    private func refreshResourceCreationPermissions(auth: SchoologyAuth, collections: [SchoologyResourceCollection]) async {
+        canCreateResourceCollection = false
+        creatableResourceCollectionIDs = []
+        let paths = ["/v1/collections"] + collections.map { "/v1/collections/\($0.id)/resources" }
+        do {
+            let data = try await api.postMultiOptions(paths, auth: auth)
+            let root = Self.object(data)
+            let rows = (root["response"] as? [[String: Any]]) ?? (root["responses"] as? [[String: Any]]) ?? []
+            var postable = Set<String>()
+            for row in rows {
+                guard let location = row["location"] as? String else { continue }
+                let body = String(describing: row["body"] ?? "").lowercased()
+                if body.range(of: #"\\bpost\\b"#, options: .regularExpression) != nil {
+                    postable.insert(location)
+                }
+            }
+            canCreateResourceCollection = postable.contains("/v1/collections")
+            creatableResourceCollectionIDs = Set(collections.compactMap { collection in
+                postable.contains("/v1/collections/\(collection.id)/resources") ? collection.id : nil
+            })
+        } catch {
+            // Unknown permission state is treated as denied; creation is never inferred from role names.
+            canCreateResourceCollection = false
+            creatableResourceCollectionIDs = []
+        }
+    }
+
+    func canCreateResource(in collectionID: String) -> Bool {
+        creatableResourceCollectionIDs.contains(collectionID)
+    }
+
+    func createResourceCollection(title: String) async throws {
+        guard let auth else { throw SchoologyAPIError.notSignedIn }
+        let cleanTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleanTitle.isEmpty else { throw SchoologyAPIError.invalidResponse }
+        let permissions = try await api.postMultiOptions(["/v1/collections"], auth: auth)
+        guard Self.postableLocations(permissions).contains("/v1/collections") else {
+            throw NSError(domain: "ClassWire.ResourceCreation", code: 403,
+                userInfo: [NSLocalizedDescriptionKey: "Schoology does not allow this account to create resource collections."])
+        }
+        _ = try await api.postJSON("collections", auth: auth, body: ["title": cleanTitle])
+    }
+
+    func createResourceTemplate(
+        collectionID: String,
+        title: String,
+        type: String,
+        body: String,
+        notes: String,
+        linkURL: String,
+        maxPoints: Int
+    ) async throws {
+        guard let auth else { throw SchoologyAPIError.notSignedIn }
+        let cleanTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanBody = body.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanNotes = notes.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleanTitle.isEmpty, ["page", "discussion", "assignment", "document"].contains(type) else {
+            throw SchoologyAPIError.invalidResponse
+        }
+        let path = "/v1/collections/\(collectionID)/resources"
+        let permissions = try await api.postMultiOptions([path], auth: auth)
+        guard Self.postableLocations(permissions).contains(path) else {
+            throw NSError(domain: "ClassWire.ResourceCreation", code: 403,
+                userInfo: [NSLocalizedDescriptionKey: "Schoology does not allow this account to add resources to the selected collection."])
+        }
+        var templateFields: [String: Any] = [:]
+        var payload: [String: Any] = ["title": cleanTitle, "type": type, "resource_notes": cleanNotes]
+        switch type {
+        case "page", "discussion":
+            templateFields["body"] = cleanBody
+        case "assignment":
+            templateFields["body"] = cleanBody
+            templateFields["max_points"] = max(0, maxPoints)
+        case "document":
+            guard let url = URL(string: linkURL.trimmingCharacters(in: .whitespacesAndNewlines)),
+                  ["http", "https"].contains(url.scheme?.lowercased() ?? "") else {
+                throw NSError(domain: "ClassWire.ResourceCreation", code: 400,
+                    userInfo: [NSLocalizedDescriptionKey: "Enter a valid HTTP or HTTPS link for this document."])
+            }
+            templateFields["document_type"] = "link"
+            payload["attachments"] = [["url": url.absoluteString]]
+        default: throw SchoologyAPIError.invalidResponse
+        }
+        payload["template_fields"] = templateFields
+        _ = try await api.postJSON("collections/\(collectionID)/resources", auth: auth, body: payload)
+    }
+
+    private static func postableLocations(_ data: Data) -> Set<String> {
+        let root = Self.object(data)
+        let rows = (root["response"] as? [[String: Any]]) ?? (root["responses"] as? [[String: Any]]) ?? []
+        return Set(rows.compactMap { row in
+            guard let location = row["location"] as? String else { return nil }
+            let body = String(describing: row["body"] ?? "").lowercased()
+            return body.range(of: #"\\bpost\\b"#, options: .regularExpression) != nil ? location : nil
+        })
     }
 
     private func loadResourceCollections(

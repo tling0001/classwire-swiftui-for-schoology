@@ -42,7 +42,7 @@ struct DestinationView: View {
         }
         .toolbar {
             if destination != .aiAssistant && destination != .messages && destination != .notifications && destination != .profile {
-                ToolbarItem(placement: .primaryAction) {
+                ToolbarItem(placement: destination == .resources ? .secondaryAction : .primaryAction) {
                     Button {
                         Task {
                             switch destination {

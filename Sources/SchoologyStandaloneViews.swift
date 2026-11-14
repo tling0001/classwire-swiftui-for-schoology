@@ -3,6 +3,7 @@ import SwiftUI
 struct SchoologyResourcesView: View {
     @Environment(AppSession.self) private var session
     @State private var expanded: Set<SchoologyResourceCategory> = [.mine, .shared, .groups, .apps]
+    @State private var creationMode: SchoologyResourceCreationMode?
 
     var body: some View {
         Group {
@@ -72,6 +73,28 @@ struct SchoologyResourcesView: View {
         }
         .task { await session.loadResources() }
         .refreshable { await session.loadResources(force: true) }
+        .toolbar {
+            if session.canCreateResourceCollection || !session.creatableResourceCollections.isEmpty {
+                ToolbarItem(placement: .primaryAction) {
+                    Menu {
+                        if session.canCreateResourceCollection {
+                            Button("New Collection", systemImage: "folder.badge.plus") { creationMode = .collection }
+                        }
+                        if !session.creatableResourceCollections.isEmpty {
+                            Button("New Resource", systemImage: "doc.badge.plus") { creationMode = .resource }
+                        }
+                    } label: {
+                        Label("Create", systemImage: "plus")
+                    }
+                    .accessibilityLabel("Create resource or collection")
+                }
+            }
+        }
+        .sheet(item: $creationMode) { mode in
+            SchoologyResourceCreationSheet(mode: mode, collections: session.creatableResourceCollections) {
+                await session.loadResources(force: true)
+            }
+        }
     }
 
     private func collectionSymbol(_ item: SchoologyResourceCollection) -> String {
@@ -121,6 +144,7 @@ private struct SchoologyResourceCollectionView: View {
     @State private var items: [SchoologyProfileItem] = []
     @State private var loading = true
     @State private var error: String?
+    @State private var creationMode: SchoologyResourceCreationMode?
 
     var body: some View {
         SchoologyResourcesContentView(
@@ -135,6 +159,19 @@ private struct SchoologyResourceCollectionView: View {
         }
         .navigationTitle(collection.title)
         .task { await load() }
+        .toolbar {
+            if session.canCreateResource(in: collection.id) {
+                ToolbarItem(placement: .primaryAction) {
+                    Button("Create Resource", systemImage: "plus") { creationMode = .resource }
+                        .accessibilityLabel("Create resource in \(collection.title)")
+                }
+            }
+        }
+        .sheet(item: $creationMode) { mode in
+            SchoologyResourceCreationSheet(mode: mode, collections: [collection], preferredCollectionID: collection.id) {
+                await load()
+            }
+        }
     }
 
     private func load() async {
