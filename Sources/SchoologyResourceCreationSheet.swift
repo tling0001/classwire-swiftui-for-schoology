@@ -182,7 +182,7 @@ struct SchoologyResourceCreationSheet: View {
     private var navigationTitle: String {
         switch mode {
         case .collection: "New Collection"
-        case .resource: "New File or Link"
+        case .resource: "New Resource Item"
         case .folder: "New Folder"
         }
     }

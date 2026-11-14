@@ -1,3 +1,13 @@
+## [2026.10.0-port.152]
+
+### Resource creation consistency
+- Standardize the resource-item action and creation-sheet title as **New Resource Item** across the SwiftUI port.
+- Keep New Folder as a distinct action and preserve the unified resource type picker with matching fields for pages, discussions, assignments, links, files, videos, and embeds.
+- Retain the native plus primary action and descriptive VoiceOver labels; use Apple's semantic primary-action placement so iPhone/iPad put it at the trailing navigation-bar edge and macOS uses its native toolbar placement.
+
+### Build
+- Increment the app marketing version to `2026.10.152` and build number to `152`.
+
 ## [2026.10.0-port.151]
 
 ### Resource creation actions
