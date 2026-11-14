@@ -16,7 +16,9 @@ struct SchoologyResourcesContentView: View {
     let emptyTitle: String
     let emptyDescription: String
     var selection: Binding<[String: SchoologyPickedResource]>? = nil
+    var onCreateInFolder: ((String, SchoologyResourceCreationMode) -> Void)? = nil
     let onRefresh: () async -> Void
+    @State private var editingItem: SchoologyProfileItem?
 
     var body: some View {
         Group {
@@ -29,7 +31,7 @@ struct SchoologyResourcesContentView: View {
             } else {
                 List {
                     ForEach(items) { item in
-                        SchoologyInlineResourceItemRow(item: item, source: source, collection: collection, selection: selection)
+                        SchoologyInlineResourceItemRow(item: item, source: source, collection: collection, selection: selection, onEdit: { editingItem = $0 }, onCreateInFolder: onCreateInFolder)
                     }
                 }
                 .schoologyInsetGroupedListStyle()
@@ -39,11 +41,16 @@ struct SchoologyResourcesContentView: View {
             }
         }
         .refreshable { await onRefresh() }
+        .sheet(item: $editingItem) { item in
+            if let collection {
+                SchoologyResourceEditSheet(item: item, collectionID: collection.id) { await onRefresh() }
+            }
+        }
     }
 }
 
 /// Shared recursive row for group resources, collections, the standalone Resources
-/// page, and the resource picker. Collection folders navigate; picker folders remain expandable.
+/// page, and the resource picker. Collections navigate; folders remain recursively expandable.
 struct SchoologyInlineResourceItemRow: View {
     @Environment(AppSession.self) private var session
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -51,24 +58,18 @@ struct SchoologyInlineResourceItemRow: View {
     let source: SchoologyResourceBrowserSource
     var collection: SchoologyResourceCollection? = nil
     var selection: Binding<[String: SchoologyPickedResource]>? = nil
+    var onEdit: ((SchoologyProfileItem) -> Void)? = nil
+    var onCreateInFolder: ((String, SchoologyResourceCreationMode) -> Void)? = nil
+    @State private var canEditResource = false
     @State private var isExpanded = false
     @State private var children: [SchoologyProfileItem]?
     @State private var isLoading = false
     @State private var loadError: String?
 
     var body: some View {
+        Group {
         if item.isFolder {
-            if selection == nil, let collection {
-                NavigationLink {
-                    SchoologyResourceFolderView(collection: collection, folder: item)
-                } label: {
-                    folderNavigationLabel
-                }
-                .disabled(!item.isAvailable)
-                .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
-            } else {
-                folderRow
-            }
+            folderRow
         } else if let selection {
             selectableItemRow(selection)
                 .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
@@ -78,30 +79,17 @@ struct SchoologyInlineResourceItemRow: View {
         } else {
             resourceItemRow
                 .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
-        }
-    }
-
-    private var folderNavigationLabel: some View {
-        HStack(alignment: .center, spacing: 9) {
-            Image(systemName: "folder.fill")
-                .foregroundStyle(folderTint)
-                .frame(width: 20)
-                .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 3) {
-                Text(item.title).font(.body)
-                if !item.body.isEmpty {
-                    Text(item.body)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(nil)
-                        .fixedSize(horizontal: false, vertical: true)
+                .contextMenu {
+                    if canEditResource, let onEdit {
+                        Button("Edit", systemImage: "pencil") { onEdit(item) }
+                    }
                 }
-                SchoologyCourseMaterialStatusLabel(item: item)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-        .contentShape(Rectangle())
+        }
+        .task(id: "\(collection?.id ?? ""):\(item.id)") {
+            guard selection == nil, let collection else { return }
+            canEditResource = await session.canEditResourceTemplate(collectionID: collection.id, resourceID: item.id)
+        }
     }
 
     private var folderRow: some View {
@@ -128,7 +116,7 @@ struct SchoologyInlineResourceItemRow: View {
                     .transition(.opacity.combined(with: .move(edge: .top)))
             } else if let children {
                 ForEach(children) { child in
-                    SchoologyInlineResourceItemRow(item: child, source: source, collection: collection, selection: selection)
+                    SchoologyInlineResourceItemRow(item: child, source: source, collection: collection, selection: selection, onEdit: onEdit, onCreateInFolder: onCreateInFolder)
                         .transition(.opacity.combined(with: .move(edge: .top)))
                 }
             }
@@ -161,6 +149,15 @@ struct SchoologyInlineResourceItemRow: View {
         .onChange(of: isExpanded) { _, expanded in
             guard expanded, children == nil, !isLoading else { return }
             Task { await loadChildren() }
+        }
+        .contextMenu {
+            if canEditResource, let onEdit {
+                Button("Edit", systemImage: "pencil") { onEdit(item) }
+            }
+            if let collection, session.canCreateResource(in: collection.id), let onCreateInFolder {
+                Button("New Resource Item", systemImage: "doc.badge.plus") { onCreateInFolder(item.id, .resource) }
+                Button("New Folder", systemImage: "folder.badge.plus") { onCreateInFolder(item.id, .folder) }
+            }
         }
     }
 

@@ -898,6 +898,80 @@ final class AppSession {
         creatableResourceCollectionIDs.contains(collectionID)
     }
 
+    func canEditResourceTemplate(collectionID: String, resourceID: String) async -> Bool {
+        guard let auth else { return false }
+        let path = "/v1/collections/\(collectionID)/resources/\(resourceID)"
+        do {
+            let data = try await api.postMultiOptions([path], auth: auth)
+            return Self.methodAllowedLocations(data, method: "put").contains(path)
+        } catch { return false }
+    }
+
+    func updateResourceTemplate(
+        collectionID: String, item: SchoologyProfileItem, title: String,
+        body: String, notes: String, folderColor: String
+    ) async throws {
+        guard let auth else { throw SchoologyAPIError.notSignedIn }
+        let cleanTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleanTitle.isEmpty,
+              var payload = (try? JSONSerialization.jsonObject(with: item.rawJSON)) as? [String: Any] else {
+            throw SchoologyAPIError.invalidResponse
+        }
+        let path = "/v1/collections/\(collectionID)/resources/\(item.id)"
+        let permissions = try await api.postMultiOptions([path], auth: auth)
+        guard Self.methodAllowedLocations(permissions, method: "put").contains(path) else {
+            throw NSError(domain: "ClassWire.ResourceEditing", code: 403,
+                userInfo: [NSLocalizedDescriptionKey: "Schoology does not currently grant permission to edit this resource."])
+        }
+        for key in ["id", "collection_id", "uid", "created", "last_updated", "links"] {
+            payload.removeValue(forKey: key)
+        }
+        payload["title"] = cleanTitle
+        payload["resource_notes"] = notes.trimmingCharacters(in: .whitespacesAndNewlines)
+        if var fields = payload["template_fields"] as? [String: Any], fields["body"] != nil {
+            fields["body"] = body
+            payload["template_fields"] = fields
+        }
+        if item.isFolder {
+            let colors = ["black", "blue", "gray", "green", "orange", "pink", "purple", "red", "yellow"]
+            payload["color"] = colors.contains(folderColor) ? folderColor : item.folderColor
+        }
+        if let attachments = payload["attachments"] ?? payload["attachment"] {
+            payload["attachments"] = Self.resourceAttachmentPutValue(attachments)
+            payload.removeValue(forKey: "attachment")
+        }
+        let payloadData = try JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys])
+        _ = try await api.putJSONData(
+            "collections/\(collectionID)/resources/\(item.id)", auth: auth, bodyData: payloadData
+        )
+    }
+
+    private static func methodAllowedLocations(_ data: Data, method: String) -> Set<String> {
+        let root = Self.object(data)
+        let rows = (root["response"] as? [[String: Any]]) ?? (root["responses"] as? [[String: Any]]) ?? []
+        let pattern = "\\b\(NSRegularExpression.escapedPattern(for: method))\\b"
+        return Set(rows.compactMap { row in
+            guard let location = row["location"] as? String else { return nil }
+            let body = String(describing: row["body"] ?? "").lowercased()
+            return body.range(of: pattern, options: .regularExpression) != nil ? location : nil
+        })
+    }
+
+    private static func resourceAttachmentPutValue(_ value: Any) -> Any {
+        if let list = value as? [[String: Any]] { return list }
+        guard let groups = value as? [String: Any] else { return value }
+        var result: [[String: Any]] = []
+        for groupValue in groups.values {
+            if let list = groupValue as? [[String: Any]] { result.append(contentsOf: list); continue }
+            guard let group = groupValue as? [String: Any] else { continue }
+            for rawValue in group.values {
+                if let list = rawValue as? [[String: Any]] { result.append(contentsOf: list) }
+                else if let attachment = rawValue as? [String: Any] { result.append(attachment) }
+            }
+        }
+        return result.isEmpty ? value : result
+    }
+
     func createResourceCollection(title: String) async throws {
         guard let auth else { throw SchoologyAPIError.notSignedIn }
         let cleanTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)

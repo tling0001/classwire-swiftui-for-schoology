@@ -25,6 +25,7 @@ struct SchoologyProfileItem: Identifiable, Sendable {
     var isAvailable: Bool = true
     var hasCompletionRules: Bool = false
     var isCompleted: Bool? = nil
+    var rawJSON: Data = Data()
 
     var isFolder: Bool { kind.lowercased() == "folder" || documentType.lowercased() == "folder" }
 
@@ -169,7 +170,8 @@ struct SchoologyProfileItem: Identifiable, Sendable {
                 folderColor: folderColor,
                 isAvailable: isAvailable,
                 hasCompletionRules: hasCompletionRules,
-                isCompleted: isCompleted
+                isCompleted: isCompleted,
+                rawJSON: (try? JSONSerialization.data(withJSONObject: item, options: [.fragmentsAllowed])) ?? Data()
             )
         }
     }

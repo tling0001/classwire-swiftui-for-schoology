@@ -1,3 +1,15 @@
+## [2026.10.0-port.157] - 2026-11-14
+
+### Resource navigation and editing
+- Keep collections as navigation destinations while restoring recursively expandable inline folder rows inside each collection.
+- Preserve nested folder creation through each folder's native context menu.
+- Add permission-checked resource and folder editing for title, notes, body, and folder color.
+- Retain the original resource fields and existing attachment identifiers when saving edits; only show Edit when Schoology's live multioptions response grants PUT access.
+- Use cross-platform semantic toolbar placement for iOS, iPadOS, and macOS.
+
+### Build
+- Increment the SwiftUI port version to `2026.10.0-port.157`.
+
 ## [2026.10.0-port.156] - 2026-11-14
 
 ### Nested resource folders

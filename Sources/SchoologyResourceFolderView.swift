@@ -28,7 +28,7 @@ struct SchoologyResourceFolderView: View {
         .navigationTitle(folder.title)
         .task(id: "\(collection.id):\(folder.id)") { await load() }
         .toolbar {
-            ToolbarItemGroup(placement: .topBarTrailing) {
+            ToolbarItemGroup(placement: .automatic) {
                 Button("Refresh", systemImage: "arrow.clockwise") {
                     Task { await load() }
                 }

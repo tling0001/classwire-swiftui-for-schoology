@@ -74,7 +74,7 @@ struct SchoologyResourcesView: View {
         .task { await session.loadResources() }
         .refreshable { await session.loadResources(force: true) }
         .toolbar {
-            ToolbarItemGroup(placement: .topBarTrailing) {
+            ToolbarItemGroup(placement: .automatic) {
                 Button("Refresh", systemImage: "arrow.clockwise") {
                     Task { await session.loadResources(force: true) }
                 }
@@ -150,6 +150,7 @@ private struct SchoologyResourceCollectionView: View {
     @State private var loading = true
     @State private var error: String?
     @State private var creationMode: SchoologyResourceCreationMode?
+    @State private var creationFolderID: String?
 
     var body: some View {
         SchoologyResourcesContentView(
@@ -159,14 +160,18 @@ private struct SchoologyResourceCollectionView: View {
             isLoading: loading,
             error: error,
             emptyTitle: "No resources",
-            emptyDescription: "This collection is empty."
+            emptyDescription: "This collection is empty.",
+            onCreateInFolder: { folderID, mode in
+                creationFolderID = folderID
+                creationMode = mode
+            }
         ) {
             await load()
         }
         .navigationTitle(collection.title)
         .task { await load() }
         .toolbar {
-            ToolbarItemGroup(placement: .topBarTrailing) {
+            ToolbarItemGroup(placement: .automatic) {
                 Button("Refresh", systemImage: "arrow.clockwise") {
                     Task { await load() }
                 }
@@ -187,7 +192,7 @@ private struct SchoologyResourceCollectionView: View {
                 mode: mode,
                 collections: [collection],
                 preferredCollectionID: collection.id,
-                preferredFolderID: collection.folderID
+                preferredFolderID: creationFolderID ?? collection.folderID
             ) {
                 await load()
             }

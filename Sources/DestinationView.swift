@@ -131,7 +131,7 @@ struct HomeView: View {
         }
         .refreshable { await refreshHome() }
         .toolbar {
-            ToolbarItemGroup(placement: .topBarTrailing) {
+            ToolbarItemGroup(placement: .automatic) {
                 Menu {
                     if !postableDestinations.isEmpty { Button("Post Update", systemImage: "square.and.pencil") { presentedComposer = .update } }
                     if createDestinations.contains(where: \.canCreateDiscussion) { Button("Discussion", systemImage: "text.bubble") { presentedComposer = .discussion } }
