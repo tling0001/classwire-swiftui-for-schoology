@@ -26,6 +26,7 @@ struct SchoologyProfileItem: Identifiable, Sendable {
     var hasCompletionRules: Bool = false
     var isCompleted: Bool? = nil
     var rawJSON: Data = Data()
+    var attachments: [SchoologyAttachment] = []
 
     var isFolder: Bool { kind.lowercased() == "folder" || documentType.lowercased() == "folder" }
 
@@ -166,6 +167,7 @@ struct SchoologyProfileItem: Identifiable, Sendable {
                 fileViewURL: fileViewURL,
                 fileName: fileName,
                 fileMIME: fileMIME,
+                attachments: SchoologyAttachment.decodeList(attachmentValue),
                 documentType: documentType,
                 folderColor: folderColor,
                 isAvailable: isAvailable,

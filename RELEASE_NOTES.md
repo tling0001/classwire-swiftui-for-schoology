@@ -1,3 +1,13 @@
+## [2026.10.0-port.160] - 2026-11-14
+
+### Resources and toolbar refresh
+- Restore normalized attachment metadata on resource profile items so resource file, link, embed, and external-tool rows can use the shared attachment preview/opening behavior.
+- Give the Resources and collection refresh commands explicit trailing navigation-bar placement on iPhone, with a fixed-size progress indicator replacing the refresh symbol while loading.
+- Keep refresh actions disabled during active requests and expose the refreshing state to assistive technologies.
+
+### Build
+- Increment the SwiftUI port version to `2026.10.0-port.160`.
+
 ## [2026.10.0-port.159] - 2026-11-14
 
 ### Resource loading and attachment opening

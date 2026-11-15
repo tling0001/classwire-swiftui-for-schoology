@@ -71,16 +71,25 @@ struct SchoologyResourcesView: View {
         .task { await session.loadResources() }
         .refreshable { await session.loadResources(force: true) }
         .toolbar {
-            ToolbarItemGroup(placement: .automatic) {
+            ToolbarItem(placement: .topBarTrailing) {
                 Button {
                     Task { await session.loadResources(force: true) }
                 } label: {
-                    if session.isLoadingResources { ProgressView().controlSize(.small) }
-                    else { Label("Refresh", systemImage: "arrow.clockwise") }
+                    Group {
+                        if session.isLoadingResources {
+                            ProgressView().controlSize(.small)
+                        } else {
+                            Image(systemName: "arrow.clockwise")
+                        }
+                    }
+                    .frame(width: 24, height: 24)
                 }
-                .accessibilityLabel("Refresh")
+                .accessibilityLabel("Refresh resources")
+                .accessibilityValue(session.isLoadingResources ? "Refreshing" : "")
                 .disabled(session.isLoadingResources)
-                if session.canCreateResourceCollection || !session.creatableResourceCollections.isEmpty {
+            }
+            if session.canCreateResourceCollection || !session.creatableResourceCollections.isEmpty {
+                ToolbarItem(placement: .topBarTrailing) {
                     Menu {
                         if session.canCreateResourceCollection {
                             Button("New Collection", systemImage: "folder.badge.plus") { creationMode = .collection }
@@ -172,16 +181,25 @@ private struct SchoologyResourceCollectionView: View {
         .navigationTitle(collection.title)
         .task { await load() }
         .toolbar {
-            ToolbarItemGroup(placement: .automatic) {
+            ToolbarItem(placement: .topBarTrailing) {
                 Button {
                     Task { await load() }
                 } label: {
-                    if loading { ProgressView().controlSize(.small) }
-                    else { Label("Refresh", systemImage: "arrow.clockwise") }
+                    Group {
+                        if loading {
+                            ProgressView().controlSize(.small)
+                        } else {
+                            Image(systemName: "arrow.clockwise")
+                        }
+                    }
+                    .frame(width: 24, height: 24)
                 }
-                .accessibilityLabel("Refresh")
+                .accessibilityLabel("Refresh resources")
+                .accessibilityValue(loading ? "Refreshing" : "")
                 .disabled(loading)
-                if session.canCreateResource(in: collection.id) {
+            }
+            if session.canCreateResource(in: collection.id) {
+                ToolbarItem(placement: .topBarTrailing) {
                     Menu {
                         Button("New Resource Item", systemImage: "doc.badge.plus") { creationMode = .resource }
                         Button("New Folder", systemImage: "folder.badge.plus") { creationMode = .folder }
