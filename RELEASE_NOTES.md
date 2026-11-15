@@ -1,3 +1,15 @@
+## [2026.10.0-port.162] - 2026-11-15
+
+### Unify group creation composers
+- Route group updates through the shared rich-text update composer used by courses and Home, including the shared attachment and resource pickers.
+- Route group discussions and events through the shared Home create composer, retaining the selected group destination and the group's confirmed create permissions.
+- Keep the specialized album and resource-ID flows, which do not have equivalent shared composers elsewhere in the app.
+- Preserve the single group sheet presenter and refresh the active group tab after a successful creation.
+- Remove the duplicate minimal update, discussion, and event forms so group creation no longer diverges from the shared composer experience.
+
+### Build
+- Increment the iOS and macOS marketing version to 2026.10.162 and build number to 162.
+
 ## [2026.10.0-port.161] - 2026-11-14
 
 ### Fix SwiftUI archive errors and resource refresh toolbar

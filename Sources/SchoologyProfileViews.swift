@@ -60,8 +60,36 @@ struct GroupProfileView: View {
         .task { await load() }
         .onChange(of: tab) { _, selected in Task { await loadTab(selected) } }
         .sheet(item: $presentedAction) { action in
-            GroupProfileActionSheet(groupID: group.id, action: action) {
-                Task { await loadTab(tab, force: true) }
+            switch action {
+            case .update:
+                SchoologyUpdateComposerView(destinations: [
+                    SchoologyUpdateDestination(
+                        realm: "groups",
+                        resourceID: group.id,
+                        title: profile?.group.title ?? group.title
+                    )
+                ]) {
+                    Task { await loadTab(tab, force: true) }
+                }
+            case .discussion, .event:
+                SchoologyHomeCreateComposerView(
+                    destinations: [
+                        SchoologyHomeCreateDestination(
+                            realm: "groups",
+                            resourceID: group.id,
+                            title: profile?.group.title ?? group.title,
+                            canCreateDiscussion: profile?.permissions.canCreateDiscussion ?? false,
+                            canCreateEvent: profile?.permissions.canCreateEvent ?? false
+                        )
+                    ],
+                    action: action == .discussion ? .discussion : .event
+                ) {
+                    Task { await loadTab(tab, force: true) }
+                }
+            case .album, .resource:
+                GroupProfileActionSheet(groupID: group.id, action: action) {
+                    Task { await loadTab(tab, force: true) }
+                }
             }
         }
     }
