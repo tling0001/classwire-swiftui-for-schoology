@@ -1,3 +1,13 @@
+## [2026.10.0-port.163] - 2026-11-15
+
+### Expand likes sheets to available height
+- Remove the fixed 520-point height limit from the likes list so it can fill the presented sheet instead of leaving unused vertical space.
+- Let loading, empty, and error states expand within the available sheet area while retaining the system large-sheet presentation.
+- Keep list row sizing and native navigation presentation unchanged.
+
+### Build
+- Increment the iOS and macOS marketing version to 2026.10.163 and build number to 163.
+
 ## [2026.10.0-port.162] - 2026-11-15
 
 ### Unify group creation composers

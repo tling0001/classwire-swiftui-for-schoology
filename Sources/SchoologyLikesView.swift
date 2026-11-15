@@ -13,12 +13,13 @@ struct SchoologyLikesView: View {
         Group {
             if isLoading {
                 ProgressView("Loading likes…")
-                    .padding(36)
-                    .frame(maxWidth: .infinity)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if let errorMessage {
                 ContentUnavailableView("Unable to load likes", systemImage: "exclamationmark.triangle", description: Text(errorMessage))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if users.isEmpty {
                 ContentUnavailableView("No likes yet", systemImage: "hand.thumbsup")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 0) {
@@ -49,9 +50,10 @@ struct SchoologyLikesView: View {
                     }
                     .padding(.vertical, 8)
                 }
-                .frame(maxHeight: 520)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .navigationTitle("Likes")
         #if os(macOS)
         .toolbar {
