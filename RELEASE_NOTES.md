@@ -1,3 +1,15 @@
+## [2026.10.0-port.159] - 2026-11-14
+
+### Resource loading and attachment opening
+- Move resource refresh progress into the navigation/title-bar refresh control and remove duplicate page-level loading indicators.
+- Prefer normalized resource attachment metadata for files, links, embeds, and external tools, while retaining legacy resource-field fallbacks.
+- Preserve original filenames for downloads and use native URL opening for link and external destinations.
+- Keep playable audio/video on its original authenticated URL; use converted downloads for document previews only when conversion is ready.
+- Avoid selecting a converted file as a preview while its conversion status is pending.
+
+### Build
+- Increment the SwiftUI port version to `2026.10.0-port.159`.
+
 ## [2026.10.0-port.158] - 2026-11-14
 
 ### Attachment metadata and decoding

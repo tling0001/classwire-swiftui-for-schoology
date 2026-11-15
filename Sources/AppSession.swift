@@ -1171,7 +1171,7 @@ final class AppSession {
             return destination
         }
         guard let auth else { throw SchoologyAPIError.notSignedIn }
-        let sourceURL = forViewing ? attachment.previewDownloadURL : attachment.originalURL
+        let sourceURL = forViewing ? (attachment.viewURL ?? attachment.url) : attachment.url
         // File downloads may require the authenticated web session from /v1/sessionstart.
         let cookies = try await api.webSessionCookies(auth: auth)
         let isHTMLAttachment = ["html", "htm"].contains(attachment.fileExtension)
@@ -1186,21 +1186,19 @@ final class AppSession {
             .appendingPathComponent("SchoologyAttachments", isDirectory: true)
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        let isConvertedPreview = forViewing && (sourceURL == attachment.convertedDownloadURL || sourceURL == attachment.viewURL)
-        let preferredName = isConvertedPreview && !attachment.convertedFileName.isEmpty
-            ? attachment.convertedFileName
-            : (attachment.fileName.isEmpty ? attachment.title : attachment.fileName)
-        let suppliedName = preferredName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let suppliedName = attachment.title.trimmingCharacters(in: .whitespacesAndNewlines)
         let candidate = suppliedName.isEmpty || suppliedName == "Attachment"
             ? sourceURL.lastPathComponent
             : suppliedName
         var filename = URL(fileURLWithPath: candidate).lastPathComponent
             .replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: ":", with: "_")
         if filename.isEmpty || filename == "." { filename = "Attachment" }
-        if URL(fileURLWithPath: filename).pathExtension.isEmpty {
+        if forViewing, attachment.viewURL != nil {
+            let base = URL(fileURLWithPath: filename).deletingPathExtension().lastPathComponent
+            filename = base + ".pdf"
+        } else if URL(fileURLWithPath: filename).pathExtension.isEmpty {
             let ext = sourceURL.pathExtension
             if !ext.isEmpty { filename += "." + ext }
-            else if isConvertedPreview && attachment.convertedMimeType.lowercased().contains("pdf") { filename += ".pdf" }
             else if mimeType.lowercased().contains("pdf") { filename += ".pdf" }
         }
         let destination = directory.appendingPathComponent(filename)

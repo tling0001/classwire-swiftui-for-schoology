@@ -26,7 +26,6 @@ struct SchoologyProfileItem: Identifiable, Sendable {
     var hasCompletionRules: Bool = false
     var isCompleted: Bool? = nil
     var rawJSON: Data = Data()
-    var attachments: [SchoologyAttachment] = []
 
     var isFolder: Bool { kind.lowercased() == "folder" || documentType.lowercased() == "folder" }
 
@@ -79,7 +78,6 @@ struct SchoologyProfileItem: Identifiable, Sendable {
             let normalizedRole = roleText.lowercased().replacingOccurrences(of: "_", with: " ").replacingOccurrences(of: "-", with: " ")
             let isAdmin = adminFlags.contains(where: { SchoologyValue.bool($0) }) || ["admin", "administrator", "owner"].contains { normalizedRole.contains($0) }
             let attachmentValue = item["attachments"] ?? item["attachment"]
-            let normalizedAttachments = SchoologyAttachment.decodeList(attachmentValue)
             let file = SchoologyValue.list(attachmentValue, keys: ["files", "file", "items"]).first ?? item
             let link = SchoologyValue.list(attachmentValue, keys: ["links", "link", "items"]).first ?? [:]
             let embed = SchoologyValue.list(attachmentValue, keys: ["embeds", "embed", "items"]).first ?? [:]
@@ -173,8 +171,7 @@ struct SchoologyProfileItem: Identifiable, Sendable {
                 isAvailable: isAvailable,
                 hasCompletionRules: hasCompletionRules,
                 isCompleted: isCompleted,
-                rawJSON: (try? JSONSerialization.data(withJSONObject: item, options: [.fragmentsAllowed])) ?? Data(),
-                attachments: normalizedAttachments
+                rawJSON: (try? JSONSerialization.data(withJSONObject: item, options: [.fragmentsAllowed])) ?? Data()
             )
         }
     }

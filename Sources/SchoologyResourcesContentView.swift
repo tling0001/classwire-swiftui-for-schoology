@@ -212,7 +212,26 @@ struct SchoologyInlineResourceItemRow: View {
 
     @ViewBuilder
     private var resourceItemRow: some View {
-        if item.documentType.lowercased() == "external_tool", let url = item.url ?? item.fileViewURL {
+        if let attachment, attachment.kind == "external_tool", let url = attachment.externalDestinationURL {
+            NavigationLink {
+                SchoologyEmbeddedWebView(url: url, title: item.title)
+            } label: {
+                resourceRowLabel
+            }
+            .disabled(!item.isAvailable)
+        } else if let attachment, attachment.kind == "embed", let url = attachment.externalDestinationURL {
+            NavigationLink {
+                SchoologyEmbeddedWebView(url: url, title: item.title)
+            } label: {
+                resourceRowLabel
+            }
+            .disabled(!item.isAvailable)
+        } else if let attachment, let url = attachment.linkDestinationURL {
+            Link(destination: url) {
+                resourceRowLabel
+            }
+            .disabled(!item.isAvailable)
+        } else if item.documentType.lowercased() == "external_tool", let url = item.url ?? item.fileViewURL {
             NavigationLink {
                 SchoologyEmbeddedWebView(url: url, title: item.title)
             } label: {
@@ -277,7 +296,8 @@ struct SchoologyInlineResourceItemRow: View {
     private var isLinkMaterial: Bool {
         let kind = item.kind.lowercased()
         let documentType = item.documentType.lowercased()
-        return documentType == "link" || documentType == "external_tool" || kind.contains("link")
+        return attachment?.isLink == true || attachment?.kind == "external_tool" ||
+            documentType == "link" || documentType == "external_tool" || kind.contains("link")
     }
 
     private var isFileMaterial: Bool {
@@ -290,6 +310,7 @@ struct SchoologyInlineResourceItemRow: View {
     }
 
     private var attachment: SchoologyAttachment? {
+        if let normalized = item.attachments.first { return normalized }
         guard let url = item.url ?? item.fileViewURL else { return nil }
         let kind = item.kind.lowercased()
         let isFile = item.fileViewURL != nil || !item.fileMIME.isEmpty ||
@@ -298,7 +319,11 @@ struct SchoologyInlineResourceItemRow: View {
         return SchoologyAttachment(
             title: item.fileName.isEmpty ? item.title : item.fileName,
             url: url,
-            viewURL: item.fileViewURL == url ? nil : item.fileViewURL
+            viewURL: item.fileViewURL == url ? nil : item.fileViewURL,
+            fileName: item.fileName,
+            mimeType: item.fileMIME,
+            originalDownloadURL: item.url,
+            convertedDownloadURL: item.fileViewURL == url ? nil : item.fileViewURL
         )
     }
 

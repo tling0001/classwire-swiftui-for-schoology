@@ -29,14 +29,14 @@ struct SchoologyAttachmentPreviewButton: View {
     @State private var isPresented = false
     var body: some View {
         Button {
-            if attachment.isLink {
-                openURL(attachment.url)
+            if let destination = attachment.externalDestinationURL {
+                openURL(destination)
             } else {
                 isPresented = true
             }
         } label: {
             HStack(spacing: 10) {
-                Label(attachment.title, systemImage: attachment.isLink ? "link" : "paperclip")
+                Label(attachment.title, systemImage: attachment.externalDestinationURL != nil ? "link" : "paperclip")
                     .font(.subheadline)
                     .lineLimit(2)
                 Spacer(minLength: 8)
@@ -50,7 +50,7 @@ struct SchoologyAttachmentPreviewButton: View {
             .padding(.vertical, 4)
         }
         .buttonStyle(.plain)
-        .accessibilityHint(attachment.isLink ? "Opens this link in your browser" : "Opens attachment actions")
+        .accessibilityHint(attachment.externalDestinationURL != nil ? "Opens this destination" : "Opens attachment actions")
         .task {
             if automaticallyPresent && !attachment.isLink { isPresented = true }
         }
@@ -127,9 +127,9 @@ private struct SchoologyAttachmentActionRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            if attachment.isLink {
+            if let destinationURL = attachment.externalDestinationURL {
                 Button {
-                    openURL(attachment.url)
+                    openURL(destinationURL)
                 } label: {
                     Label(attachment.title, systemImage: icon)
                         .font(.subheadline.weight(.medium))
@@ -231,17 +231,18 @@ private struct SchoologyAttachmentActionRow: View {
     }
 
     private var safeFilename: String {
-        let suppliedName = attachment.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let preferredName = attachment.fileName.isEmpty ? attachment.title : attachment.fileName
+        let suppliedName = preferredName.trimmingCharacters(in: .whitespacesAndNewlines)
         let candidate = suppliedName.isEmpty || suppliedName == "Attachment"
-            ? attachment.url.lastPathComponent
+            ? attachment.originalURL.lastPathComponent
             : suppliedName
         var name = URL(fileURLWithPath: candidate).lastPathComponent
             .replacingOccurrences(of: "/", with: "_")
             .replacingOccurrences(of: ":", with: "_")
         if name.isEmpty || name == "." { name = "Attachment" }
         if URL(fileURLWithPath: name).pathExtension.isEmpty,
-           !attachment.url.pathExtension.isEmpty {
-            name += "." + attachment.url.pathExtension
+           !attachment.originalURL.pathExtension.isEmpty {
+            name += "." + attachment.originalURL.pathExtension
         }
         return name
     }

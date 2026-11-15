@@ -8,7 +8,7 @@ struct SchoologyResourcesView: View {
     var body: some View {
         Group {
             if session.isLoadingResources && !session.hasLoadedResources {
-                ProgressView("Loading resources…").frame(maxWidth: .infinity, maxHeight: .infinity)
+                ContentUnavailableView("Loading resources", systemImage: "folder", description: Text("Your resource collections will appear here."))
             } else if let error = session.resourcesError, session.resourceCollections.isEmpty && session.resourceApps.isEmpty {
                 ContentUnavailableView("Unable to load resources", systemImage: "exclamationmark.triangle", description: Text(error))
             } else {
@@ -66,18 +66,19 @@ struct SchoologyResourcesView: View {
                     }
                 }
                 .schoologyInsetGroupedListStyle()
-                .overlay(alignment: .top) {
-                    if session.isLoadingResources { ProgressView().padding(.top, 8) }
-                }
-            }
+                            }
         }
         .task { await session.loadResources() }
         .refreshable { await session.loadResources(force: true) }
         .toolbar {
             ToolbarItemGroup(placement: .automatic) {
-                Button("Refresh", systemImage: "arrow.clockwise") {
+                Button {
                     Task { await session.loadResources(force: true) }
+                } label: {
+                    if session.isLoadingResources { ProgressView().controlSize(.small) }
+                    else { Label("Refresh", systemImage: "arrow.clockwise") }
                 }
+                .accessibilityLabel("Refresh")
                 .disabled(session.isLoadingResources)
                 if session.canCreateResourceCollection || !session.creatableResourceCollections.isEmpty {
                     Menu {
@@ -172,9 +173,13 @@ private struct SchoologyResourceCollectionView: View {
         .task { await load() }
         .toolbar {
             ToolbarItemGroup(placement: .automatic) {
-                Button("Refresh", systemImage: "arrow.clockwise") {
+                Button {
                     Task { await load() }
+                } label: {
+                    if loading { ProgressView().controlSize(.small) }
+                    else { Label("Refresh", systemImage: "arrow.clockwise") }
                 }
+                .accessibilityLabel("Refresh")
                 .disabled(loading)
                 if session.canCreateResource(in: collection.id) {
                     Menu {

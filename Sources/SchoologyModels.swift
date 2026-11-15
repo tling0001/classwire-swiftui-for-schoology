@@ -115,10 +115,19 @@ struct SchoologyAttachment: Identifiable, Hashable, Sendable {
     var isPlayableMedia: Bool { isVideo || isAudio }
     var originalURL: URL { originalDownloadURL ?? url }
     var previewDownloadURL: URL {
+        // Keep playable media on its original stream; document conversions are for Quick Look.
+        if isPlayableMedia { return originalURL }
         if Self.conversionIsReady(conversionStatus), let convertedDownloadURL { return convertedDownloadURL }
         return viewURL ?? originalURL
     }
     var linkDestinationURL: URL? { linkURL ?? (isLink ? url : nil) }
+    var externalDestinationURL: URL? {
+        switch kind {
+        case "link": linkDestinationURL
+        case "external_tool", "embed": launchURL ?? linkURL ?? url
+        default: nil
+        }
+    }
 
     private static func conversionIsReady(_ status: String) -> Bool {
         ["success", "converted", "complete", "completed", "ready", "1", "true"].contains(status.trimmingCharacters(in: .whitespacesAndNewlines).lowercased())
@@ -210,7 +219,7 @@ struct SchoologyAttachment: Identifiable, Hashable, Sendable {
         let isLink = kind == "link"
         let raw = (try? JSONSerialization.data(withJSONObject: item, options: [.sortedKeys])) ?? Data()
         return SchoologyAttachment(
-            title: title, url: url, viewURL: converted, isLink: isLink, kind: kind,
+            title: title, url: url, viewURL: Self.conversionIsReady(conversion) ? converted : nil, isLink: isLink, kind: kind,
             attachmentID: attachmentID, fileMetadataID: metadataID, fileName: fileName,
             mimeType: mime, fileSize: size, originalDownloadURL: original,
             convertedDownloadURL: converted, convertedFileName: convertedName,
