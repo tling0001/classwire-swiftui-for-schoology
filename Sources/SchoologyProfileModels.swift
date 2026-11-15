@@ -167,13 +167,13 @@ struct SchoologyProfileItem: Identifiable, Sendable {
                 fileViewURL: fileViewURL,
                 fileName: fileName,
                 fileMIME: fileMIME,
-                attachments: SchoologyAttachment.decodeList(attachmentValue),
                 documentType: documentType,
                 folderColor: folderColor,
                 isAvailable: isAvailable,
                 hasCompletionRules: hasCompletionRules,
                 isCompleted: isCompleted,
-                rawJSON: (try? JSONSerialization.data(withJSONObject: item, options: [.fragmentsAllowed])) ?? Data()
+                rawJSON: (try? JSONSerialization.data(withJSONObject: item, options: [.fragmentsAllowed])) ?? Data(),
+                attachments: SchoologyAttachment.decodeList(attachmentValue)
             )
         }
     }

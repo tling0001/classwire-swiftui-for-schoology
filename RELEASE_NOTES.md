@@ -1,3 +1,20 @@
+## [2026.10.0-port.161] - 2026-11-14
+
+### Fix SwiftUI archive errors and resource refresh toolbar
+- Correct the SchoologyProfileItem initializer argument order for normalized attachment metadata.
+- Use the same cross-platform `.primaryAction` toolbar placement as other app screens; `.topBarTrailing` is unavailable to the macOS target.
+- Match the existing app-wide refresh button pattern: a standalone primary-action toolbar item swaps its refresh label for a compact progress indicator while loading. A Resources-view-owned refresh state ensures the iPhone toolbar redraws immediately instead of depending only on shared session state.
+- Keep collection refresh behavior and creation actions in their own toolbar items.
+- Increment the SwiftUI port version to `2026.10.0-port.161`.
+
+## [2026.10.0-port.161] - 2026-11-14
+
+### Fix SwiftUI archive errors and resource refresh toolbar
+- Correct the SchoologyProfileItem initializer argument order for normalized attachment metadata.
+- Use the same cross-platform `.primaryAction` toolbar placement as other app screens; `.topBarTrailing` is unavailable to the macOS target.
+- Match the existing app-wide refresh button pattern: a single primary-action toolbar item swaps its refresh label for a compact progress indicator while loading. Keep creation actions in their own toolbar item.
+- Increment the SwiftUI port version to `2026.10.0-port.161`.
+
 ## [2026.10.0-port.160] - 2026-11-14
 
 ### Resources and toolbar refresh

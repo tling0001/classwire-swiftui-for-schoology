@@ -4,6 +4,18 @@ struct SchoologyResourcesView: View {
     @Environment(AppSession.self) private var session
     @State private var expanded: Set<SchoologyResourceCategory> = [.mine, .shared, .groups, .apps]
     @State private var creationMode: SchoologyResourceCreationMode?
+    @State private var isRefreshingResources = false
+
+    private var isRefreshInProgress: Bool {
+        isRefreshingResources || session.isLoadingResources
+    }
+
+    private func refreshResources() async {
+        guard !isRefreshInProgress else { return }
+        isRefreshingResources = true
+        defer { isRefreshingResources = false }
+        await session.loadResources(force: true)
+    }
 
     var body: some View {
         Group {
@@ -69,27 +81,23 @@ struct SchoologyResourcesView: View {
                             }
         }
         .task { await session.loadResources() }
-        .refreshable { await session.loadResources(force: true) }
+        .refreshable { await refreshResources() }
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
+            ToolbarItem(placement: .primaryAction) {
                 Button {
-                    Task { await session.loadResources(force: true) }
+                    Task { await refreshResources() }
                 } label: {
-                    Group {
-                        if session.isLoadingResources {
-                            ProgressView().controlSize(.small)
-                        } else {
-                            Image(systemName: "arrow.clockwise")
-                        }
+                    if isRefreshInProgress {
+                        ProgressView().controlSize(.small)
+                    } else {
+                        Label("Refresh", systemImage: "arrow.clockwise")
                     }
-                    .frame(width: 24, height: 24)
                 }
-                .accessibilityLabel("Refresh resources")
-                .accessibilityValue(session.isLoadingResources ? "Refreshing" : "")
-                .disabled(session.isLoadingResources)
+                .accessibilityLabel("Refresh")
+                .disabled(isRefreshInProgress)
             }
             if session.canCreateResourceCollection || !session.creatableResourceCollections.isEmpty {
-                ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItem(placement: .primaryAction) {
                     Menu {
                         if session.canCreateResourceCollection {
                             Button("New Collection", systemImage: "folder.badge.plus") { creationMode = .collection }
@@ -181,25 +189,21 @@ private struct SchoologyResourceCollectionView: View {
         .navigationTitle(collection.title)
         .task { await load() }
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
+            ToolbarItem(placement: .primaryAction) {
                 Button {
                     Task { await load() }
                 } label: {
-                    Group {
-                        if loading {
-                            ProgressView().controlSize(.small)
-                        } else {
-                            Image(systemName: "arrow.clockwise")
-                        }
+                    if loading {
+                        ProgressView().controlSize(.small)
+                    } else {
+                        Label("Refresh", systemImage: "arrow.clockwise")
                     }
-                    .frame(width: 24, height: 24)
                 }
-                .accessibilityLabel("Refresh resources")
-                .accessibilityValue(loading ? "Refreshing" : "")
+                .accessibilityLabel("Refresh")
                 .disabled(loading)
             }
             if session.canCreateResource(in: collection.id) {
-                ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItem(placement: .primaryAction) {
                     Menu {
                         Button("New Resource Item", systemImage: "doc.badge.plus") { creationMode = .resource }
                         Button("New Folder", systemImage: "folder.badge.plus") { creationMode = .folder }
