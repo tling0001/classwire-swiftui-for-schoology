@@ -1,6 +1,6 @@
 # ClassWire — Native SwiftUI
 
-A native ClassWire client for **macOS, iPhone, and iPad**, built for Schoology courses and communication.
+A native ClassWire client for **macOS, iPhone, and iPad**, built for Schoology courses, coursework, and communication.
 
 ## Reference implementations
 
@@ -37,6 +37,7 @@ The project is an incremental native port. The following areas have native imple
 - OAuth 1.0 HMAC-SHA1 request signing and token exchange.
 - Canadian Schoology environment selection.
 - Session restoration and authenticated Schoology web-session cookie retrieval.
+- Parent-account learning context and student selection where Schoology exposes linked student accounts.
 
 ### Home and navigation
 
@@ -48,17 +49,32 @@ The project is an incremental native port. The following areas have native imple
 
 ### Schoology content
 
-- Recent activity posts with author information, attachments, likes, and comments.
+- Recent activity posts with author information, attachments, likes, comments, and polls.
 - Native comment threads, replies, and like actions.
 - Course, group, school, and person profile views.
 - Course materials, nested folders, pages, and course applications.
 - Schoology Resources browsing, shared/group collections, and Resource Apps.
 - Resource App importing, including files and links returned through the Schoology mobile import flow.
+- Resource and folder creation, including supported pages, discussions, assignments, links, files, videos, and embeds.
+- Permission-checked resource and folder editing that retains existing fields and attachment identifiers.
 - Assignments, assignment details, submissions, teacher/student submission views, and grading.
-- Gradebook and overall-grade summaries, including supported teacher overrides.
+- Teacher grade editing, including supported score, comment-visibility, and grade override fields.
+- Gradebook and overall-grade summaries.
 - Calendar, Upcoming events, discussions, and event details.
 - Messages with Inbox, Unread, and Sent folders, message details, attachments, and composing.
 - Notifications, notification preferences, and native push-notification registration support.
+
+### ClassWire AI
+
+- Optional assistant with provider choices for Google Gemini, OpenAI, Anthropic, Ollama, and Puter.
+- Schoology-aware tools for courses, groups, upcoming work, assignments, grades, course materials, updates, and message threads.
+- Context-aware navigation to supported Schoology destinations.
+- Drafting and proposed actions for supported assignment submissions, messages, course updates, and teacher grade changes; the user must review and explicitly confirm an action before it is sent or saved.
+- AI image generation through the supported Gemini image route and creation of text-based conversation attachments.
+- Optional Google sign-in flow for automatic Gemini Cloud project and API-key setup.
+- Conversation history stored locally on the device. Prompts, relevant Schoology context, and supported attachments are sent to the provider selected by the user; see `privacy_policy.md`.
+
+Provider capabilities, model compatibility, and account requirements vary. Ollama requires a reachable server configured by the user, and Puter requires its own account connection.
 
 ### Attachments and media
 
@@ -115,9 +131,11 @@ Never commit signing credentials, private keys, provisioning profiles, or genera
 
 ## Repository layout
 
-- `Sources/` — SwiftUI screens, Schoology models/API, session management, and platform integrations.
+- `Sources/` — SwiftUI screens, Schoology models/API, session management, AI assistant, and platform integrations.
 - `Resources/Assets.xcassets/` — app icons and bundled image assets.
 - `Config/` — platform entitlements and generated Info.plist configuration.
 - `.github/workflows/build.yml` — signed CI build and release workflow.
 - `VERSION` — current port release version.
 - `RELEASE_NOTES.md` — user-facing release history.
+- `description.md` — store/listing description.
+- `privacy_policy.md` — current privacy policy.
