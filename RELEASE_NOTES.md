@@ -1,3 +1,14 @@
+## [2026.10.0-port.176] - 2026-11-17
+
+### Administrator policies and private school OAuth
+- Add a non-TestFlight administrator control to disable app update checks, update notices, and update installation on this device.
+- Extend the sign-out-on-launch policy to clear the local Schoology session when iPadOS locks protected device data. A normal app switch does not trigger sign-out; a pending lock reset is applied on the next activation if iPadOS suspends the process.
+- Add an administrator option to use a built-in private WKWebView for school OAuth sign-in. Its nonpersistent website data store discards cookies and web sign-in state after the sheet closes.
+- Keep the existing system authentication session as the default when private built-in web sign-in is disabled.
+
+### Build
+- Increment iOS and macOS marketing version to 2026.10.176 and build number to 176.
+
 ## [2026.10.0-port.163] - 2026-11-15
 
 ### Expand likes sheets to available height
