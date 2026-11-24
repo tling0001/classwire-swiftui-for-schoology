@@ -59,7 +59,7 @@ jobs:
     name: Build, sign and notarize macOS
     runs-on: xcode-27
     steps:
-# Trigger port.195 source 0ab545fc6847b36239bb69f2cfd3f44aada97e1d from ClassWire/classwire-swiftui-for-schoology; this repository runs CI and retains logs/artifacts.
+# Trigger port.196 source a4d9fb6218b6c01617a2aef7d4bc160d157552ea from ClassWire/classwire-swiftui-for-schoology; this repository runs CI and retains logs/artifacts.
       - uses: actions/checkout@v4
         with:
           repository: ClassWire/classwire-swiftui-for-schoology
